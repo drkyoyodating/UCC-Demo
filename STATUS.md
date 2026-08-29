@@ -14,7 +14,7 @@ Repo: https://github.com/drkyoyodating/UCC-Demo · Branch `main`
 | Phase | Planned | Status | Gate | Audit | Commit | Deviations |
 |---|---|---|---|---|---|---|
 | P0 Setup | 0–0.5 | ✅ **COMPLETE** | n/a (§1.0 pre-answered) | 1 combined **PASS** | `67ebc57` | venv is `.venv/` on py3.14.7, not `ucc-venv/`; optional deps split out |
-| P1 Ingest | 0.5–2 | ✅ **COMPLETE** | auto-proceed | 1 combined | pending | acceptance test corrected mid-phase (see DECISIONS); pages landed as CSV.gz not NDJSON |
+| P1 Ingest | 0.5–2 | ✅ **COMPLETE** | auto-proceed | 1 combined **PASS-w-findings** | `e6bb419` | acceptance test corrected mid-phase (see DECISIONS); pages landed as CSV.gz not NDJSON |
 | P2 Normalizer + skeleton | 2–4 | — | auto-proceed | 1 combined | | |
 | P3 Corpora | 4–6 | — | **HARD STOP** | 1 combined | | |
 | P4 EDA | 6–7.5 | — | auto-proceed | 1 | | |

@@ -19,11 +19,20 @@ is a file-existence check rather than a claim, and any later re-projection is a
 local job instead of a second network walk. Writes are atomic (tmp + rename) so
 an interrupted fetch can never leave a short file that looks complete.
 
+NOTE ON THE SHIPPED DATA: the walk that produced the committed results used a
+single-column $order. That is provably sufficient only where the key is unique
+(debtors, secured_parties). For filings and collateral the key repeats, so the
+count match alone does NOT rule out a skip-plus-duplicate; those two tables were
+therefore verified by check_boundaries() below, which found zero tied keys
+straddling any of the 87 page boundaries. The $order for those two tables now
+carries a fileid tiebreaker so a re-run is stable by construction rather than by
+inspection. Changing $order invalidates the raw_pages cache: delete it to re-walk.
+
 Termination is ONLY on a short page. The natural `if not rows: break` reads a
 429 or a timed-out page as end-of-dataset and exits 0 on a truncated table.
 """
 from __future__ import annotations
-import argparse, gzip, os, shutil, sys, time
+import argparse, csv, gzip, io, os, sys, time
 from pathlib import Path
 import requests, duckdb
 
@@ -38,7 +47,7 @@ UA = {"User-Agent": "ucc-demo/1.0 (+https://github.com/drkyoyodating/UCC-Demo)"}
 # lifecycle columns (exclude rows the state marks deleted), and `assignor`
 # (stops one filing being double-counted under two lenders in the league table).
 TABLES = {
-    "filings": dict(ds="wffy-3uut", pk="transactionid", expected=2_587_492, cols=[
+    "filings": dict(ds="wffy-3uut", pk="transactionid", order="transactionid,fileid", expected=2_587_492, cols=[
         "transactionid","masterdocumentid","transactiontype","filingtype",
         "documenttype","filingdate","continuation","terminationflag","fileid"]),
     "debtors": dict(ds="8upq-58vz", pk="debtorid", expected=2_012_155, cols=[
@@ -47,9 +56,59 @@ TABLES = {
     "secured_parties": dict(ds="ap62-sav4", pk="spid", expected=2_082_624, cols=[
         "spid","organizationname","address1","city","state","zipcode",
         "fileid","actiontype","recordstatus","assignor"]),
-    "collateral": dict(ds="4am6-w6u4", pk="collateralid", expected=1_702_184, cols=[
+    "collateral": dict(ds="4am6-w6u4", pk="collateralid", order="collateralid,fileid", expected=1_702_184, cols=[
         "collateralid","fileid","collateraldescription","actiontype","recordstatus"]),
 }
+
+def csv_rows(body: bytes) -> int:
+    """Exact data-row count (header excluded), honouring RFC4180 quoting."""
+    if not body:
+        raise RuntimeError("empty body with no header")
+    rdr = csv.reader(io.TextIOWrapper(io.BytesIO(body), encoding="utf-8", newline=""))
+    next(rdr, None)                      # header
+    return sum(1 for _ in rdr)
+
+def page_key(body: bytes, cols: list[str], keys: list[str], first: bool):
+    """(first|last) data row's key tuple from a page, or None if the page is empty."""
+    rdr = csv.reader(io.TextIOWrapper(io.BytesIO(body), encoding="utf-8", newline=""))
+    hdr = next(rdr, None)
+    if hdr is None:
+        return None
+    idx = [hdr.index(k) for k in keys]
+    row = None
+    for row in rdr:
+        if first:
+            break
+    return tuple(row[i] for i in idx) if row else None
+
+def check_boundaries(name: str) -> list[str]:
+    """THE MONOTONICITY ASSERTION.
+
+    A two-way count match against the API proves the walk is faithful ONLY when
+    the ordered key is unique: where a key repeats, a fault that skips one row of
+    a tied group while duplicating another row elsewhere preserves both the total
+    AND the distinct count, and slips through. The defence is an ordering with no
+    ties, plus this check: across every page boundary the key must strictly
+    increase, and no tied key may straddle a boundary.
+    """
+    t = TABLES[name]
+    keys = t.get("order", t["pk"]).split(",")
+    files = sorted((RAW / name).glob("*.csv.gz"))
+    fails, prev_last = [], None
+    for f in files:
+        body = gzip.open(f, "rb").read()
+        lo = page_key(body, t["cols"], keys, first=True)
+        hi = page_key(body, t["cols"], keys, first=False)
+        if lo is None:
+            continue
+        if prev_last is not None and not (prev_last < lo):
+            fails.append(f"{name}: page boundary at {f.name} — previous page ended "
+                         f"{prev_last}, this page starts {lo}: not strictly increasing "
+                         f"(a tied key straddles the boundary; rows may be dup/skipped)")
+        prev_last = hi
+    log(f"{name}: page-boundary monotonicity checked across {len(files)} pages — "
+        f"{'OK' if not fails else str(len(fails)) + ' VIOLATIONS'}")
+    return fails
 
 def log(m: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {m}", flush=True)
@@ -76,9 +135,9 @@ def api_distinct(ds: str, col: str) -> int:
         time.sleep(2 ** a)
     raise RuntimeError(f"distinct count failed for {ds}.{col}")
 
-def fetch_page(ds: str, cols: list[str], pk: str, offset: int) -> tuple[bytes, int]:
+def fetch_page(ds: str, cols: list[str], order: str, offset: int) -> tuple[bytes, int]:
     """Returns (csv_bytes, data_row_count). Raises rather than returning short."""
-    params = {"$select": ",".join(cols), "$order": pk,
+    params = {"$select": ",".join(cols), "$order": order,
               "$limit": str(PAGE), "$offset": str(offset)}
     last = None
     for attempt in range(MAX_ATTEMPTS):
@@ -86,9 +145,10 @@ def fetch_page(ds: str, cols: list[str], pk: str, offset: int) -> tuple[bytes, i
             r = requests.get(f"{BASE}/{ds}.csv", params=params, headers=UA, timeout=TIMEOUT)
             if r.status_code == 200:
                 body = r.content
-                n = body.count(b"\n") - 1 if body else 0   # minus the header row
-                if n < 0:
-                    raise RuntimeError("empty body with no header")
+                # Exact count via a real CSV parse. A naive newline count is
+                # wrong whenever a quoted field contains an embedded newline,
+                # which organisation names in this register genuinely do.
+                n = csv_rows(body)
                 return body, n
             last = f"HTTP {r.status_code}"
             if r.status_code in (429, 500, 502, 503, 504):
@@ -116,11 +176,11 @@ def walk(name: str) -> dict:
         f = d / f"{offset:09d}.csv.gz"
         if f.exists() and f.stat().st_size > 0:          # RESUME, not restart
             with gzip.open(f, "rb") as fh:
-                n = sum(1 for _ in fh) - 1
+                n = csv_rows(fh.read())
             log(f"  offset={offset:>9,} cached rows={n:,}")
         else:
             s = time.time()
-            body, n = fetch_page(t["ds"], t["cols"], t["pk"], offset)
+            body, n = fetch_page(t["ds"], t["cols"], t.get("order", t["pk"]), offset)
             tmp = f.with_suffix(".gz.tmp")
             with gzip.open(tmp, "wb", compresslevel=6) as fh:
                 fh.write(body)
@@ -214,7 +274,7 @@ def main() -> int:
             walks[nme]["fetched"] = con.execute(
                 f"SELECT count(*) FROM {nme}").fetchone()[0]
         f_, fi_ = verify(con, nme, walks[nme])
-        fails += f_; findings += fi_
+        fails += f_ + check_boundaries(nme); findings += fi_
         out = ROOT / "parquet"; out.mkdir(exist_ok=True)
         con.execute(f"COPY {nme} TO '{out/nme}.parquet' (FORMAT parquet)")
     con.close()

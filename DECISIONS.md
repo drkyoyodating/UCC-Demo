@@ -107,7 +107,10 @@ count BELOW the API's. Both hold for all four tables, so the walk is proven clea
 **Genuine source data-quality findings (properties of Colorado's data, not of our pipeline):**
 - **`filings.transactionid` is NOT unique — 14,964 repeats (0.578%).** The real grain is
   `(transactionid, fileid)`: one transaction can act on several files. Verified example: transactionid
-  19952082638 appears against fileids 34545/34549/34552/34553, identical in every other column.
+  19952082638 appears **23 times**, against fileids 34544-34566 contiguously, identical in every other
+  column. *(An earlier revision of this file said "fileids 34545/34549/34552/34553" — that was a subset
+  of the real 23 rows, quoted from a `LIMIT 4` query, and it materially understated the example it was
+  offering as proof. Corrected after the P1 audit caught it.)*
   **Any P7 view that counts filings by transaction must respect this grain or it will undercount.**
 - **`collateral.collateralid` is NOT unique — 3,808 repeats (0.224%), and every one is a
   FULLY-IDENTICAL duplicate row.** Exact duplicates in the source. **P3's EQUIPMENT filter joins through
@@ -116,3 +119,19 @@ count BELOW the API's. Both hold for all four tables, so the walk is proven clea
 - filings additionally carries 12 fully-identical duplicate rows (0.0005%). Negligible but recorded.
 - Splink's `unique_id` therefore comes from `debtorid` / `spid`, which ARE perfectly unique (verified
   against the API) — exactly why the projection was widened before the walk.
+
+## P1 — audit response (2026-08-30)
+The P1 combined audit returned PASS-WITH-FINDINGS. Three findings were upheld and fixed:
+1. **The two-way-match argument was overstated.** It proves a faithful copy only where the ordered key is
+   UNIQUE. For `filings` and `collateral` the key repeats, and a fault that skips one row of a tied group
+   while duplicating another row elsewhere preserves BOTH the row count and the distinct count. The
+   argument is sound for debtors/secured_parties and was not sound as stated for the other two.
+   *Resolution:* `check_boundaries()` now implements the monotonicity assertion, and the auditor
+   independently verified zero tied keys straddle any of the 87 page boundaries in the shipped data. The
+   `$order` for those two tables now carries a `fileid` tiebreaker so a re-run is stable by construction
+   rather than by inspection.
+2. **`ingest.py`'s docstring promised a monotonicity assertion that did not exist in the code.** A claim
+   outrunning its evidence inside our own source file. Now implemented and wired into acceptance.
+3. **The worked example was materially wrong** (4 fileids claimed, 23 actual). Corrected above.
+Also fixed: exact RFC4180 CSV row counting (a naive newline count is wrong when a quoted field contains an
+embedded newline); STATUS.md's stale "pending" commit reference.
