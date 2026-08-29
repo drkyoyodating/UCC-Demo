@@ -232,3 +232,44 @@ source data. Both are stated as measured limitations in the README rather than p
 written rules, and 6 new rows (category C9 — three positives, three parent-entity/truncated negatives, all
 verbatim real values chosen by a stated rule) were added the same way. Nothing was regenerated from
 `normalize_name`'s output, which the fixture header explicitly forbids. Suite: 207 -> **225 passing**.
+
+## P3 — Working corpora (2026-08-30) — ACCEPTANCE PASS
+**Corpus decision: A — party rows on EQUIPMENT filings only. Founder-confirmed at the hard-stop gate
+against measured numbers**, not against the runbook default alone. Option B ("all rows for any debtor
+appearing on >=1 EQUIPMENT filing") measured 85,112 rows vs A's 37,587 — **2.3x the comparison space for
+the IDENTICAL 24,488 distinct keys**, because a debtor is identified by its name. B buys extra address
+observations per entity and nothing else, against a 4h P5 budget. Rejected on evidence.
+
+| corpus | rows | active | distinct raw | distinct name_clean | base/holdout | suffix | addr1/zip present |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `corpus_debtors_eq` (P5) | 37,587 | 36,531 | 26,926 | 24,488 | 33,899 / 3,688 | 58.6% | 99.4% / 99.2% |
+| `corpus_lenders_eq` (P5b) | 44,919 | 43,282 | 3,848 | 3,174 | 40,364 / 4,555 | 33.5% | 91.1% / 91.2% |
+
+**Grain established (the block P1's audit required):**
+- filings 2,587,492 rows / 2,587,480 distinct `fileid` / 2,572,528 distinct `transactionid`.
+- collateral 1,702,184 rows / 1,368,513 distinct `fileid` / 1,698,376 distinct `collateralid`;
+  `SELECT DISTINCT *` also yields 1,698,376, confirming all 3,808 duplicates are byte-exact.
+- **1,218,967 filing fileids (47.1%) have NO collateral row at all.** A coverage fact the README must state.
+- **EQUIPMENT: 41,985 collateral ROWS but 41,392 distinct FILEIDS.** Appendix B's "≈41,985 filings" was a
+  collateral row count, exactly as P1's audit predicted. The real filing count is 593 lower. Measured now.
+
+**Three implementation points that are load-bearing:**
+1. **Collateral is deduplicated before the join** — parties join to `SELECT DISTINCT fileid FROM collateral
+   WHERE collateraldescription='EQUIPMENT'`, which is immune both to the 3,808 exact duplicates and to the
+   legitimate many-collateral-rows-per-file grain. A naive join multiplies party rows and inflates every
+   downstream count.
+2. **`is_active` is computed, not filtered.** Deleted/inactive rows stay behind a flag (debtors: 1,056 rows,
+   2.8%; lenders: 1,637 rows, 3.6%), so the filter is a reversible downstream decision and the totals stay
+   reconcilable with the numbers reported at the gate.
+3. **The 10% stability holdout is a SEEDED MD5 HASH of the party id, never a sample.** P6 runs resolution
+   twice — run 1 on the base 90%, run 2 on 100% — to measure canonical-ID churn under a refresh. That
+   number is meaningless if the split moves between runs, and `random.sample` / `ORDER BY random()` would
+   move it. Python's builtin `hash()` is salted per process and must never be used here. Realised split:
+   9.81% and 10.14%.
+4. Rows whose `name_clean` normalises to NULL are dropped from the corpus — a row with no blocking key
+   cannot participate in resolution at all. `unique_id` (`debtorid`/`spid`) verified unique per corpus,
+   which Splink requires.
+
+**Address completeness is excellent and settles the P5 comparison design:** debtors 99.4% address1 /
+99.2% zipcode; lenders 91.1% / 91.2%. ZIP blocking is viable and address belongs in the comparison set
+rather than being treated as mostly-missing.
