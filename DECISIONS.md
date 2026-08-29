@@ -185,3 +185,50 @@ In every shape the trailing noise sits AFTER the legal suffix, so the suffix nev
 cannot match its clean twin — a systematic recall hole of roughly 4.7% of the corpus. Whether to close it
 before P5 trains on these keys is under audit review, with the explicit instruction to argue both sides
 against real data rather than default to "more normalization is better".
+
+## P2 — step 5 added: trailing registration boilerplate stripped (founder-approved 2026-08-30)
+The P2 audit recommended closing the trailing-noise recall hole, scoped. Founder approved "exactly as
+scoped". Implemented as a new step 5 in `normalize.py`, between period deletion and punctuation-to-space.
+
+**The rule is a closed WHITELIST consumed to end-of-string, never a blocklist.** A trailing `, A <clause>`
+is removed only when EVERY token of the clause is in `_FORM_VOCAB` (legal forms + jurisdictions).
+`OF`, `DIVISION`, `SUBSIDIARY`, `WHOLLY`, `PROGRAM` and all company names are absent from the vocabulary,
+so parent-entity clauses are immune **by construction** rather than by enumeration. A bare truncated `, A`
+requires a following token to match, so `HORNINGS INC., A` and `CAPITAL ONE N,A` are also immune. Trailing
+`(THE)` is stripped separately. Both strip repeatedly.
+
+**The whitelist was derived from the full 2,987,031-row named-party set, not from a sample — and that
+mattered.** The audit analysed only `debtors` and found the `A DIVISION OF ...` shape at 21 rows, concluding
+it was a negligible edge case. Across BOTH party tables it is **21,713 rows**, because lenders are bank
+divisions: `A DIVISION OF BRANCH BANKING AND TRUST COMPANY` (5,328), `A DIVISION OF US BANK NATIONAL
+ASSOCIATION` (3,070), `A DIVISION OF NBH BANK` (2,613), `A DIVISION OF TRUIST BANK` (2,215). Those rows are
+the **front-page league table**. A phrase-blocklist or a generic "strip the last comma clause" rule would
+have silently merged distinct lenders on the one view the whole project leads with.
+
+**Measured effect over all 2,987,031 named party rows:**
+| metric | value |
+|---|---|
+| rows whose normalisation changed | 52,450 (1.756%) |
+| rows where the REMOVED TEXT contained a parent-naming word | **0** |
+| `A DIVISION OF` rows altered | 11 — and in all 11 only a trailing `(THE)` was removed; the parent clause survived |
+| `A WHOLLY OWNED SUBSIDIARY OF` / `A PROGRAM OF` / bare `, A` rows altered | 0 / 0 / 0 |
+| records that previously had a UNIQUE (unmatchable) key and now share one | **5,178** |
+| suffixes recovered where the head carried none | 4,445 |
+| suffixes LOST | **0** |
+| idempotency on every changed row | PASS |
+| crashes across all 2,987,031 rows | 0 |
+| throughput | 1.4 µs/row (2.99M rows normalised in 8s) |
+
+Worked example: `WOODMEN OFFICE CAMPUS II JV LLC, A COLORADO LIMITED LIABILITY COMPANY` previously blocked
+on the entire string with `LLC` buried mid-name and could never meet its clean twin; it now blocks on
+`WOODMEN OFFICE CAMPUS II JV` with suffix `LLC`. Counter-example preserved: `VALVOLINE COMPANY, A DIVISION
+OF ASHLAND, INC. (THE)` -> `('VALVOLINE COMPANY A DIVISION OF ASHLAND', 'INC')` — only `(THE)` removed.
+
+**Deliberately still NOT done:** DBA/D-B-A splitting (0.94%) is multi-entity extraction, a different
+feature, not a normalisation tweak. Dangling trailing `&`/`AND` (0.062%, 587 rows) is genuinely truncated
+source data. Both are stated as measured limitations in the README rather than papered over.
+
+**Fixture integrity:** the 2 affected rows of the original 50 were RE-DERIVED BY HAND from the updated
+written rules, and 6 new rows (category C9 — three positives, three parent-entity/truncated negatives, all
+verbatim real values chosen by a stated rule) were added the same way. Nothing was regenerated from
+`normalize_name`'s output, which the fixture header explicitly forbids. Suite: 207 -> **225 passing**.
