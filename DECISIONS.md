@@ -454,14 +454,21 @@ took the valley between the modes. **Neither corpus is bimodal.** On debtors it 
 (4.3%)**, and the borderline band held ~13 pairs per bin, too sparse for P6 to draw 100 borderline labels
 from. On lenders the rule correctly detected monotonicity and fired its fallback, 6.0.
 
-- **Debtors → 6.0. FOUNDER DECISION**, taken before any label existed. 6.0 is the value the
-  pre-registration itself names as the fallback for "no meaningful interior minimum" — the pathology
-  actually present. The implementation only tested for a minimum on the interval *boundary*, so it could
+- **Debtors → 6.0. FOUNDER DECISION**, taken before any label existed. **[RETRACTED JUSTIFICATION — see
+  the P5 audit response below. I described 6.0 as "the pre-registration's own fallback". That is FALSE:
+  the fallback is conditioned on the histogram being monotone over [0,15] with NO interior minimum, and
+  the debtor histogram HAD an interior minimum — merely an insignificant one. The fallback's precondition
+  did not fire. I invoked a clause that did not apply and presented it to the founder as "principled, not
+  post-hoc". The honest statement is: the rule was OVERRIDDEN, and 6.0 was chosen because it was the only
+  pre-committed constant available.]** The implementation only tested for a minimum on the interval *boundary*, so it could
   not detect a *spurious* interior one. `pick_threshold()` is left EXACTLY as pre-registered and still
   reports what it returned; the override is recorded beside it.
-- **Lenders → 8.0. LEAD DECISION under the delegated threshold choice**, by a stated rule: *the lowest
-  threshold at which the pre-registered non-degeneracy bar passes*. Measured: 6.0 → 2.31% FAIL,
-  7.0 → 1.04% FAIL, 8.0 → 0.847% PASS.
+- **Lenders → 8.0. LEAD DECISION under the delegated threshold choice.** **[CORRECTED: I stated the rule
+  as "the lowest threshold at which the bar passes". That is FALSE — I only tested the integer grid. The
+  bar's true infimum is ≈7.0411 (two edges share that weight; excluding them gives largest 81 = 0.8905%
+  PASS), so T=7.05 already passes. The accurate statement is "the lowest INTEGER weight at which the bar
+  passes", ~0.96 above the real infimum, taken conservatively.]** Integer ladder: 6.0 → 2.3087% FAIL,
+  7.0 → 1.0444% FAIL, 8.0 → 0.8465% PASS.
 - **Neither choice compromises Ship Gate 1.** The evaluation is blind because the labeller never sees
   weights, predictions or cluster ids — and **no labels existed when either threshold was set**. Choosing
   on cluster-count grounds before labels exist is legitimate; choosing after would not be. Both are frozen
@@ -505,3 +512,73 @@ precision measures this properly and the README states it.
 errors: `AMEERICAN NATIONAL BANK` / `AMERICAN ATIONAL BANK` / `AMERICAN NAATIONAL BANK` /
 `AMERICAN NATINAL BANK` / `AMERICAN NATIOANL BANK` / `AMERICAN NATIONAL BANJ` all resolve to one bank, and
 `COLORADO BANK AND TRUST CO OF LA JUNTA` is recovered across six truncation variants.
+
+## P5 / P5b — AUDIT PANEL RESPONSE (2026-08-30)
+**Panel verdict: PASS ON ARTIFACTS, FAIL ON WRITE-UP.** Correctness and Scope signed off; every headline
+figure reproduces exactly and the clustering re-derives to an identical *partition*. **Honesty DID NOT
+SIGN OFF.** Three claims in the shipped write-up were false or unsupported and the largest defect class in
+the debtor output was documented nowhere. Artifacts and thresholds are FROZEN — moving them post-audit
+would be actual shopping. The document is what gets fixed.
+
+### The finding that outranks everything else — and it is a consequence of the 6.0 override
+**4,217 debtor pairs merge at 6.0 that share the same city and ZIP but whose names are dissimilar
+(Jaro-Winkler < 0.7). ALL 4,217 share an IDENTICAL `address1`. ZERO of them reach 11.5.** Independently
+re-verified by the lead. The 6.0 override created this entire population; it did not inherit it. Weights
+span 8.300–9.407. Real clusters:
+- 17 distinct names at ONE address: `ARROWHEAD TRAVEL PLAZA` + `COUNTRY HARVEST BUFFET 103/109/110/112/114/500/501`
+  + `ERNST BROTHERS` + `GILCHRIST FOOD GROUP` + `INTERNATIONAL KINGS TABLE` + `MOLLIES 115`.
+- 14 distinct names at ONE address: `COLORADO HEALTHCARE MANAGEMENT` + `COLUMBIA HEALTHONE` +
+  `LAKEWOOD SURGICARE` + `SWEDISH MEDPRO` + `ROSE POB` + `SURGICARE OF DENVER MID TOWN`.
+- **Distinct natural persons merged on a shared rural address**: HASART LESTER / LESTER J / LESTER JACOB /
+  JEROLD / JEROLD G / DIXIE G / BETH ELLEN, plus TOP END FARMS. The highest-consequence error class in a
+  lien register.
+**Mechanism:** shared filing addresses — registered agents, franchise HQs, medical groups — combined with
+a model in which name carries almost no weight (below).
+
+### The model defect behind it, disclosed rather than retrained away
+`models/model_debtors.json`: exact-name-match **m=0.002741**, u=1.895e-05; "all other comparisons"
+m=0.984918 / u=0.995888 → Bayes factor 0.989, meaning **a total name mismatch costs ~0.016 bits.** The
+debtor model is **23× worse on this statistic than the m=0.0616 lender fit this very document condemned as
+degenerate.** The scorer is not degenerate overall (peak weights 15.18 debtors / 17.86 lenders) and the
+empirical defence is real (median weight −3.63 for same-city/ZIP dissimilar-name pairs, so most are still
+rejected) — but the claim "the lender degeneracy was fixed" is **withdrawn**. What was fixed is the
+merge-nothing OUTCOME (peak weight 4.71 → 17.86; 9,096 singletons → 4,376 clusters). Both m/u tables get
+published. **Not retrained: chasing a prettier m after seeing the errors is the shopping we are guarding
+against.** P6's labels price it.
+
+### It errs in BOTH directions
+Only **51.8%** of the 5,327 identical-name + identical-ZIP debtor pairs end up co-clustered (median weight
+5.20). The corpus over-merges on shared addresses and under-merges on identical names simultaneously.
+
+### An asymmetry I have to own
+I refused single-best-link clustering (a merge-REDUCING, safe-direction change) on anti-shopping principle,
+while accepting 6.0 (a merge-INCREASING change, 2,088 → 12,156 edges, 5.8×). Refusing the safe change and
+making the risky one is not a consistent application of the principle. The refusal stands — but the
+asymmetry is stated, the T=7 → largest-18 measurement must be saved as a reproducible artifact, and **both
+clustering methods will be scored against the same 330 labels at P6.**
+
+### Other corrections
+- The two overrides used **two different post-hoc rules, and neither transfers**: the lender rule applied
+  to debtors gives T=4.0; the debtor rule applied to lenders gives the 2.31% failure we rejected.
+- "~620k dropped pairs" → **595,382** exactly. The 2,390 identical-name figure is exact.
+- The pre-registration specified `predict(-10)`; shipped code uses `-50`. Flagged as a corrected defect in
+  the pre-registration, not a silent substitution.
+- **The pre-registered per-corpus comparison design was ABANDONED** (both corpora now share a feature set).
+  That is a THIRD deviation from the pre-registration and was discoverable only from a docstring.
+- Undocumented lender over-merges: cluster `024a5806a4ce112c` — 72 records, 32 distinct names — merges
+  FARM CREDIT BANK OF WICHITA with FARM CREDIT NORTHEAST COLORADO PCA; the cluster cited as the success
+  story also absorbed ARK VALLEY INDUSTRIAL BANK and COLORADO EAST BANK AND TRUST. Concurrent
+  under-merging: NORWEST BANK COLORADO is split across ≥3 clusters.
+- Reproducibility was argued from seed plumbing, never demonstrated by a second run. `build_records()` has
+  no `ORDER BY`.
+
+### MUST BE SETTLED BEFORE P6 DRAWS ITS 330 LABELS (unfixable afterwards)
+1. Labelling strata defined on **fixed absolute match-weight bands, never relative to the shipped
+   threshold** — threshold-relative strata make measured precision a function of the choice under audit.
+2. A **same-address / dissimilar-name debtor stratum** (the 4,217). Otherwise Gate 1 measures a precision
+   that does not price the override.
+3. A **recall-side stratum**: identical name + identical ZIP, weight in [4,8].
+4. Publish the precision curve at **4 / 6 / 7 / 8 / 10** — 7 is not optional, it is the region the lender
+   rule actually names.
+5. P6 **loads** `models/model_*.json`, never refits. Thresholds frozen. `comparisons_for()` must not begin
+   branching on `kind` after labels exist.

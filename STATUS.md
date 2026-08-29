@@ -6,7 +6,7 @@ Repo: https://github.com/drkyoyodating/UCC-Demo · Branch `main`
 ## Meters
 | Meter | Reading |
 |---|---|
-| BUDGET (planned hours earned at DoD) | **7.5 / 24** |
+| BUDGET (planned hours earned at DoD) | **14.5 / 24** |
 | Modelling freeze | hour 16 |
 | FOUNDER minutes spent | 0 / 240 (90 reserved for labelling) |
 
@@ -18,8 +18,8 @@ Repo: https://github.com/drkyoyodating/UCC-Demo · Branch `main`
 | P2 Normalizer + skeleton | 2–4 | ✅ **COMPLETE** | auto-proceed | 1 combined **PASS** | `2c32c40` | step 5 (boilerplate strip) added post-audit, founder-approved; walking skeleton deferred to P3 |
 | P3 Corpora | 4–6 | ✅ **COMPLETE** | ✅ corpus A confirmed | 1 combined **PASS-w-findings** | `b1a1b3a` | NULL-key guard relabelled as inert after audit |
 | P4 EDA | 6–7.5 | ✅ **COMPLETE** | auto-proceed | 1 **PASS-w-findings** | `e2cb8a0`+ | blocking-loss stat wrong twice, replaced with a decidable measure; record-level blocking adopted for P5b |
-| P5 Splink debtors | 7.5–15 | — | **HARD STOP** (threshold delegated, §1.0 r15) | 3 | | |
-| P5b Splink lenders | 13.5–14.5 | — | auto-proceed | 3 | | |
+| P5 Splink debtors | 7.5–15 | ✅ **COMPLETE (artifacts)** | ✅ threshold 6.0 founder-decided | 3-panel: correctness+scope PASS, **honesty NO SIGN-OFF** | `03fa75a` | rule overridden; 4,217 same-address over-merges disclosed |
+| P5b Splink lenders | 13.5–14.5 | ✅ **COMPLETE (artifacts)** | auto-proceed | (same panel) | `03fa75a` | threshold 8.0 = lowest INTEGER passing the bar |
 | ⛔ FREEZE | 16 | — | | | | |
 | P6 Evidence | 16–20 | — | **HARD STOP** (labelling) | **4** | | |
 | P7 Publish | 20–24 | — | **HARD STOP** | 3 | | |
