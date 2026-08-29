@@ -298,3 +298,44 @@ rather than being treated as mostly-missing.
   single-category demo corpus — tens of thousands of rows — not large-scale entity resolution.** Any claim
   implying resolution "at scale" would be misleading. The large numbers in this project belong to the
   INGEST (8,384,455 rows / 4,094,779 party records); the resolution number is small and careful.
+
+## P4 — EDA (2026-08-30). Output: `docs/eda.md`. Every number names the P5 decision it changes.
+**Blocking cardinality — the number that decides whether P5 finishes inside its budget:**
+
+| corpus | `zipcode` | `substr(name_clean,1,4)` | union (approx) | unblocked |
+|---|---:|---:|---:|---:|
+| debtors | 3,565,664 | 827,699 | ~4.4M | 706,372,491 |
+| lenders | 24,128,705 | 49,590,742 | ~74M | 1,008,835,821 |
+
+**Two findings that change P5's design:**
+
+1. **⚠ P5b must resolve DISTINCT PARTY RECORDS, not rows.** `corpus_lenders_eq` has 44,919 rows but only
+   **8,922 distinct `(name_clean, address1, city, zipcode)` records** — 5× row-level redundancy, because one
+   lender files thousands of times (`WAGNER EQUIPMENT` ×6,334 rows). Blocking on raw rows costs ~74M
+   comparisons versus the debtor corpus's ~4.4M, for no additional information. Resolving records and
+   mapping canonical ids back to rows for the league table gives the same answer for ~25× less work — and
+   it removes duplicate-row mass that would otherwise dominate the match-weight histogram and **flatter the
+   high-weight labelling stratum in P6**.
+2. **Measured blocking-loss lower bound.** `4,712` distinct debtor key-pairs differ inside the first four
+   characters yet agree once spaces are collapsed (the `ACM EXCAVATION` / `ACME EXCAVATING` shape). ZIP
+   rescues 124, leaving **4,588 pairs reachable by neither rule**. Lenders: 619 / 219 / **400**. This is what
+   a third blocking rule would have to be worth, and it is the honest ceiling on recall no tuning can lift.
+
+**CORRECTION — a vacuous statistic caught and removed before it reached the audit.** The first version of
+this analysis reported "pairs sharing an identical `name_clean` that agree on neither rule" and printed
+**0**, presenting it as a blocking-loss floor. That is 0 **by construction** — identical keys share their
+own 4-character prefix — i.e. a tautology dressed as a finding. Replaced with the escape measure above,
+which can actually be non-zero and is.
+
+**Other numbers:**
+- Normalisation alone collapsed 2,438 debtor variants (9.1%) and 674 lender variants (17.5%) pre-model.
+- Exact-`name_clean` match already groups 5,146 debtor keys and 1,485 lender keys with ≥2 rows. **That is
+  the floor Splink must beat, not its result** — the README must state the naive baseline alongside the model.
+- Largest exact groups reveal the lender-side problem directly: `VECTRA BANK COLORADO NATIONAL ASSOCIATION`
+  ×1,739 across **60 ZIPs**, `AMERICAN NATIONAL BANK` ×1,423 across 34, `BANK OF COLORADO` ×1,315 across 34.
+  One entity, many branch addresses → address disagreement must not veto a lender match.
+- Completeness: debtors 99.4% address1 / 99.2% zip; lenders 91.1% / 91.2%. Address stays in the comparison set.
+- **EQUIPMENT filings by `filingtype`: `ucc` 35,281, `efs` 6,111.** The register is not UCC-only, so the
+  write-up says "lien register", and the five-year lapse premise behind the P7 refi view governs the `ucc`
+  rows only — the 6,111 `efs` (agricultural effective-financing-statement) rows follow different rules.
+- **Non-ASCII names in both corpora: 0.** The measured number confirming no Unicode confusable map is built.
