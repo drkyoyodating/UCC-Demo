@@ -390,3 +390,51 @@ multi-branch, so address disagreement is expected and uninformative for lenders.
 are geographically concentrated: `SEMA CONSTRUCTION` (139 rows) and `CREEKSTONE DEVELOPMENT` (158 rows) each
 sit in **one ZIP**, the latter with 15 address string variants that are formatting noise at a single site.
 **P5 leans on address; P5b down-weights it to roughly city/state-level agreement.**
+
+## P5 — PRE-REGISTRATION (committed BEFORE any model is trained or any histogram is seen)
+The founder delegated the threshold choice to the lead (§1.0 row 15) on the condition that the selection
+rule be written down first. Pre-registering it is what makes the blind evaluation in P6 meaningful: if the
+threshold could be moved after seeing labels — or even after seeing the histogram's effect on cluster
+counts — then precision would be a number that was shopped for, and the whole demo's differentiator dies.
+This section is committed before `src/resolve.py` exists. The commit hash is the timestamp.
+
+### Threshold selection rule (fully determined; no judgement at selection time)
+1. Predict with `threshold_match_weight=-10` so the full weight distribution is retained.
+2. Bin match weights into **0.5-wide bins over [-10, +25]**.
+3. Smooth counts with a **3-bin centred moving average**.
+4. Search the decision interval **[0, 15]** for the bin with the **minimum smoothed count** — the valley
+   between the non-match and match modes.
+5. **Threshold = the left edge of that bin.**
+6. **Tie-break: on equal minima, take the HIGHEST weight.** Ties break toward precision, because precision
+   is the gated ship-gate number (≥0.90 target) and recall is reported regardless.
+7. **Fallback:** if the smoothed histogram is monotone across [0, 15] (no interior minimum), threshold =
+   **match weight 6.0** (match probability ≈ 0.984).
+8. The chosen value, the histogram, and which branch fired are all reported at the gate. **The threshold is
+   frozen in a commit at hour 16 and is never touched after any label is seen.** Precision will additionally
+   be published at 3–4 thresholds from the same labels, so a reader can see nothing was shopped.
+
+### Model configuration, also fixed in advance
+- **Resolution operates on DISTINCT PARTY RECORDS** `(name_clean, address1, city, zipcode)`, not raw rows,
+  per the P4 audit: it cuts lender ZIP comparisons 130× and, more importantly, stops one entity's thousands
+  of repeat filings from biasing term-frequency and u-probability estimation and from flattering P6's
+  high-weight labelling stratum. `record_id` is a deterministic MD5 of the record tuple, so the same record
+  carries the same id across P6's two stability runs.
+- Blocking: **union of `zipcode` and `substr(name_clean,1,4)`** — no third rule. P4 measured the maximum
+  possible gain from a third rule at **17 debtor pairs / 5 lender pairs**.
+- `count_comparisons_from_blocking_rule` is run and logged **before** any predict.
+- Prior set via `estimate_probability_two_random_records_match` with deterministic rules, then
+  `estimate_u_using_random_sampling(seed=20260830)`, then EM per blocking rule. This defuses the documented
+  trap where the default prior of 0.0001 plus untrained `m` yields zero matches with no error.
+- Comparisons — **the two corpora deliberately differ**, per P4: debtor same-name clusters are
+  geographically concentrated (`SEMA CONSTRUCTION` 139 rows in 1 ZIP) while lender ones are multi-branch by
+  design (`VECTRA BANK` 199 addresses across 60 ZIPs).
+  - **Debtors:** `NameComparison(name_clean)`, `ExactMatch(suffix)`, `JaroWinklerAtThresholds(address1)`,
+    `ExactMatch(city)`, `ExactMatch(zipcode)` — address carries real weight.
+  - **Lenders (P5b):** same name/suffix treatment, but address demoted to city/state-level agreement, so a
+    branch-address disagreement cannot veto a true lender match.
+  - `PostcodeComparison` is NOT used: it is built for UK postcode structure. ZIP is compared by exact match.
+- **Non-degeneracy acceptance bar, fixed now: no single cluster may hold >1% of the corpus.** "Clusters
+  exist" is satisfied by a model that merges everything; this is not.
+- `resolve(table, seed)` is written as a callable from line one so P5b is a second call, never a refactor
+  at hour 15. Both trained models are saved with `save_model_to_json` and committed, and P6's second run
+  LOADS them rather than retraining — otherwise the stability number confounds refit with perturbation.
