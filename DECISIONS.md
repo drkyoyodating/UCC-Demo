@@ -339,3 +339,54 @@ which can actually be non-zero and is.
   write-up says "lien register", and the five-year lapse premise behind the P7 refi view governs the `ucc`
   rows only — the 6,111 `efs` (agricultural effective-financing-statement) rows follow different rules.
 - **Non-ASCII names in both corpora: 0.** The measured number confirming no Unicode confusable map is built.
+
+## P4 — audit response (2026-08-30). Two of MY numbers were wrong; both replaced.
+The P4 audit reproduced E1–E7 exactly, then dismantled the one statistic I was most pleased with.
+
+**1. The "blocking loss" figure was noise, and this is the third iteration of it.**
+- *v1* — "identical `name_clean` pairs agreeing on neither rule" → **0**. True **by construction**:
+  identical keys share their own 4-char prefix. A tautology presented as a finding. I caught this one.
+- *v2* — "keys differing in the first 4 chars but agreeing once spaces collapse" → **4,712**, published as
+  a recall ceiling. The audit hand-judged a 30-pair sample: **0 were genuine same-firm variants.** 70% of
+  the population involves an `X AND Y` name whose space-collapse coincidentally lands on `SANDWICH`,
+  `RANDOLPH`, `BAND…`, `LAND…`. It measured coincidence and **overstated blocking loss by ~2 orders of
+  magnitude** — in a number bound for the published README.
+- *v3, shipped* — pairs whose keys are **identical once spaces are removed**. Decidable: no sampling, no
+  judgement. **Debtors 70 pairs, 53 rescued by ZIP, 17 unreachable. Lenders 20 / 15 / 5.** Real examples:
+  `BLU SKY RESTORATION CONTRACTORS`/`BLUSKY RESTORATION CONTRACTORS`, `K R SWERDFEGER CONSTRUCTION`/
+  `KR SWERDFEGER CONSTRUCTION`, and on the lender side `U S BANK NATIONAL ASSOCIATION`/
+  `US BANK NATIONAL ASSOCIATION` — a genuine league-table entity.
+- **Conclusion: a third blocking rule is worth at most 17 debtor pairs. None is added.** The two-rule union
+  stands, and the loss is stated rather than hidden.
+
+**2. The `ACM EXCAVATION` / `ACME EXCAVATING` example does not exist in this data.** It came from an AI
+search summary, was already retracted once from the runbook as unverified — and I then re-introduced it into
+`docs/eda.md` and `DECISIONS.md` as the illustrative shape of a *measured* phenomenon. Same error, twice, in
+a file destined for publication. **Removed. Every example in `docs/eda.md` is now a verbatim pair from the
+corpus**, produced by the query that reports the statistic.
+
+**3. `zshare` multiplicity bug fixed.** The CTE was keyed on `(name_clean, zipcode)`, so a pair sharing
+several ZIPs counted several times. Re-keyed on the name pair with an `EXISTS` over ZIPs.
+
+**4. Record-level blocking — the audit's most valuable design finding, now measured and adopted for P5b.**
+Applying the same two rules to DISTINCT `(name_clean, address1, city, zipcode)` records instead of rows:
+
+| corpus | rule | rows | records | reduction |
+|---|---|---:|---:|---:|
+| lenders | `zipcode` | 24,128,705 | **186,118** | **130×** |
+| lenders | `substr(name_clean,1,4)` | 49,590,742 | **1,099,055** | **45×** |
+| debtors | `zipcode` | 3,565,664 | 2,079,845 | 1.7× |
+| debtors | `substr(name_clean,1,4)` | 827,699 | 393,981 | 2.1× |
+
+The lender ZIP block that held 5,743 rows contains **21 distinct records**. Row-level blocking there is
+almost entirely wasted work. **Debtor redundancy is only 1.30× (37,587 rows → 29,003 records), so this is
+urgent for P5b and merely tidy for P5** — the audit was explicit that the urgency is asymmetric and the
+write-up must not imply otherwise. Deduplicating before resolution also fixes term-frequency and
+u-probability estimation, which raw rows bias when one entity files thousands of times.
+
+**5. The two corpora need DIFFERENT comparison designs.** `VECTRA BANK COLORADO NATIONAL ASSOCIATION` has
+**199 distinct addresses** across 60 ZIPs; `AMERICAN NATIONAL BANK` has 96 across 34 — legitimately
+multi-branch, so address disagreement is expected and uninformative for lenders. Debtor same-name clusters
+are geographically concentrated: `SEMA CONSTRUCTION` (139 rows) and `CREEKSTONE DEVELOPMENT` (158 rows) each
+sit in **one ZIP**, the latter with 15 address string variants that are formatting noise at a single site.
+**P5 leans on address; P5b down-weights it to roughly city/state-level agreement.**

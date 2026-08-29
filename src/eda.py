@@ -84,39 +84,59 @@ def main() -> int:
                   GROUP BY {expr})""")
             w(f"| {rule} | {blocks:,} | {int(pairs or 0):,} | {mx:,} | "
               f"{int(mx*(mx-1)/2):,} |")
+        # Record-level: the same two rules applied to DISTINCT party records.
+        for rule, expr in [("`zipcode` (records)", "zipcode"),
+                           ("`substr(name_clean,1,4)` (records)", "substr(name_clean,1,4)")]:
+            blocks, pairs, mx = q1(f"""
+                SELECT count(*), sum(c*(c-1)/2), max(c) FROM (
+                  SELECT count(*) c FROM (SELECT DISTINCT name_clean, address1, city, zipcode
+                                          FROM {corpus}) WHERE {expr} IS NOT NULL
+                  GROUP BY {expr})""")
+            w(f"| {rule} | {blocks:,} | {int(pairs or 0):,} | {mx:,} | "
+              f"{int(mx*(mx-1)/2):,} |")
         naive = q1(f"SELECT count(*) FROM {corpus}")[0]
         w(f"| *(no blocking — for scale)* | 1 | {naive*(naive-1)//2:,} | {naive:,} | "
           f"{naive*(naive-1)//2:,} |")
         w()
 
-        # --- the recall ceiling that blocking imposes ---
-        # NOTE: an earlier version of this asked for identical-name pairs agreeing on
-        # neither rule. That is 0 BY CONSTRUCTION -- identical keys share their own
-        # 4-char prefix -- i.e. a tautology dressed as a finding. What actually
-        # escapes both rules is a name VARIANT whose difference falls inside the first
-        # four characters (ACM EXCAVATION vs ACME EXCAVATING). That is measurable:
-        # collapse spaces, and count key pairs whose space-stripped prefixes agree
-        # while their real prefixes do not.
-        esc = q1(f"""
-            WITH k AS (SELECT DISTINCT name_clean nc, substr(name_clean,1,4) p4,
-                              substr(replace(name_clean,' ',''),1,4) s4
+        # --- does blocking actually lose true matches? ---
+        # Three iterations, all recorded because the process is the point.
+        #  v1: "identical keys agreeing on neither rule" -> 0. True BY CONSTRUCTION
+        #      (identical keys share their own prefix). A tautology dressed as a finding.
+        #  v2: "keys differing in the first 4 chars but agreeing once spaces collapse"
+        #      -> 4,712, published as a recall ceiling. The P4 audit hand-judged 30 of
+        #      them: 0 were genuine variants. 70% involve an "X AND Y" name whose
+        #      space-collapse coincidentally hits SANDWICH / RANDOLPH / BAND- / LAND-.
+        #      So v2 measured coincidence and overstated loss by ~2 orders of magnitude.
+        #  v3 (this): pairs whose keys are IDENTICAL once spaces are removed. Decidable,
+        #      no sampling and no judgement call: these ARE the same normalised name
+        #      written with different spacing, and the prefix rule provably cannot
+        #      propose them.
+        n_var, n_resc = q1(f"""
+            WITH k AS (SELECT DISTINCT name_clean nc, replace(name_clean,' ','') sq,
+                              substr(name_clean,1,4) p4
+                       FROM {corpus} WHERE name_clean IS NOT NULL),
+                 z AS (SELECT DISTINCT name_clean nc, zipcode zp
+                       FROM {corpus} WHERE zipcode IS NOT NULL)
+            SELECT count(*),
+                   count(*) FILTER (WHERE EXISTS (SELECT 1 FROM z za JOIN z zb ON za.zp=zb.zp
+                                                  WHERE za.nc=a.nc AND zb.nc=b.nc))
+            FROM k a JOIN k b ON a.sq=b.sq AND a.nc<b.nc AND a.p4<>b.p4""")
+        ex = q(f"""
+            WITH k AS (SELECT DISTINCT name_clean nc, replace(name_clean,' ','') sq,
+                              substr(name_clean,1,4) p4
                        FROM {corpus} WHERE name_clean IS NOT NULL)
-            SELECT count(*) FROM k a JOIN k b ON a.s4=b.s4 AND a.p4<>b.p4 AND a.nc<b.nc""")[0]
-        zshare = q1(f"""
-            WITH k AS (SELECT DISTINCT name_clean nc, zipcode z,
-                              substr(name_clean,1,4) p4,
-                              substr(replace(name_clean,' ',''),1,4) s4
-                       FROM {corpus} WHERE name_clean IS NOT NULL)
-            SELECT count(*) FROM k a JOIN k b ON a.s4=b.s4 AND a.p4<>b.p4 AND a.nc<b.nc
-             AND a.z IS NOT DISTINCT FROM b.z""")[0]
-        w(f"- **Prefix-rule escape: {esc:,} distinct-key pairs differ inside the first four "
-          f"characters yet agree once spaces are collapsed** (the `ACM EXCAVATION` / "
-          f"`ACME EXCAVATING` shape). The prefix rule cannot propose them; "
-          f"{zshare:,} of those are rescued by the ZIP rule, leaving **{esc-zshare:,} "
-          f"reachable by neither**.")
-        w("  → *P5: this is the measured lower bound on blocking loss — recall is reported "
-          "as conditional on the union of the two rules, and this number is what a third "
-          "rule would have to be worth.*")
+            SELECT a.nc, b.nc FROM k a JOIN k b ON a.sq=b.sq AND a.nc<b.nc AND a.p4<>b.p4
+            ORDER BY length(a.nc) DESC LIMIT 3""")
+        w(f"- **Measured blocking loss: {n_var} spacing-variant key pairs, of which "
+          f"{n_resc} are rescued by the ZIP rule, leaving {n_var-n_resc} unreachable by "
+          f"either rule.** These are pairs whose keys are *identical once spaces are "
+          f"removed* — decidably the same name, differently spaced, and provably outside "
+          f"the prefix rule. Examples: "
+          + "; ".join(f"`{x}` / `{y}`" for x, y in ex) + ".")
+        w(f"  → *P5: a third blocking rule would be worth at most {n_var-n_resc} pairs on "
+          f"this corpus, so none is added. Recall is reported as conditional on the union "
+          f"of the two rules, with this figure stated as the known loss.*")
         w()
 
         if corpus == "corpus_lenders_eq":

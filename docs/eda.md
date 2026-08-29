@@ -17,10 +17,12 @@ Every number below is followed by the P5 design decision it changes. Nothing her
 |---|---:|---:|---:|---:|
 | `zipcode` | 986 | 3,565,664 | 706 | 248,865 |
 | `substr(name_clean,1,4)` | 7,362 | 827,699 | 556 | 154,290 |
+| `zipcode` (records) | 986 | 2,079,845 | 402 | 80,601 |
+| `substr(name_clean,1,4)` (records) | 7,362 | 393,981 | 363 | 65,703 |
 | *(no blocking — for scale)* | 1 | 706,372,491 | 37,587 | 706,372,491 |
 
-- **Prefix-rule escape: 4,712 distinct-key pairs differ inside the first four characters yet agree once spaces are collapsed** (the `ACM EXCAVATION` / `ACME EXCAVATING` shape). The prefix rule cannot propose them; 124 of those are rescued by the ZIP rule, leaving **4,588 reachable by neither**.
-  → *P5: this is the measured lower bound on blocking loss — recall is reported as conditional on the union of the two rules, and this number is what a third rule would have to be worth.*
+- **Measured blocking loss: 70 spacing-variant key pairs, of which 53 are rescued by the ZIP rule, leaving 17 unreachable by either rule.** These are pairs whose keys are *identical once spaces are removed* — decidably the same name, differently spaced, and provably outside the prefix rule. Examples: `BLU SKY RESTORATION CONTRACTORS` / `BLUSKY RESTORATION CONTRACTORS`; `T E A M PANELS INTERNATIONAL` / `TEAM PANELS INTERNATIONAL`; `P J WILSON INSURANCE AGENCY` / `PJ WILSON INSURANCE AGENCY`.
+  → *P5: a third blocking rule would be worth at most 17 pairs on this corpus, so none is added. Recall is reported as conditional on the union of the two rules, with this figure stated as the known loss.*
 
 ## LENDERS (P5b) — `corpus_lenders_eq`
 
@@ -37,10 +39,12 @@ Every number below is followed by the P5 design decision it changes. Nothing her
 |---|---:|---:|---:|---:|
 | `zipcode` | 1,412 | 24,128,705 | 5,743 | 16,488,153 |
 | `substr(name_clean,1,4)` | 904 | 49,590,742 | 6,680 | 22,307,860 |
+| `zipcode` (records) | 1,412 | 186,118 | 265 | 34,980 |
+| `substr(name_clean,1,4)` (records) | 904 | 1,099,055 | 835 | 348,195 |
 | *(no blocking — for scale)* | 1 | 1,008,835,821 | 44,919 | 1,008,835,821 |
 
-- **Prefix-rule escape: 619 distinct-key pairs differ inside the first four characters yet agree once spaces are collapsed** (the `ACM EXCAVATION` / `ACME EXCAVATING` shape). The prefix rule cannot propose them; 219 of those are rescued by the ZIP rule, leaving **400 reachable by neither**.
-  → *P5: this is the measured lower bound on blocking loss — recall is reported as conditional on the union of the two rules, and this number is what a third rule would have to be worth.*
+- **Measured blocking loss: 20 spacing-variant key pairs, of which 15 are rescued by the ZIP rule, leaving 5 unreachable by either rule.** These are pairs whose keys are *identical once spaces are removed* — decidably the same name, differently spaced, and provably outside the prefix rule. Examples: `U S SMALL BUSINESS ADMINISTRATION` / `US SMALL BUSINESS ADMINISTRATION`; `U S BANK NATIONAL ASSOCIATION` / `US BANK NATIONAL ASSOCIATION`; `U S BANK NATIONAL ASSOC` / `US BANK NATIONAL ASSOC`.
+  → *P5: a third blocking rule would be worth at most 5 pairs on this corpus, so none is added. Recall is reported as conditional on the union of the two rules, with this figure stated as the known loss.*
 
 - ⚠ **Comparison space warning.** This corpus has 44,919 rows but only 8,922 distinct (name, address, city, zip) RECORDS — a 5× row-level redundancy, because one lender files thousands of times (`WAGNER EQUIPMENT` ×6,334). Blocking on raw rows costs ~74M comparisons against the debtor corpus's ~4.4M.
   → *P5b: resolve DISTINCT PARTY RECORDS, not rows, then map canonical ids back to rows for the league table. Same answer, ~25× less work, and it removes the duplicate-row mass that would otherwise dominate the match-weight histogram and flatter the high-weight labelling stratum.*
