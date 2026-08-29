@@ -266,10 +266,35 @@ observations per entity and nothing else, against a 4h P5 budget. Rejected on ev
    number is meaningless if the split moves between runs, and `random.sample` / `ORDER BY random()` would
    move it. Python's builtin `hash()` is salted per process and must never be used here. Realised split:
    9.81% and 10.14%.
-4. Rows whose `name_clean` normalises to NULL are dropped from the corpus — a row with no blocking key
-   cannot participate in resolution at all. `unique_id` (`debtorid`/`spid`) verified unique per corpus,
+4. Rows whose `name_clean` normalises to NULL are dropped — a row with no blocking key cannot participate
+   in resolution. **[corrected after the P3 audit] This guard currently removes ZERO rows from either
+   corpus** (verified over all 82,506 eligible rows). It is correct and cheap, and it fires the moment a
+   pure-boilerplate name such as a bare `L.L.C.` appears among equipment filers — but calling it
+   "load-bearing" was wrong, and this runbook's own rule is that a stage which provably never fires is
+   padding unless it is labelled as a guard. Labelled. Contrast the collateral dedup, which the audit
+   measured as preventing a real **+1,007 debtor / +845 lender row inflation** across the 503 EQUIPMENT
+   fileids that carry more than one collateral row. `unique_id` (`debtorid`/`spid`) verified unique per corpus,
    which Splink requires.
 
 **Address completeness is excellent and settles the P5 comparison design:** debtors 99.4% address1 /
 99.2% zipcode; lenders 91.1% / 91.2%. ZIP blocking is viable and address belongs in the comparison set
 rather than being treated as mostly-missing.
+
+## P3 — audit response (2026-08-30) — PASS-WITH-FINDINGS, nothing blocking
+- **Dedup verified as a real defect avoided.** 503 EQUIPMENT fileids carry >1 collateral row; a naive join
+  yields 38,594 debtor rows vs the correct 37,587 (+1,007) and 45,764 lender rows vs 44,919 (+845).
+- **Holdout determinism verified independently.** `in_holdout()` recomputed in a fresh process reproduced
+  every one of the 82,506 stored `is_holdout` values with 0 mismatches. The P6 stability metric rests on
+  this; it is now evidence, not assertion. Base vs holdout show no material skew (within ~1pp on active
+  rate, address1 and zipcode completeness in both corpora).
+- **Stored keys are consistent with the live normalizer:** 20,000 rows sampled per corpus, 0 mismatches on
+  both `name_clean` and `suffix`.
+- **Option B's definition pinned.** The audit confirmed 85,112 rows only under matching by **raw name**;
+  matching by `name_clean` instead gives **138,707** rows. The distinction is recorded because the two
+  readings differ by 63%, and the corpus decision was argued on the first one.
+- **Honest scale characterisation, to be used verbatim in the README.** The corpora total **82,506 party
+  rows resolving to 27,662 distinct entity keys** (24,488 debtors + 3,174 lenders), drawn from a single
+  collateral category that is a small slice of a ~1.37M-fileid collateral table. This is a **small,
+  single-category demo corpus — tens of thousands of rows — not large-scale entity resolution.** Any claim
+  implying resolution "at scale" would be misleading. The large numbers in this project belong to the
+  INGEST (8,384,455 rows / 4,094,779 party records); the resolution number is small and careful.
