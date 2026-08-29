@@ -1,4 +1,4 @@
-# messy_names.csv -- P2 normalizer fixture. 50 rows.
+# messy_names.csv -- P2 normalizer fixture. 56 rows (50 original C1-C8 + 6 added as C9).
 #
 # SELECTION RULE (deterministic and re-runnable; nothing here was picked by taste).
 # Source: raw_pages/sample_debtors_50k.csv, column `organizationname` (50,000 rows drawn at

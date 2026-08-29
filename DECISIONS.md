@@ -450,7 +450,7 @@ This section is committed before `src/resolve.py` exists. The commit hash is the
 The rule (committed `cfe134b` before any model existed) assumed a bimodal match-weight distribution and
 took the valley between the modes. **Neither corpus is bimodal.** On debtors it returned **11.5** from a
 "valley" whose smoothed count was **27 out of 2,489,916 scored pairs** — a sparse spot in tail noise. At
-11.5 the model merged **227 of 5,327 record pairs that share an identical name AND an identical ZIP
+11.5 the model merged **227 of 5,325 record pairs that share an identical name AND an identical ZIP
 (4.3%)**, and the borderline band held ~13 pairs per bin, too sparse for P6 to draw 100 borderline labels
 from. On lenders the rule correctly detected monotonicity and fired its fallback, 6.0.
 
@@ -547,7 +547,7 @@ published. **Not retrained: chasing a prettier m after seeing the errors is the 
 against.** P6's labels price it.
 
 ### It errs in BOTH directions
-Only **51.8%** of the 5,327 identical-name + identical-ZIP debtor pairs end up co-clustered (median weight
+Only **51.8%** of the 5,325 identical-name + identical-ZIP debtor pairs end up co-clustered (median weight
 5.20). The corpus over-merges on shared addresses and under-merges on identical names simultaneously.
 
 ### An asymmetry I have to own
@@ -582,3 +582,43 @@ clustering methods will be scored against the same 330 labels at P6.**
    rule actually names.
 5. P6 **loads** `models/model_*.json`, never refits. Thresholds frozen. `comparisons_for()` must not begin
    branching on `kind` after labels exist.
+
+## P6 — PRE-REGISTRATION of the labelling design (appended before any label exists)
+Verified at write time: `docs/labels_blank.csv` has 330 rows and **0 non-blank labels**. The cross-phase
+audit noted this section was missing from the pre-registration file while its content lived only in a
+commit message — for a project whose claim is pre-registration, that gap was itself the defect.
+
+**Batch 1 — 330 rows (300 unique + 30 hidden repeats), key sha256 `c297165…409b82f` (commit f43942d).**
+200 debtor + 100 lender pairs across 13 strata. Weight bands on FIXED ABSOLUTE boundaries (2/4/6/7/8/10),
+never relative to the shipped threshold. Targeted strata: `debtor_same_addr_diff_name` (N_h=4,217),
+`debtor_recall_probe` (N_h=2,690), `lender_recall_probe` (N_h=14,037).
+
+**Batch 2 — 51 additional LENDER pairs, key sha256 `e41b011…46e7a7`.** Purely additive; batch 1 and its
+hash are untouched and still checkable. Reason: the audit called the precision curve at 4/6/7/8/10
+non-optional, and batch 1's lender bands were `[(2,6),(6,8),(8,10),(10,999)]` — no 4, no 7 — leaving
+lender precision@7 resting on 11 pairs and @4 on 6. Bands `lender_band_4_6` (N_h=22,220), `6_7` (4,379),
+`7_8` (2,977). Batch 1 was NOT regenerated: re-drawing voids a hash committed before any label existed,
+and that evidence chain is worth more than tidiness — the same precedent the decision rule set when it
+declined to re-draw over a 0.67% independence issue.
+
+**Estimator.** Band strata alone feed the weighted precision estimate, pooled by `N_h` with a stratified
+variance. Targeted strata are NOT a random sample of anything and are NEVER pooled; each reports its own
+error rate. *Derivation of the "unweighted pooling overstates precision by ~0.23" figure quoted earlier:
+it came from the pre-flight review's simulation against a realistic match-weight histogram and **has not
+been re-derived in this repo**. It is therefore quoted as a motivation, not published as a result.*
+
+**Disclosed sampling limitations.**
+- `draw()` skips records already used by an earlier stratum, and the six debtor bands run before the two
+  targeted strata. Measured bite: **135 of 4,217 same-address pairs (3.2%)** and **238 of 2,690 recall-probe
+  pairs (8.85%)** were unreachable when their stratum drew. Targeted-stratum rates are therefore
+  conditional on the no-record-reuse constraint.
+- Batch 1 de-duplicated on record id, so two distinct source rows printing identically slipped through:
+  one record appears in both P122 and P162 (0.67%). Batch 2 excludes by TEXT identity instead.
+- The 30 hidden repeats are byte-identical in the same A/B order, so a labeller who notices one may recall
+  rather than re-derive. The intra-rater figure is published with that caveat.
+
+**Decision rule.** Draft `a725496` → R11-R13 added `54b076c` → RESTRUCTURED in the commit below after the
+cross-phase audit found that **96 of 330 pairs (29%) matched no rule at all** — including 77 that were
+simply different-name/different-address, the commonest case in the file. All amendments were made with
+**zero labels in existence**, and none can affect which pairs were drawn: strata are selected on match
+weight and record patterns, never on the rule.

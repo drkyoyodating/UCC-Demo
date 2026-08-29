@@ -45,27 +45,36 @@ BLOCKING = [block_on("zipcode"), block_on("substr(name_clean,1,4)")]
 #: boundary between modes. The rule's premise (a bimodal weight distribution) does
 #: not hold on this data.
 #:
-#: 6.0 is the value the PRE-REGISTRATION ITSELF names as the fallback for "no
-#: interior minimum", which is the pathology actually present -- the implementation
-#: only tested for a minimum on the interval BOUNDARY, so it could not detect a
-#: spurious interior one. The override therefore invokes the rule's own escape
-#: hatch rather than substituting a hand-picked number.
+#: [CORRECTED -- the original wording here was retracted in DECISIONS.md and is
+#: reproduced nowhere.] 6.0 is NOT "the rule's own escape hatch": the fallback is
+#: conditioned on the histogram being monotone with no interior minimum, and an
+#: interior minimum DID exist -- merely an insignificant one, at smoothed-count 27
+#: of 2,489,916 pairs. The rule was OVERRIDDEN. 6.0 was chosen because it was the
+#: only pre-committed constant available, and because at 11.5 the borderline band
+#: held ~13 pairs per bin, too sparse for P6 to sample from.
 #:
 #: This does not compromise Ship Gate 1. The evaluation is blind because the
 #: labeller never sees weights, predictions or cluster ids -- and no labels existed
 #: when this was chosen. Selecting on cluster-count grounds before labels exist is
 #: legitimate; selecting after they exist would not be. Frozen from here.
 THRESHOLD_REASON = {
-    "debtors": "FOUNDER DECISION (2026-08-30, before any label existed): rule returned "
-               "11.5 from a valley of smoothed-count 27 out of 2,489,916 pairs -- tail "
-               "noise, not a mode boundary. 6.0 is the pre-registration's own named "
-               "fallback for 'no meaningful interior minimum', which is the pathology "
-               "actually present.",
-    "lenders": "LEAD DECISION under the founder's delegation of threshold choice "
-               "(locked row 15), by the stated rule 'lowest threshold at which the "
-               "pre-registered non-degeneracy bar passes'. Rule's fallback gave 6.0; "
-               "measured CC largest-cluster 6.0->2.31% FAIL, 7.0->1.04% FAIL, "
-               "8.0->0.85% PASS.",
+    # [CORRECTED] Both strings previously asserted justifications that DECISIONS.md
+    # formally retracted. They are printed at every run, so the retraction was live
+    # in the log and dead in the code -- which reads as a cosmetic retraction and is
+    # worse than never retracting. Corrected wording below matches the log.
+    "debtors": "FOUNDER DECISION (2026-08-30, before any label existed). The "
+               "pre-registered rule was OVERRIDDEN, not satisfied: it returned 11.5 "
+               "from a valley of smoothed-count 27 out of 2,489,916 pairs -- tail "
+               "noise. Its fallback branch (monotone / no interior minimum) did NOT "
+               "fire, because an interior minimum existed; it was merely "
+               "insignificant. 6.0 was chosen because it was the only pre-committed "
+               "constant available. See DECISIONS.md, P5 audit response.",
+    "lenders": "LEAD DECISION under the founder's delegation (locked row 15): the "
+               "lowest INTEGER weight at which the pre-registered non-degeneracy bar "
+               "passes -- ~0.96 above the measured infimum of ~7.0411, taken "
+               "conservatively. NOT 'the lowest threshold at which the bar passes', "
+               "which an earlier version of this string claimed and which is false. "
+               "Integer ladder: 6.0->2.3087% FAIL, 7.0->1.0444% FAIL, 8.0->0.8465% PASS.",
 }
 
 THRESHOLD_OVERRIDE = {

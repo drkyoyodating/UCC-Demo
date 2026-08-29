@@ -10,8 +10,10 @@ confirmation was written into this file in the SAME commit as the labelling file
 NOT strictly predate the sample. It does not bias the sample — strata are selected on match weight and
 record patterns, never on the decision rule — but the git-evidence chain for R4 alone is weaker than for
 the other nine rules, and saying so is cheaper than being caught not saying it.
-**R11–R13 were added later still**, after the pre-label audit found the gaps and BEFORE any label existed
-(commit below). Same reasoning: they cannot affect which pairs were drawn.
+**The rules were RESTRUCTURED after the pre-label and cross-phase audits**, with ZERO labels in existence
+(verified: 330 rows, 0 non-blank). The first draft is `a725496`; the R11-R13 additions `54b076c`; this
+restructure the commit below. None of it can affect which pairs were drawn — strata are selected on match
+weight and record patterns, never on the rule. Same reasoning: they cannot affect which pairs were drawn.
 This commit's timestamp is the pre-registration evidence for Ship Gate 2. Once signed, the rule is
 followed **even when it feels wrong**; deviations are noted in a comment column, never improvised.
 
@@ -29,66 +31,73 @@ Not "are these related", not "do these share an owner". **One borrower.**
 
 ---
 
-## Rules, in priority order
+## How to work a pair: two steps
 
-**R1 — Suffix-only difference at the same address → SAME.**
-`ACME EXCAVATING LLC` vs `ACME EXCAVATING INC` at one address is **SAME**. Entities convert between legal
-forms routinely and keep filing. *(Founder-locked, question 8a.)*
+### STEP 1 — Clean up the fields before you compare anything
+These are *pre-processing*, not tie-breakers. Apply them first, always, before any rule below.
 
-**R2 — Distinct legal entities of one corporate family → DIFFERENT.**
-`WELLS FARGO BANK NA` vs `WELLS FARGO EQUIPMENT FINANCE INC` is **DIFFERENT** — separately chartered
-entities. Any commercial roll-up is presentation, shown separately on the league table, never in the
-ground truth. Same for `X, A DIVISION OF Y` vs `Y`: **DIFFERENT**. *(Founder-locked, question 8b.)*
+- **P1 — Address formatting is not an address difference.** `WARS RD`/`WARD RD`, `EAST`/`E`,
+  `CO RD`/`COUNTY RD`, `HAMPSEN`/`HAMPDEN`, `P.O. BOX`/`PO BOX`, `1200 S. TOWNSEND`/`1200 S TOWNSEND`,
+  a ZIP+4 written `80110-2109` or `801102109` — one address written two ways. Treat as the SAME address.
+- **P2 — A ZIP that disagrees while the name and street agree is a data error.** Ignore it and decide on
+  name and street. (A ZIP+4 vs its 5-digit form is not a disagreement at all — see P1.)
+- **P3 — A wrong state code is a data error.** `CT` on a record whose city, street and ZIP are plainly
+  Colorado: ignore the state field.
+- **P4 — A blank field is not evidence either way.** Decide on the fields that are present. Never read a
+  missing address as "a different address".
 
-**R3 — Same name, different Colorado cities, no shared address → DIFFERENT.**
-`JOHNSON CONSTRUCTION` in Denver and in Pueblo is **DIFFERENT** unless something else ties them.
-*(Founder-locked, question 8c.)*
+### STEP 2 — Then apply the rules, in this priority order
 
-**R4 — Same name, same city, different street address → SAME.**
-A firm with a yard and an office, or one that moved. `ACME CONTRACTING LLC` at two Lakewood addresses is
-**SAME**. *(FOUNDER-CONFIRMED at sign-off, 2026-08-30: SAME.)*
+**R0 — Identical name AND identical address → SAME.** The trivial case. Stated so it is never in doubt.
 
-**R5 — DIFFERENT NAMES AT THE SAME ADDRESS → DIFFERENT, unless the names themselves say otherwise.**
-**This is the most important rule in the document.** A shared address is *not* evidence of one firm:
-registered agents, franchise headquarters, medical groups, law offices and rural family properties all
-put unrelated filers at one address. `ARROWHEAD TRAVEL PLAZA` and `ERNST BROTHERS` at one address are
-**DIFFERENT**. Numbered outlets of one chain — `COUNTRY HARVEST BUFFET 103` vs `COUNTRY HARVEST BUFFET
-500` — are **SAME** (the name says so, not the address).
-*The model is known to over-merge on exactly this pattern; the rule exists to measure that, so apply it
-strictly.*
+**R1 — Plainly different firms with no shared address → DIFFERENT.**
+`NORWEST BANK COLORADO / 129 South 3rd St` vs `FIRST SECURITY BANK / 201 South Third St` → **DIFFERENT**.
+This is the commonest case in the file. It needs no further thought.
 
-**R6 — Individuals.** Two person-names at one address (spouses, parent and child, e.g.
-`LESTER HASART` and `DIXIE HASART`) are **DIFFERENT** — different borrowers. A person and their farm
-(`LESTER HASART` vs `TOP END FARMS`) are **DIFFERENT** unless the names overlap.
+**R2 — Is one name a damaged, shortened or abbreviated version of the other? → SAME.**
+`AMEERICAN NATIONAL BANK`, `AMERICAN NATINAL BANK`, `AMERICAN NATIONAL BANJ` are all the same firm as
+`AMERICAN NATIONAL BANK`. `COOPERS CONST` = `COOPERS CONSTRUCTION`. `COLO NATIONAL BANK` = `COLORADO
+NATIONAL BANK`. `U S BANK` = `US BANK`. Truncations too: `COLORADO BANK AND TRUST CO OF LA JUN` = `... LA
+JUNTA`. **Test this BEFORE R5** — a spelling variant of one name is not a different name.
 
-**R7 — Obvious typo / OCR variant of the same name → SAME.**
-`AMEERICAN NATIONAL BANK`, `AMERICAN NATINAL BANK`, `AMERICAN NATIONAL BANJ` are all **SAME** as
-`AMERICAN NATIONAL BANK`. Truncations too: `COLORADO BANK AND TRUST CO OF LA JUN` = `... LA JUNTA`.
+**R3 — Suffix-only difference → SAME.** `ACME EXCAVATING LLC` vs `ACME EXCAVATING INC`. Entities convert
+legal form and keep filing. *(Founder-locked, question 8a.)*
 
-**R8 — Abbreviation of the same name → SAME.** `COLO NATIONAL BANK` = `COLORADO NATIONAL BANK`;
-`U S BANK NATIONAL ASSOCIATION` = `US BANK NATIONAL ASSOCIATION`.
+**R4 — Same name, same city, different address → SAME.** A yard and an office, or a firm that moved.
+Different PO Box numbers count as a different address, so this rule applies to them too.
+*(Founder-confirmed at sign-off.)*
+
+**R5 — Same name, different Colorado cities, no shared address → DIFFERENT.**
+`JOHNSON CONSTRUCTION` in Denver and in Pueblo. *(Founder-locked, question 8c.)*
+
+**R6 — DIFFERENT NAMES AT THE SAME ADDRESS → DIFFERENT.**
+**The most important rule in the document.** A shared address is not evidence of one firm: registered
+agents, franchise headquarters, medical groups, law offices and rural family properties all put unrelated
+filers at one address. `ARROWHEAD TRAVEL PLAZA` and `ERNST BROTHERS` at one address are **DIFFERENT**.
+`INTERNATIONAL KINGS TABLE 105` and `GILCHRIST FOOD GROUP` at one address are **DIFFERENT**.
+*Exception, and it is the only one:* numbered outlets of one chain — `COUNTRY HARVEST BUFFET 103` vs
+`COUNTRY HARVEST BUFFET 500` — are **SAME**, because the **name** says so, not the address.
+*R2 is tested first: `AMERICAN NATIONAL BANJ` at the same address as `AMERICAN NATIONAL BANK` is a typo,
+not a different name, and is SAME.*
+*The model is known to over-merge on exactly this pattern. Apply R6 strictly — measuring that is the point.*
+
+**R7 — Distinct legal entities of one corporate family → DIFFERENT.**
+`WELLS FARGO BANK NA` vs `WELLS FARGO EQUIPMENT FINANCE INC` — separately chartered. `X, A DIVISION OF Y`
+vs `Y` → **DIFFERENT**. *(Founder-locked, question 8b.)*
+
+**R8 — TWO DIFFERENT person-names at one address → DIFFERENT.** Spouses, parent and child
+(`LESTER HASART` / `DIXIE HASART`) are different borrowers. A person and their farm
+(`LESTER HASART` vs `TOP END FARMS`) → **DIFFERENT** unless the names overlap.
+**The SAME person at one address is SAME** — `HASART JEROLD G` vs `HASART JEROLD G` is one person, and a
+spelling difference in the address is handled by P1.
 
 **R9 — Successor / renamed entity → DIFFERENT**, unless one name visibly contains the other.
-`NORWEST BANK COLORADO` and `WELLS FARGO BANK` are **DIFFERENT** here even though one became the other:
-we are labelling records as filed, not corporate history.
+`NORWEST BANK COLORADO` and `WELLS FARGO BANK` are **DIFFERENT** here: we label records as filed, not
+corporate history.
 
-**R11 — Address FORMATTING is not an address difference.** `WARS RD` / `WARD RD`, `EAST` / `E`,
-`CO RD` / `COUNTY RD`, `HAMPSEN` / `HAMPDEN`, a ZIP+4 written `80110-2109` or `801102109` — these are one
-address written two ways, not two addresses. Resolve them to "same address" FIRST, then apply R1 or R5.
-R4 is for a genuinely different *location*, not for a typo.
-
-**R12 — A divergent state code on an otherwise-Colorado record is a data error. Ignore it.**
-If one record says `CT` while its city, ZIP and street are plainly Colorado, treat the state field as
-noise and decide on everything else. Do not let it trigger R3.
-
-**R13 — Different PO Box numbers are a genuine address difference**, so R4 governs: same name, same city,
-different box → **SAME**. A PO Box on one record and a street address on the other, same name and city,
-is also **SAME** under R4. Different name at either → R5 applies and the answer is **DIFFERENT**.
-
-**R10 — When two rules collide, the lower number wins.** When genuinely undecidable after applying all of
-them, answer **UNSURE**.
-
----
+**R10 — Precedence.** Step 1 always runs first. Then, among the rules above, **the lower number wins** —
+with the ordering as written, which already puts R2 (typos and abbreviations) ahead of R6 (same address).
+When genuinely undecidable after all of it → **UNSURE**, and move on without agonising.
 
 ## What you must NOT do
 - Do not look anything up. No Google, no Secretary of State search. The rule is the rule; outside
