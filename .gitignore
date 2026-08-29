@@ -1,0 +1,24 @@
+# --- environments ---
+.venv/
+ucc-venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- data: the repo ships code + a small sample + a fetch script, never gigabytes ---
+*.duckdb
+*.duckdb.wal
+raw_pages/
+checkpoints/
+*.parquet
+
+# --- the published SQLite export is deliberately NOT ignored ---
+!docs/ucc.db
+
+# --- private planning / career documents: never publish ---
+UCC_DEMO_RUNBOOK.md
+artifactdemo.md
+artifact-data-verification.md
+*resume*.md
+*linkedin*.md
+*contract work*.md
