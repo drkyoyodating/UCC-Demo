@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Who finances equipment in Colorado</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1a1a18;--mut:#6b6b66;--line:#e3e3df;--acc:#7a5c2e}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#131311;--fg:#eceae4;--mut:#9a978e;--line:#2c2c28;--acc:#c9a765}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:60rem;margin:0 auto;padding:4rem 1.5rem}
+h1{font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.15;letter-spacing:-.02em;margin:0 0 .75rem;font-weight:650}
+.sub{color:var(--mut);font-size:1.05rem;margin:0 0 2.5rem;max-width:44rem}
+.badge{display:inline-block;font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--acc);border:1px solid var(--line);border-radius:2rem;padding:.3rem .8rem;margin-bottom:1.5rem}
+.card{border:1px solid var(--line);border-radius:.6rem;padding:1.5rem;background:color-mix(in srgb,var(--fg) 2.5%,transparent)}
+dt{font-weight:600;margin-top:1rem}dd{margin:.15rem 0 0;color:var(--mut)}
+footer{margin-top:3.5rem;padding-top:1.5rem;border-top:1px solid var(--line);color:var(--mut);font-size:.85rem}
+a{color:var(--acc)}
+</style></head><body><main>
+<div class="badge">Build in progress</div>
+<h1>Who finances equipment in Colorado</h1>
+<p class="sub">Entity resolution over Colorado's public UCC lien register: ~4.1&nbsp;million raw debtor and
+secured-party records resolved into canonical firms, with precision, recall and canonical-ID stability
+measured rather than asserted.</p>
+<div class="card">
+<p style="margin-top:0"><strong>This page is a placeholder.</strong> The pipeline is being built in the open; this
+shell exists to verify the deploy path. The finished page will carry:</p>
+<dl>
+<dt>Lender league table</dt><dd>Top canonical secured parties on equipment filings, with cumulative market share.</dd>
+<dt>Entity timeline</dt><dd>Filings per year for a given canonical firm, with continuation and termination.</dd>
+<dt>Refinancing window</dt><dd>Active equipment filings approaching their five-year lapse.</dd>
+<dt>The numbers, and what is wrong with them</dt><dd>Precision and recall on blind hand-labelled pairs with
+confidence intervals and stated denominators, plus canonical-ID stability across re-resolution.</dd>
+</dl>
+</div>
+<footer>
+Source data: Colorado Secretary of State via <a href="https://data.colorado.gov">data.colorado.gov</a> (public record).
+Not affiliated with, endorsed by, or sponsored by the State of Colorado.
+&middot; <a href="https://github.com/drkyoyodating/UCC-Demo">Repository and write-up</a>
+</footer>
+</main></body></html>

@@ -13,7 +13,7 @@ Repo: https://github.com/drkyoyodating/UCC-Demo · Branch `main`
 ## Phase ledger
 | Phase | Planned | Status | Gate | Audit | Commit | Deviations |
 |---|---|---|---|---|---|---|
-| P0 Setup | 0–0.5 | ✅ **COMPLETE** | n/a (§1.0 pre-answered) | 1 combined | — | venv is `.venv/` on py3.14.7, not `ucc-venv/`; optional deps split out |
+| P0 Setup | 0–0.5 | ✅ **COMPLETE** | n/a (§1.0 pre-answered) | 1 combined **PASS** | `67ebc57` | venv is `.venv/` on py3.14.7, not `ucc-venv/`; optional deps split out |
 | P1 Ingest | 0.5–2 | ⏳ next | auto-proceed | 1 combined | | |
 | P2 Normalizer + skeleton | 2–4 | — | auto-proceed | 1 combined | | |
 | P3 Corpora | 4–6 | — | **HARD STOP** | 1 combined | | |

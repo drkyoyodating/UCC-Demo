@@ -14,3 +14,38 @@ that survives a context compaction mid-project.
 - SEED = 20260830, fixed project-wide. EM in 4.0.16 has no RNG; the only stochastic step is `estimate_u_using_random_sampling(seed=...)`. Seeded, the pipeline is deterministic — required for the P6 stability number to measure clustering churn rather than our own sampling noise.
 - LICENSE: MIT, code only, with an explicit Colorado open-data attribution and non-affiliation notice.
 - `.gitignore` excludes UCC_DEMO_RUNBOOK.md and the Desktop career docs (they contain interview-odds framing and the drafted outreach email); `docs/ucc.db` is deliberately NOT ignored.
+
+## P0→P1 boundary — findings from the spread-offset sample (50k debtors, 25k secured parties)
+Fetched BEFORE the full walk precisely because the projection is irreversible afterwards. These are
+new facts the evidence file did not record; they are not a re-verification of Appendix B.
+
+- **Debtors: 44.8% of rows have a BLANK `organizationname`** (22,422 / 50,000). The full column list
+  for `8upq-58vz` is `debtorid, fileid, actiontypecode, actiontype, recordstatuscode, recordstatus,
+  organizationname, address1, city, state, country, zipcode, efsuniqueid` — there is **no first/last
+  name column anywhere**. Colorado does not publish individual debtor names. So the named-organization
+  debtor universe is ~55% of 2,012,155 ≈ **1.11M rows**, not 2.01M. NO PROJECTION CHANGE IS NEEDED —
+  there is nothing further to pull — but P3's corpus math and the README's coverage table must use the
+  named figure, and the headline sentence must say "ingested 4.09M party records" (true) and resolve
+  only the named subset (also true). This is a finding to state, not a problem to fix.
+- **Secured parties: only 1.2% blank** (294 / 25,000). The lender side is 98.8% named — the half that
+  carries the front-page league table is essentially complete. Asymmetry is expected: lenders are
+  organizations, debtors are often individuals.
+- **Address completeness is excellent and ZIP blocking is viable:** address1 blank 0.5–0.6%, city 0.5%,
+  zipcode 0.3–1.5%. This is the P4 input that drives P5 comparison design; it argues for keeping
+  address in the comparison set rather than treating it as mostly-missing.
+- **Non-ASCII organization names: 2 in 50,000 (0.004%).** This converts runbook §1.3's assertion that a
+  Unicode confusable-map stage "provably fires zero times" from a claim into a MEASURED number. Use the
+  number in the write-up.
+- **`actiontype`:** 98.0% `add`, 1.5% `change only`, 0.4% `delete only`, 0.02% `change and delete`.
+  **`recordstatus`:** 98.1% active / 1.9% inactive. Filtering deleted/inactive rows matters but is small.
+- **`assignor` = '0' for all 25,000 sampled secured parties.** The feared double-count-under-two-lenders
+  effect may be negligible; P4 must confirm across the full table before the league table is trusted.
+- **Live entity-resolution evidence, visible in a 25k sample:** `HSBC BANK NEVADA, N.A.` (1,192 filings)
+  and `HSBC BANK NEVADA N.A.` (330 filings) are the same lender split by a single comma — 1,522 filings
+  fragmented across two strings. This is the project's premise demonstrated in raw data and belongs in
+  the README as the worked example.
+- **The EQUIPMENT filter is load-bearing, confirmed:** the top raw secured parties are dominated by auto
+  insurance and consumer credit (STATE FARM, PROGRESSIVE, FARMERS, ALLSTATE, HSBC, GE MONEY BANK). The
+  one clear equipment financier in the top 12 is `KOMATSU FINANCIAL LIMITED PARTNERSHIP`. Without the
+  EQUIPMENT collateral filter the "who finances equipment in Colorado" league table would be an auto-
+  insurance table. This validates locked decision §1.0 row 7.
