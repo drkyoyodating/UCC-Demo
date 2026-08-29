@@ -49,3 +49,70 @@ new facts the evidence file did not record; they are not a re-verification of Ap
   one clear equipment financier in the top 12 is `KOMATSU FINANCIAL LIMITED PARTNERSHIP`. Without the
   EQUIPMENT collateral filter the "who finances equipment in Colorado" league table would be an auto-
   insurance table. This validates locked decision §1.0 row 7.
+
+## P1 — Ingest design (pre-registered before the walk)
+- **Pre-walk API counts taken and matched Appendix B EXACTLY** — filings 2,587,492 · debtors 2,012,155 ·
+  secured parties 2,082,624 · collateral 1,702,184. Zero drift. Counts are re-taken AFTER the walk and
+  reconciliation is against the POST-walk number (the register refreshes during a 170-page walk).
+- **`$order` on every request**, keyed to each table's real primary key: `transactionid` / `debtorid` /
+  `spid` / `collateralid`. Socrata does not guarantee stable implicit ordering; without `$order` a walk can
+  re-emit and skip rows silently, and a count check cannot see it because a duplicate-plus-skip preserves
+  the count. Acceptance therefore also asserts `count(*) == count(DISTINCT pk)` per table.
+- **Collateral projection widened.** The probe revealed a real primary key `collateralid` plus
+  `actiontype` / `recordstatus` (and `farmproductflag`) that the evidence file never recorded. Pulling the
+  PK now avoids the `:id` pseudo-column and makes the distinct-key acceptance test possible. Free now,
+  a second 35-page walk later.
+- **DEVIATION from the runbook's "gzipped NDJSON":** pages are landed as **gzipped CSV**. Socrata's JSON
+  output omits keys whose value is null, so across 170 pages the inferred schema is unstable — and 44.8%
+  of debtor rows have a null `organizationname`. CSV always emits every projected column. Same principle
+  (land to disk before loading; resume is a file-existence check), more robust encoding. CSV quoting is
+  already proven on this data by the P0 sample, which contained names like `COLORADO-DENVER DELIVERY, INC.`
+- **Atomic writes** (tmp + `os.replace`) so an interrupted fetch can never leave a short file that a resume
+  would mistake for complete.
+- **Termination only on a short page.** The natural `if not rows: break` treats a 429 or a timed-out page as
+  end-of-dataset and exits 0 on a truncated table. Retries are bounded at 6 with exponential backoff and
+  honour `Retry-After`; exhaustion raises rather than returning short.
+- All columns loaded as **VARCHAR**. No type inference at ingest — `continuation`/`terminationflag` arrive as
+  the strings `"true"`/`"false"`, `filingdate` as an ISO timestamp string, and zip codes must not become
+  integers. Casting happens downstream where the semantics are decided, not silently at load.
+- Parquet exported per table on completion so every downstream read-only agent works from parquet and
+  never opens the DuckDB file (single-writer lease protocol).
+- **Filings schema confirms the P7 refi-window correction:** the first row is `transactiontype=Amendment`
+  with `transactionid` 10002102626 != `masterdocumentid` 19942055999, carrying `terminationflag=true`.
+  Continuation/termination are properties of separate amendment ROWS keyed to a parent document, not flags
+  on the original filing. The naive "no continuation, no termination" filter would exclude nothing.
+
+## P1 — Ingest RESULT (2026-08-30) — ACCEPTANCE PASS
+Walk: 170 pages, 8,384,455 rows, ~11 min, 128 MB gzipped on disk, 173 MB parquet. Zero retries needed
+beyond one transient 37s server stall that the backoff absorbed.
+
+| table | loaded | API rows | distinct pk | API distinct pk |
+|---|---|---|---|---|
+| filings | 2,587,492 | 2,587,492 | 2,572,528 | 2,572,528 |
+| debtors | 2,012,155 | 2,012,155 | 2,012,155 | 2,012,155 |
+| secured_parties | 2,082,624 | 2,082,624 | 2,082,624 | 2,082,624 |
+| collateral | 1,702,184 | 1,702,184 | 1,698,376 | 1,698,376 |
+
+**CORRECTED ACCEPTANCE TEST — the original was wrong and this matters.** The first version asserted
+`count(*) == count(DISTINCT pk)` and FAILED the phase, reporting "unordered-paging corruption" on filings
+and collateral. That test conflated two different questions: *is this column a unique key* and *did paging
+work*. It is not a valid paging test, because a source is entitled to non-unique keys and duplicate rows,
+and an ingest must not silently "fix" them.
+
+The valid test is a **two-way match against the API's own aggregates**: loaded rows == `count(*)` AND
+loaded distinct == `count(distinct pk)`. Those are only jointly satisfiable by a faithful copy — a walk
+that duplicated a row must have skipped another to keep the total right, which would drive our distinct
+count BELOW the API's. Both hold for all four tables, so the walk is proven clean.
+
+**Genuine source data-quality findings (properties of Colorado's data, not of our pipeline):**
+- **`filings.transactionid` is NOT unique — 14,964 repeats (0.578%).** The real grain is
+  `(transactionid, fileid)`: one transaction can act on several files. Verified example: transactionid
+  19952082638 appears against fileids 34545/34549/34552/34553, identical in every other column.
+  **Any P7 view that counts filings by transaction must respect this grain or it will undercount.**
+- **`collateral.collateralid` is NOT unique — 3,808 repeats (0.224%), and every one is a
+  FULLY-IDENTICAL duplicate row.** Exact duplicates in the source. **P3's EQUIPMENT filter joins through
+  this table, so it MUST `SELECT DISTINCT` or dedupe on collateralid, or the equipment filing population
+  is inflated by up to 0.22% and every downstream count inherits the error.**
+- filings additionally carries 12 fully-identical duplicate rows (0.0005%). Negligible but recorded.
+- Splink's `unique_id` therefore comes from `debtorid` / `spid`, which ARE perfectly unique (verified
+  against the API) — exactly why the projection was widened before the walk.
