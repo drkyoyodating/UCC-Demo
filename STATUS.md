@@ -6,7 +6,7 @@ Repo: https://github.com/drkyoyodating/UCC-Demo · Branch `main`
 ## Meters
 | Meter | Reading |
 |---|---|
-| BUDGET (planned hours earned at DoD) | **2.0 / 24** |
+| BUDGET (planned hours earned at DoD) | **4.0 / 24** |
 | Modelling freeze | hour 16 |
 | FOUNDER minutes spent | 0 / 240 (90 reserved for labelling) |
 
@@ -15,7 +15,7 @@ Repo: https://github.com/drkyoyodating/UCC-Demo · Branch `main`
 |---|---|---|---|---|---|---|
 | P0 Setup | 0–0.5 | ✅ **COMPLETE** | n/a (§1.0 pre-answered) | 1 combined **PASS** | `67ebc57` | venv is `.venv/` on py3.14.7, not `ucc-venv/`; optional deps split out |
 | P1 Ingest | 0.5–2 | ✅ **COMPLETE** | auto-proceed | 1 combined **PASS-w-findings** | `e6bb419` | acceptance test corrected mid-phase (see DECISIONS); pages landed as CSV.gz not NDJSON |
-| P2 Normalizer + skeleton | 2–4 | — | auto-proceed | 1 combined | | |
+| P2 Normalizer + skeleton | 2–4 | ✅ **COMPLETE** | auto-proceed | 1 combined **PASS** | `2c32c40` | step 5 (boilerplate strip) added post-audit, founder-approved; walking skeleton deferred to P3 |
 | P3 Corpora | 4–6 | — | **HARD STOP** | 1 combined | | |
 | P4 EDA | 6–7.5 | — | auto-proceed | 1 | | |
 | P5 Splink debtors | 7.5–15 | — | **HARD STOP** (threshold delegated, §1.0 r15) | 3 | | |
