@@ -438,3 +438,70 @@ This section is committed before `src/resolve.py` exists. The commit hash is the
 - `resolve(table, seed)` is written as a callable from line one so P5b is a second call, never a refactor
   at hour 15. Both trained models are saved with `save_model_to_json` and committed, and P6's second run
   LOADS them rather than retraining — otherwise the stability number confounds refit with perturbation.
+
+## P5 / P5b — Splink resolution (2026-08-30). Both pass the non-degeneracy bar.
+
+| | records | rows | scored pairs | threshold | clusters | singletons | largest | largest % |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| debtors | 29,238 | 37,587 | 2,489,916 | **6.0** | 21,033 | 15,752 | 21 | 0.072% ✅ |
+| lenders | 9,096 | 44,919 | 1,290,471 | **8.0** | 4,376 | 3,142 | 77 | 0.847% ✅ |
+
+### The pre-registered threshold rule FAILED its premise, and that is reported, not hidden
+The rule (committed `cfe134b` before any model existed) assumed a bimodal match-weight distribution and
+took the valley between the modes. **Neither corpus is bimodal.** On debtors it returned **11.5** from a
+"valley" whose smoothed count was **27 out of 2,489,916 scored pairs** — a sparse spot in tail noise. At
+11.5 the model merged **227 of 5,327 record pairs that share an identical name AND an identical ZIP
+(4.3%)**, and the borderline band held ~13 pairs per bin, too sparse for P6 to draw 100 borderline labels
+from. On lenders the rule correctly detected monotonicity and fired its fallback, 6.0.
+
+- **Debtors → 6.0. FOUNDER DECISION**, taken before any label existed. 6.0 is the value the
+  pre-registration itself names as the fallback for "no meaningful interior minimum" — the pathology
+  actually present. The implementation only tested for a minimum on the interval *boundary*, so it could
+  not detect a *spurious* interior one. `pick_threshold()` is left EXACTLY as pre-registered and still
+  reports what it returned; the override is recorded beside it.
+- **Lenders → 8.0. LEAD DECISION under the delegated threshold choice**, by a stated rule: *the lowest
+  threshold at which the pre-registered non-degeneracy bar passes*. Measured: 6.0 → 2.31% FAIL,
+  7.0 → 1.04% FAIL, 8.0 → 0.847% PASS.
+- **Neither choice compromises Ship Gate 1.** The evaluation is blind because the labeller never sees
+  weights, predictions or cluster ids — and **no labels existed when either threshold was set**. Choosing
+  on cluster-count grounds before labels exist is legitimate; choosing after would not be. Both are frozen
+  from here, and precision will be published at 4/6/8/10 from the same labels so a reader can verify.
+
+### Two of my own errors, found and fixed
+1. **`record_id` hashed 4 columns while the GROUP BY used 6**, so records differing only in `suffix` or
+   `state` collided. The fix is not merely "hash more columns": dropping suffix from the record key would
+   have merged `ACME`+`LLC` with `ACME`+`INC` at one address inside data preparation — silently
+   pre-deciding locked ground-truth rule 8(a) before the model ever scored the pair, and destroying the
+   signal P2 split the suffix out to preserve. **235 debtor and 174 lender records** were affected.
+2. **`predict(threshold_match_weight=-10)` FILTERS, it does not merely retain.** ~620k scored pairs —
+   including 2,390 identical-name pairs — were dropped before reaching the histogram, which made blocking
+   look broken when it was not. With no floor, **blocking coverage of identical-name pairs is 100%**.
+
+### The lender comparison design was wrong, and the failure was instructive
+P4 concluded "address disagreement must not veto a lender match". I first implemented that by **deleting
+`address1` and `zipcode` from the lender comparison and substituting `state`**. The result merged
+**nothing** — 9,096 records → 9,096 singletons. Diagnosis: with `state` ~100% Colorado, EM converged on a
+degenerate solution where the match signal *was* `state` (m=1.0, u=0.54) while an exact name match carried
+**m=0.0616** — i.e. it concluded only 6% of true matches share a name. Peak weight across 1,290,471 pairs
+was 4.71.
+**Two lessons, both recorded in the code:** "this evidence is weak" is not "remove this evidence" —
+deleting address discards the *positive* signal from the cases where addresses agree, which is exactly
+when a lender match is most certain. And a near-constant field is not a free feature; it is an attractor
+for degenerate EM solutions. **Both corpora now use the same feature set and the weights are LEARNED.**
+The debtor/lender difference P4 predicted now appears as measured parameters rather than a hand-coded
+assumption — a better thing to publish.
+
+### Over-merging: found by hand inspection, quantified, and NOT tuned away
+The 1% bar is a degeneracy guard, not a correctness proof. At the passing threshold of 8.0 the largest
+lender clusters still contain real errors: `COLORADO NATIONAL BANK` + `COLORADO BUSINESS BANK` +
+`COLORADO BUSINESS PARK` in one cluster; `AMERICAN ENERGY FINANCE` inside the `AMERICAN NATIONAL BANK`
+cluster; `AFFILIATED NATIONAL BANK` merged with `BANK ONE COLORADO`. The cause is **transitive chaining** —
+pairwise links A–B and B–C closing into A–C. Single-best-link clustering was measured as an alternative
+(T=7 → largest cluster 18, 0.20%) and **not adopted**, because switching clustering method to make clusters
+look cleaner, after seeing them, is the same shopping the pre-registration exists to prevent. P6's labelled
+precision measures this properly and the README states it.
+
+**The model is also doing real work in those same clusters**, which the write-up must show alongside the
+errors: `AMEERICAN NATIONAL BANK` / `AMERICAN ATIONAL BANK` / `AMERICAN NAATIONAL BANK` /
+`AMERICAN NATINAL BANK` / `AMERICAN NATIOANL BANK` / `AMERICAN NATIONAL BANJ` all resolve to one bank, and
+`COLORADO BANK AND TRUST CO OF LA JUNTA` is recovered across six truncation variants.
