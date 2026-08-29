@@ -6,7 +6,7 @@ Repo: https://github.com/drkyoyodating/UCC-Demo · Branch `main`
 ## Meters
 | Meter | Reading |
 |---|---|
-| BUDGET (planned hours earned at DoD) | **6.0 / 24** |
+| BUDGET (planned hours earned at DoD) | **7.5 / 24** |
 | Modelling freeze | hour 16 |
 | FOUNDER minutes spent | 0 / 240 (90 reserved for labelling) |
 
@@ -17,7 +17,7 @@ Repo: https://github.com/drkyoyodating/UCC-Demo · Branch `main`
 | P1 Ingest | 0.5–2 | ✅ **COMPLETE** | auto-proceed | 1 combined **PASS-w-findings** | `e6bb419` | acceptance test corrected mid-phase (see DECISIONS); pages landed as CSV.gz not NDJSON |
 | P2 Normalizer + skeleton | 2–4 | ✅ **COMPLETE** | auto-proceed | 1 combined **PASS** | `2c32c40` | step 5 (boilerplate strip) added post-audit, founder-approved; walking skeleton deferred to P3 |
 | P3 Corpora | 4–6 | ✅ **COMPLETE** | ✅ corpus A confirmed | 1 combined **PASS-w-findings** | `b1a1b3a` | NULL-key guard relabelled as inert after audit |
-| P4 EDA | 6–7.5 | — | auto-proceed | 1 | | |
+| P4 EDA | 6–7.5 | ✅ **COMPLETE** | auto-proceed | 1 **PASS-w-findings** | `e2cb8a0`+ | blocking-loss stat wrong twice, replaced with a decidable measure; record-level blocking adopted for P5b |
 | P5 Splink debtors | 7.5–15 | — | **HARD STOP** (threshold delegated, §1.0 r15) | 3 | | |
 | P5b Splink lenders | 13.5–14.5 | — | auto-proceed | 3 | | |
 | ⛔ FREEZE | 16 | — | | | | |
