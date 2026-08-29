@@ -1,6 +1,6 @@
 # Pair decision rule — "are these two records the same firm?"
 
-**Status: DRAFT awaiting founder sign-off. Committed BEFORE the labelling file is generated.**
+**Status: SIGNED OFF by the founder 2026-08-30, R4 confirmed SAME. Committed BEFORE the labelling file was generated (draft a725496).**
 This commit's timestamp is the pre-registration evidence for Ship Gate 2. Once signed, the rule is
 followed **even when it feels wrong**; deviations are noted in a comment column, never improvised.
 
@@ -35,7 +35,7 @@ ground truth. Same for `X, A DIVISION OF Y` vs `Y`: **DIFFERENT**. *(Founder-loc
 
 **R4 — Same name, same city, different street address → SAME.**
 A firm with a yard and an office, or one that moved. `ACME CONTRACTING LLC` at two Lakewood addresses is
-**SAME**. *(Recommended default — this case is not yet founder-locked. Confirm or reverse it at sign-off.)*
+**SAME**. *(FOUNDER-CONFIRMED at sign-off, 2026-08-30: SAME.)*
 
 **R5 — DIFFERENT NAMES AT THE SAME ADDRESS → DIFFERENT, unless the names themselves say otherwise.**
 **This is the most important rule in the document.** A shared address is *not* evidence of one firm:
