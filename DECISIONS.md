@@ -135,3 +135,53 @@ The P1 combined audit returned PASS-WITH-FINDINGS. Three findings were upheld an
 3. **The worked example was materially wrong** (4 fileids claimed, 23 actual). Corrected above.
 Also fixed: exact RFC4180 CSV row counting (a naive newline count is wrong when a quoted field contains an
 embedded newline); STATUS.md's stale "pending" commit reference.
+
+## P2 boundary — authoritative full-table figures (supersede the P0 sample estimates)
+Derived from the loaded tables, not from a sample. **These replace the P0 sample numbers wherever they
+disagree, and they do disagree — the P0 note is corrected, not merely refined.**
+
+| | named (org name present) | total | named % | blank % |
+|---|---:|---:|---:|---:|
+| debtors | 951,278 | 2,012,155 | 47.28% | **52.72%** |
+| secured_parties | 2,035,753 | 2,082,624 | 97.75% | 2.25% |
+| **total named party rows** | **2,987,031** | 4,094,779 | 72.95% | — |
+
+**Methodological correction, recorded because it is exactly the kind of thing this project claims to do
+well.** The P0 spread-offset sample (5 × 10k chunks at offsets 0/400k/800k/1.2M/1.6M) estimated the debtor
+blank rate at **44.8%**; the true rate is **52.72%** — an error of ~7.9 points. The secured-party estimate
+was 1.2% against a true 2.25%. A five-point spread sample ordered by primary key is directionally useful
+but is NOT representative, because blankness correlates with the key (older filings skew organizational).
+The sample was the right tool for deciding the projection before the walk; it is the wrong tool for any
+number that gets published. Every figure that reaches the README is re-derived from the full table.
+
+**Consequence for the headline sentence:** we ingest **4,094,779 party records** (plus 2,587,492 filings
+and 1,702,184 collateral rows = 8,384,455 total rows), of which **2,987,031 carry an organization name**
+and are therefore resolvable. Both numbers are true and both will be stated; "resolved 4 million records"
+would not be.
+
+## P2 — corrections to the Session 2 brief (Session 2 was right, the brief was misleading)
+- **The brief claimed debtors carry `recordstatuscode` and secured parties `recordstatuscd`, and that this
+  makes the row-level pipeline incompatible. In OUR tables that is false** — both projections pull plain
+  `recordstatus`, verified by `DESCRIBE`. The `recordstatuscode` / `recordstatuscd` divergence is real but
+  exists only in the **raw datasets we never projected**, so it never reaches the pipeline. Session 2's
+  correction is the one that matters: the genuine per-table differences are `debtorid` vs `spid` and
+  `efsuniqueid` vs `assignor`, which is what `COLUMN_MAP` encodes.
+- The brief's claim was inherited from the evidence file's raw schema dump and was not re-checked against
+  what we actually loaded. Cited-but-unverified is how a stale fact survives; flagged here rather than
+  quietly fixed.
+
+## P2 — measured materiality of the normalizer's known gaps (over all 951,278 named debtor rows)
+Session 2 flagged these as correct-per-rules but bad outcomes, and declined to compensate because the brief
+forbade it — the right call. Measuring them so the decision to close or document is made on evidence:
+
+| shape | rows | % of named |
+|---|---:|---:|
+| trailing `, A ...` clause (`MAIN STREET RESTAURANT INC, A CORPORATION`) | 30,042 | 3.158% |
+| contains `DBA` / `D/B/A` | 8,940 | 0.940% |
+| trailing parenthetical (`HIMARK GROUP, LLC (THE)`) | 4,751 | 0.499% |
+| dangling trailing `AND` / `&` | 587 | 0.062% |
+
+In every shape the trailing noise sits AFTER the legal suffix, so the suffix never peels and the record
+cannot match its clean twin — a systematic recall hole of roughly 4.7% of the corpus. Whether to close it
+before P5 trains on these keys is under audit review, with the explicit instruction to argue both sides
+against real data rather than default to "more normalization is better".
