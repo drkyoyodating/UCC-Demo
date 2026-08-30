@@ -1,127 +1,200 @@
 # SESSION HANDOFF — UCC Entity Resolution Demo
-**Written 2026-08-30 mid-session. Read this FIRST, then `UCC_DEMO_RUNBOOK.md` §1.0 (locked decisions).**
-Repo: https://github.com/drkyoyodating/UCC-Demo (public, `main`). Working dir `/Users/user/Downloads/UCC-Demo`.
-Python: `./.venv/bin/python` (3.14.7). Never `pip install` outside `requirements*.txt`.
+**Complete state as of 2026-08-30. Read this FIRST. It supersedes all earlier handoffs.**
+
+Repo: https://github.com/drkyoyodating/UCC-Demo (public, `main`) · Dir `/Users/user/Downloads/UCC-Demo`
+Python: `./.venv/bin/python` (3.14.7, splink 4.0.16, duckdb 1.4.5, pandas 2.3.3 — pins are load-bearing)
+Runbook: `UCC_DEMO_RUNBOOK.md` (**gitignored — never publish**, it carries interview framing and a draft email)
 
 ---
-## 1. WHAT THIS IS
-A portfolio demo proving entity-resolution capability to **Tex**, a lender-intelligence data company
-(their spec: *"entity resolution that turned 48M raw names into 9.1M canonical firms"*, 310+ sources).
-Founder is Will Kerr. The demo must be **live, public, honest, and machinery-relevant**.
+## 1. WHAT THIS IS AND WHO IT IS FOR
+A public portfolio demo proving entity-resolution capability to **Tex**, a lender-intelligence data
+company whose spec reads *"entity resolution that turned 48M raw names into 9.1M canonical firms"* across
+310+ sources. Founder: Will Kerr. The job posting explicitly wants someone **adept with AI-first tools
+(Claude, Cursor) and pays for the subscriptions** — so AI-in-the-loop is the demonstrated skill, not
+something to apologise for. Document the methodology proudly and accurately.
 
-**Terminal budget: there is no token reset and no second attempt.** Finish or it does not ship.
+**Terminal budget: no token reset, no second attempt.** Founder is present continuously until done.
+
+**Founder's working model, stated by him:** the agent generates, he reviews audit reports for variance and
+makes the executive call. He has been right on every call this session — the premises model, entity type
+in the dedup key, the name-string matching rule, killing placeholder rows. **Bring him findings and a
+recommendation, not questions you can answer yourself.**
 
 ---
-## 2. STATUS
-| Phase | State |
+## 2. THE SCOPE — settled after many rounds. Do not re-litigate.
+**Heavy construction equipment finance only. Colorado + Connecticut. 1990 onward.**
+
+Two independent routes qualify a filing (`src/heavy_filter.py`):
+- **ROUTE A** — the LENDER is a heavy-construction manufacturer, captive or dealer. ~60 brands:
+  Caterpillar, John Deere Construction & Forestry, Komatsu, Kubota, CNH, Case, New Holland, Volvo,
+  Hitachi, Liebherr, Doosan, Kobelco, JCB, Terex, Genie, JLG, Manitowoc, Grove, Link-Belt, Sany,
+  Takeuchi, Bobcat, Wacker Neuson, Vermeer, Ditch Witch, Astec, Gradall, Gehl, Manitou, Bomag, Wirtgen,
+  Atlas Copco, Epiroc, Sandvik — plus Colorado dealers **Wagner Equipment** (Cat's CO dealer), Faris
+  Machinery, Honnen, 4 Rivers, Power Equipment.
+- **ROUTE B** — a heavy-construction equipment or trade word appears in the BORROWER'S OWN NAME,
+  whole-word anchored, **plurals and possessives accepted** (`BOBS CRANES`, `SHIFTS EXCAVATORS`,
+  `JIMS CRANE`). Includes the **CONCRETE family** by founder's ruling — a concrete outfit runs mixers,
+  pumpers and boom trucks, so `concrete / cement / mixer / shotcrete / precast / flatwork / rebar /
+  post-tension / curb-and-gutter / concrete pumping` qualify on the name alone.
+
+**EIGHT WORDS WERE CUT after auditing every one against real borrower names — do not re-add:**
+`FOUNDATION` (4,647 hits, almost all charities — *Saint Joseph Hospital Foundation*), `DERRICK` and
+`AUGER` (personal names — *Derrick LeRoy Tadlock*, *Cameron Auger DDS*), `ROLLER` (roller hockey),
+`WRECKING` (auto salvage), `CRUSHER` (car crushers; `CRUSHING` kept — that one is aggregate),
+`SCREENING` (pre-employment), `CONVEYOR`.
+
+### Completeness — hard line, enforced in `src/build_scope.py`
+Required: **(person OR business name) + address + loan year + route A or B.**
+**Lender MAY be blank** — banks will not disclose and cannot be cold-called; the borrower can.
+Instant discard: no address · placeholder address · **both** person and business absent · not heavy construction.
+
+### Jurisdictions cut, and why (each is a line in the write-up)
+| cut | reason |
+|---|---|
+| **NYC ACRIS** | ingested all 11,035,386 party rows to find out: **0.17% machinery**, and it is laundry/knitting equipment. Collateral decodes to FIXTURE FILING 1.74M + COOPERATIVE 2.2M (co-op apartments). Structural, per **§9-501(a)(1)** — after Article 9's 2001 revision county recorders hold fixture and real-property filings, not equipment finance |
+| **Oregon** | ingested 220,515 rows: **no borrower column at all.** A lender with no borrower cannot be contacted or verified |
+| **Philadelphia** | 8 machinery records |
+| **Connecticut** | **CUT THEN REINSTATED.** Cut for having no collateral field — reinstated because **Route B never needed one**: it reads the borrower's name, and CT publishes both party names |
+
+---
+## 3. THE CORPUS AS BUILT
+| region | rows | filings | borrowers | route A | route B | 2013+ | span |
+|---|---:|---:|---:|---:|---:|---:|---|
+| CO | 113,037 | 109,417 | 36,962 | 97,086 | 30,367 | 74,767 | 1990–2026 |
+| CT | 24,199 | 15,619 | 7,590 | 19,186 | 6,874 | 23,133 | 1990–2026 |
+| **total** | **137,236** | **125,036** | **44,478** | | | | |
+
+**→ 49,959 entities at 2.75 loans each** (CO 42,123 · CT 7,836). Tables: `scope_co`, `scope_ct`,
+`scope_all`, `co_entities`, `co_machinery_loans` in `ucc.duckdb` (gitignored).
+
+**The funnel that IS the pitch:** 8,384,455 Colorado rows in → **238,374** machinery party records →
+**97.16% of the register discarded.** Not "I ingested 8M rows" — *"I can tell you which 3% matter."*
+
+---
+## 4. THE FIVE FACTS THAT WOULD BE EXPENSIVE TO REDISCOVER
+1. **Colorado stopped coding collateral after 2012.** `EQUIPMENT` runs 1990–2012 (2011: 2,940 · 2012: 998
+   · **2013: 1**) while total filings ROSE to 134,391 in 2025. Post-2013 only agricultural categories
+   survive, because **EFS** filings are legally required to carry collateral and UCC-1s are not.
+2. **The inference that recovers it, VERIFIED:** 3,848 lenders wrote categorised EQUIPMENT liens; **747
+   still file after 2013, accounting for 136,416 filings — 3.3× the entire historical EQUIPMENT
+   population.** *Who lent* is the proxy for *what the collateral is*. This is the demo's best idea and it
+   is why post-2012 data is KEPT (founder confirmed his earlier "cut post-2012" is superseded).
+3. **The debtor model was an address matcher wearing a name matcher's costume.** Exact-name `m=0.002741`
+   → a total name mismatch cost 0.016 bits → 73.7% of merges shared an identical address. Two defect
+   classes: **C1** 4,217 same-address/dissimilar-name (97.6% wrong) and **C2** 4,625 same-address/
+   similar-name family members (100% of the [10,999) band).
+4. **PREMISES GROUPS — founder's model, and it is right.** `WOOD DONNA L` / `WOOD DONALD J` at one PO box
+   are **two legal borrowers, one operation** (married, co-signed). Do NOT merge, do NOT discard. Third
+   layer: entity (identity) · **premises (co-location)** · lender→borrower. Converts the model's hardest
+   failures into a feature and sidesteps an ambiguity no algorithm can resolve.
+5. **No phone numbers exist** in any of the four registers. Name + address only.
+
+---
+## 5. MODEL STATUS — read this before changing anything
+| model | precision | recall |
+|---|---|---|
+| shipped baseline `resolve.py` @6.0 | 0.500–0.509 | 0.703–0.730 |
+| **`src/variant_combo.py` → `combo_pf` @4.0 (RECOMMENDED)** | **1.000** (Wilson 0.901–1.000) | **0.946** |
+
+`combo_pf` = Strategy B's name floor (`jw≥0.92` OR shared 4-char token set) **AND** Strategy D's
+person/org gate, applied as a **veto** on the shipped score. **R5 violations 0 · C1 defect class 0 ·
+largest cluster 0.072%.**
+
+### ⚠ THE FINDING THAT MATTERS MOST — five agents reported 1.000 on broken models
+Wave 2's selection lead verified instead of trusting and found that **`addr_blind`, `comparison` and
+`ensemble` each merge 2,000 pairs that violate R5** (identical name, different city, nothing shared) —
+`HYDE PARK OF LAS VEGAS` in Aspen merging with the one in Las Vegas. **Not one of the 381 labels
+exercises R5**, so every agent measured 1.000 on a model breaking a signed rule 2,000 times.
+**Lesson: a model's score is only as good as the rules the label set can see.**
+Also: wave 1's `person` gazetteer is **partly label-fitted** (`MERIDIAN` is not a given name). Prefer
+`combo_pf`; `name_floor` @4.0 is the clean-provenance fallback with identical measured numbers.
+
+### Known instrument defects — FIX BEFORE PUBLISHING ANY NUMBER
+- **`src/score.py` is non-deterministic**: 7 of 70 test pairs map to several record combinations and
+  `drop_duplicates("pair_id")` keeps whichever the parallel join emitted first. Baseline recall flips
+  between 0.703 and 0.730 across identical runs. Join on `unique_id`, not text.
+- `score.py` claims `evaluate.py`'s estimator and actually computes raw `tp/(tp+fp)`; `EDGES` is defined
+  and unused; it pools targeted strata that `evaluate.py` forbids pooling.
+- The 30 hidden repeats leaked across the train/test split until 10:12 — **fixed** in `labels_split.py`,
+  but every variant fitted before then was scored on a contaminated split (24 of 70 test pairs).
+
+---
+## 6. LABELLING
+**`docs/UCC_labelling_v4.xlsx` — 1300 rows, CO 650 / CT 650, labels BLANK, with the founder now.**
+Carries loan year, loan count and lender per side. Two question types:
+- **ENTITY** "same firm?" → `SAME` / `DIFFERENT` / `UNSURE`
+- **PREMISES** "one operation?" → `ONE-OP` / `SEPARATE` / `UNSURE` (green rows)
+
+Rules live in `docs/decision_rule.md` (signed) and `docs/LABELLING_BRIEF.md`. **Identity matching per the
+founder:** name is one string split on spaces, **middle initials ignored, forwards or backwards is the
+same party** — `HOWARD JOHN F` = `JOHN HOWARD`. Company not person: dash between surnames
+(`Stutsman-Gerbaz`), any trade word (`Hernandez Excavating`), possessive-plural (`Cohen's`, `Spencers`);
+`O'Brian` is a person. **Entity type is identity: LLC ≠ INC.** Addresses expand fully
+(`RD`=`ROAD`, `HWY`=`HIGHWAY`, `S`=`SOUTH`); same address if street number matches and the abbreviation
+expands to the same string. **Never generate cross-jurisdiction pairs** — *"there are hundreds of
+businesses called YoYo in different states."*
+
+**Prior round (381 labels, superseded scope but methodologically valid):** 30/30 intra-rater,
+98.3% three-way agreement, κ=0.973. The variance auditor's verdict was **"consistency-validated, not
+accuracy-validated"** — two model passes agreeing proves determinism, not correctness. A human pass is the
+only thing that breaks that correlation. Founder is running v4 through a second model outside this shell
+plus manual review, which is the right answer.
+
+---
+## 7. PHASE STATE
+| phase | state |
 |---|---|
 | P0 setup · P1 ingest · P2 normalizer · P3 corpora · P4 EDA · P5/P5b resolution | ✅ complete, audited |
-| P6 evidence | ✅ 381 labels in, evaluated. **Model improvement done — see §4** |
-| P7 publish | ⏳ scope rewritten (§5). NOT built. `docs/index.html` is still a placeholder |
+| P6 evidence | ✅ 381 labels done; **v4 1300-row round in progress with the founder** |
+| P7 publish | ⏳ **NOT BUILT.** `docs/index.html` has 0 charts, 0 tables, 0 scripts |
 | P8 stretch · P9 skill closure | not started |
 
-**Live but unbuilt:** the published page has **0 charts, 0 tables, 0 scripts**.
+**P7 as scoped** (founder-directed): views = active equipment financiers (inference-recovered) · lender
+league table · entity timeline · refi window (**must group by `masterdocumentid`** — continuation and
+termination are separate amendment rows, NOT flags) · **lender→borrower bipartite graph** · **premises
+groups**. Plus an **interactive page** the founder asked for: a draggable match-weight threshold that
+live-updates precision, recall, cluster count and the league table. Single self-contained HTML, D3 from
+cdnjs, no server. **He dictates the final display — do not build it unilaterally.**
 
----
-## 3. THE FIVE THINGS THAT MATTER MOST
-1. **Colorado stopped coding collateral after 2012.** `EQUIPMENT` runs 1990–2012 (2011: 2,940 filings ·
-   2012: 998 · **2013: 1**), while total filings ROSE to 134,391 in 2025. Post-2013 the only categorised
-   collateral is agricultural, because EFS filings are legally required to carry it and UCC-1s are not.
-2. **The inference that fixes it, and it is VERIFIED.** 3,848 lenders wrote categorised EQUIPMENT liens;
-   **747 still file after 2013, accounting for 136,416 filings — 3.3× the entire historical EQUIPMENT
-   population.** They are Tex's exact universe: Caterpillar Financial, John Deere Construction & Forestry,
-   Kubota Credit, Komatsu Financial, CNH Industrial, **Wagner Equipment Co** (Cat's Colorado dealer).
-   *Who lent* is the proxy for *what the collateral is*. This is the demo's best idea.
-3. **The debtor model was an address matcher wearing a name matcher's costume.** Exact-name `m=0.002741`
-   meant a total name mismatch cost 0.016 bits, so 73.7% of merges shared an identical address.
-   Two defect classes: 4,217 same-address/dissimilar-name (97.6% wrong) and 4,625 same-address/
-   similar-name family members (100% of the [10,999) weight band).
-4. **FIXED — see §4.** Precision 0.482 → **1.000**, recall 0.692 → **0.974** on held-out labels.
-5. **PREMISES GROUPS — founder's idea, 2026-08-30, and it is the right model.** `WOOD DONNA L` /
-   `WOOD DONALD J` at one PO box are **two distinct legal borrowers, one operation.** Do NOT merge them
-   and do NOT discard them. Add a **third layer**: entity (identity) · **premises group (co-location)** ·
-   lender→borrower. This converts the model's hardest failures into a feature and sidesteps an ambiguity
-   no algorithm can resolve. **Must appear in both the workbook and the P7 views.**
-
----
-## 4. THE MODEL RESULT — `variant_person` @ threshold 4.0
-| model | precision | recall |
-|---|---:|---:|
-| shipped baseline @6.0 | 0.482 | 0.692 |
-| **`src/variant_person.py` @4.0** | **1.000** | **0.974** |
-
-Strict dominance on both axes. Strategy: detect person-like names, require the **given name** to agree,
-not just the surname. Fit on `labels_train.csv` (246), scored on held-out `labels_test.csv` (132).
-- **0.95 is reached as a POINT ESTIMATE** on held-out labels (1.000) and on an independent 180-pair audit
-  of real output (0.967, 0.929–0.985). Pooled 212/218 = 0.973.
-- **It is NOT certified at 95% confidence** — 74 held-out labels bound it at 0.908. Certifying needs
-  ~337 audited merges drawn from what THIS model merges. One labelling sitting. **This is the cheapest
-  remaining action.**
-- **Rejected:** `variant_comparison` looked good (0.974) but **half its merges land where no label exists**;
-  it merged bare surname `THURSTON` across five towns. Do not ship it.
-- **Do NOT implement an "enumeration veto"** — `docs/decision_rule.md` R6 makes numbered chain outlets
-  (`COUNTRY HARVEST BUFFET 103/500`) correctly SAME.
-
----
-## 5. P7 SCOPE (rewritten v2.6, founder-directed)
-**Machinery and construction ONLY.** Dropped: IRS liens (157,558), hospital liens (32,847), consumer goods,
-Snap-on (hand tools), AGCO (pure agriculture), De Lage Landen (office/medical leasing).
-**Kept lender set** (construction/heavy-machinery OEM captives + dealers): Caterpillar, Komatsu, Bobcat,
-Terex, JLG, Vermeer, Ditch Witch, Hitachi, Liebherr, Doosan, Takeuchi, Manitowoc, JCB, Kubota, CNH,
-Case, New Holland, Volvo, John Deere Construction & Forestry, Wagner Equipment, plus name patterns
-MACHINERY / CONSTRUCTION EQUIP / HEAVY EQUIP / CRANE.
-Volumes: **CO 697 construction lenders → 17,350 debtors; 23,776 construction-named debtors.
-CT 127 lenders → 3,388 debtors; 10,190 construction-named debtors.**
-
-**Views to build (none exist yet):**
-1. Active equipment financiers, recovered by inference (**the headline**)
-2. Lender league table · 3. Entity timeline · 4. Refi window (must group by `masterdocumentid` —
-   continuation/termination are SEPARATE amendment rows, not flags)
-5. Lender→borrower bipartite graph · 6. **Premises groups (§3.5)**
-**Interactive page**, founder-requested: draggable match-weight threshold that live-updates precision,
-recall, cluster count and the league table. Single self-contained HTML, D3 from cdnjs, no server.
-
----
-## 6. JURISDICTIONS (4 — Philadelphia EXCLUDED, only 8 machinery records)
-| | endpoint | status |
-|---|---|---|
-| Colorado | `data.colorado.gov` wffy-3uut / 8upq-58vz / ap62-sav4 / 4am6-w6u4 | ✅ 8,384,455 rows |
-| Connecticut | `data.ct.gov` xfev-8smz — both parties + addresses + `dt_lapse` on one row | ✅ 844,675 |
-| NYC ACRIS | `data.cityofnewyork.us` nbbg-wtuz (11.0M parties) + sv7x-dduq | ⏳ ingesting, slow |
-| Oregon | `data.oregon.gov` 2kf7-i54h — **secured parties ONLY, no debtor field** | ⏳ |
-
-**NEVER generate cross-jurisdiction pairs.** Founder: *"there are hundreds of businesses called YoYo in
-different states"* — a shared name across registers is not evidence of a shared firm. One sheet per
-jurisdiction, sampled and labelled independently.
-
-**Only 2 of 50 states publish this free and complete** (CO, CT). *"The generalisation problem is
-commercial, not technical: the ingest code ports in a day; the access does not."*
-
----
-## 7. KEY FILES
-`src/`: `ingest.py` · `ingest_multi.py` (CT+PHL) · `ingest_nyc_or.py` · `normalize.py` · `corpus.py` ·
-`eda.py` · `resolve.py` (frozen shipped model) · **`variant_person.py` (the winner)** · `evaluate.py` ·
-`score.py` (held-out scorer) · `labels_split.py` · `make_label_file*.py` · `make_workbook.py` ·
-`build_machinery_areas.py`
-`docs/`: `index.html` (placeholder) · `decision_rule.md` (13 rules, signed) · `LABELLING_BRIEF.md` ·
-`eda.md` · `UCC_labelling_CO-complete.xlsx` (**381 labels, DONE**) · `labels_key*.sha256`
-Root: `DECISIONS.md` (the running log — **read the P5/P6 sections**) · `STATUS.md` · `ucc.duckdb` (gitignored)
+### Publication blockers still open (from the 43-agent foundation sweep)
+- `README.md` is **31 bytes** while three documents cite it as containing caveats it does not.
+- `docs/eda.md` record-level figures were computed on a 4-column record key that P5 replaced with 6.
+- `labels_key.csv` was never committed despite a commit titled "keys published".
+- Retracted claims still live in `DECISIONS.md` §319-322 and in `resolve.py` docstrings.
+- `SESSION-HANDOFF.md` previously published `1.000/0.974` computed on the leaky split — corrected here.
 
 ---
 ## 8. TRAPS THAT HAVE ALREADY COST TIME
-- `predict(threshold_match_weight=X)` **FILTERS**, it does not merely retain. Passing -10 silently dropped
-  595,382 pairs and made blocking look broken.
-- `pandas.to_parquet` fails — **pyarrow is deliberately not installed.** Write parquet via DuckDB.
-- DuckDB `USING SAMPLE` binds to the **table scan, not the filtered result**. Push the filter into a subquery.
-- `git add -A` will sweep up another session's in-flight files. Commit by explicit path.
-- The runbook is **gitignored** (it carries interview framing and a drafted email). Never publish it.
+- `predict(threshold_match_weight=X)` **FILTERS**, does not merely retain. `-10` silently dropped 595,382 pairs.
+- **`pandas.to_parquet` fails** — pyarrow is deliberately absent. Write parquet via DuckDB.
+- **DuckDB `USING SAMPLE` binds to the table scan, not the filtered result.** Push filters into a subquery
+  or it silently returns almost nothing. This bit twice.
+- **Do not double-escape regex for DuckDB** — pass the pattern verbatim or `\b` and `\s` break silently.
+- DuckDB UDFs returning NULL need `null_handling="special"`. `role` is a reserved word.
+- macOS `sed` has no `\b`. Use Python for word-boundary edits.
+- `git add -A` sweeps up another session's in-flight files. Commit by explicit path.
 - **I overstated pre-registration strength FOUR times** (fallback clause, "lowest threshold", "degeneracy
-  fixed", R4 commit ordering). All retracted in `DECISIONS.md`. Watch for this reflex.
+  fixed", R4 commit ordering) — all retracted in `DECISIONS.md`. **Watch for this reflex.**
 
 ---
-## 9. NEXT ACTIONS, IN ORDER
-1. Finish NYC + Oregon ingest.
-2. Build the per-jurisdiction workbook (CO / CT / NYC / OR), construction-only, **plus premises-group pairs**.
-3. Founder labels it.
-4. Build P7 views + the interactive page.
-5. Re-audit, publish, draft the email (**founder sends it, not the agent**).
+## 9. FILE MAP
+`src/`: `ingest.py` · `ingest_multi.py` (CT+PHL) · `ingest_nyc_or.py` · `normalize.py` · `corpus.py` ·
+`eda.py` · `resolve.py` (frozen shipped model) · `heavy_filter.py` (**the scope filter**) ·
+`build_scope.py` (**builds `scope_*`**) · `build_entities.py` (entity→loans) · `build_sheet_v4.py` ·
+`make_workbook_v4.py` · `evaluate.py` · `score.py` (⚠ defective, see §5) · `labels_split.py` ·
+`variant_combo.py` (**the recommended model**) · `variant_*.py` (9 experiments)
+`docs/`: `index.html` (placeholder) · `decision_rule.md` · `LABELLING_BRIEF.md` · `eda.md` ·
+`UCC_labelling_v4.xlsx` (**live, with founder**) · `UCC_labelled_v3.xlsx` (592, prior scope)
+Root: `DECISIONS.md` (**the running log — read P5/P6**) · `STATUS.md` · `ucc.duckdb` (gitignored)
+
+---
+## 10. NEXT ACTIONS IN ORDER
+1. Founder returns `UCC_labelling_v4.xlsx` (1300 labels).
+2. **Fix `score.py` first** (§5) — it is non-deterministic and every number depends on it.
+3. Re-score `combo_pf`, `name_floor` and the baseline on the new labels. Report precision/recall with
+   intervals and denominators, and **check R5 violations explicitly** — the label set must now be able to
+   see them.
+4. Close the publication blockers (§7), README first.
+5. Build P7 views + the interactive page **to the founder's direction**.
+6. P8, then P9 skill closure (classification is the one listed skill with zero coverage).
+7. Draft the email — **the founder sends it, never the agent.**

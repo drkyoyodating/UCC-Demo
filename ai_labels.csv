@@ -1,0 +1,593 @@
+pair_id,label,note
+CO001,DIFFERENT,"R5 same name, different cities"
+CO002,SAME,"R4 same name, same city, different street"
+CO003,SAME,R4 same city; ZIP mismatch is a data error (P2)
+CO004,SAME,"R4 same city, street vs PO box"
+CO005,DIFFERENT,"R5 same name, different cities"
+CO006,SAME,"R2 typo INDPENDENCE, same address"
+CO007,SAME,"R4 same city, different street"
+CO008,SAME,"R4 same city, different street"
+CO009,SAME,"R0 same address, formatting only (P1)"
+CO010,SAME,"P1 CNTY RD = COUNTY ROAD, same address"
+CO011,SAME,"R4 same city, different street"
+CO012,SAME,"P1 DR vs ROAD, same number and city"
+CO013,SAME,R3/P4 blank address is not evidence; same name
+CO014,DIFFERENT,"R5 same name, different cities"
+CO015,SAME,same street and ZIP; city is a data error (P3)
+CO016,SAME,"R0 same address, suite formatting only"
+CO017,DIFFERENT,"R5 same name, different cities"
+CO018,SAME,"R4 same city, different street"
+CO019,SAME,"R4 same city, different street"
+CO020,SAME,"P1 same address, WELD CR 6; suffix noise (R3)"
+CO021,DIFFERENT,"R5 same name, different cities/states"
+CO022,DIFFERENT,"R5 same name, different cities"
+CO023,DIFFERENT,"R5 same name, different cities"
+CO024,DIFFERENT,"R5 same name, different cities"
+CO025,SAME,"R4 same city, different street"
+CO026,DIFFERENT,"R5 same name, different cities/states"
+CO027,SAME,"R0 same address, unit suffix only"
+CO028,DIFFERENT,"R5 same name, different cities"
+CO029,SAME,"P4 b address is a DBA line, not an address; same name and city"
+CO030,DIFFERENT,"R5 same name, different cities"
+CO031,SAME,P4 b address is a DBA line; same name and city
+CO032,DIFFERENT,"R5 same name, different cities"
+CO033,SAME,"P1 E = EAST, # D = STE D, same address"
+CO034,DIFFERENT,"R5 same name, different cities"
+CO035,SAME,"P1 2ND = SECOND, same address"
+CO036,SAME,"R2 typo TELLRIDE, same address"
+CO037,SAME,"P4 blank address; same name, suffix punctuation only"
+CO038,DIFFERENT,"R5 same name, different cities"
+CO039,DIFFERENT,"R5 same name, different cities"
+CO040,DIFFERENT,"R5 same name, different cities"
+CO041,SAME,"R4 same city, different street number"
+CO042,DIFFERENT,R1 plainly different firms
+CO043,DIFFERENT,"R1 different names, different cities"
+CO044,SAME,"P1 WCR 80 = WELD COUNTY ROAD 80, same address"
+CO045,SAME,"R2 truncation, same PO box"
+CO046,SAME,"R2 truncation/suffix, same corporate name"
+CO047,DIFFERENT,"R1 different names, different cities"
+CO048,DIFFERENT,R1 plainly different firms
+CO049,DIFFERENT,R1 plainly different firms
+CO050,DIFFERENT,R1 plainly different firms
+CO051,SAME,R2 truncation; parenthetical contact only
+CO052,DIFFERENT,R1 plainly different firms
+CO053,DIFFERENT,"R1 different names, different cities"
+CO054,DIFFERENT,R1 plainly different firms
+CO055,DIFFERENT,"R1 concrete vs construction, different firms"
+CO056,DIFFERENT,R1 plainly different firms
+CO057,DIFFERENT,R1 finance corp vs credit union
+CO058,SAME,R2 truncation at an identical address
+CO059,SAME,R2 typos on both sides of one name
+CO060,DIFFERENT,"R1 different names, different cities"
+CO061,SAME,"R2 BROS = BROTHERS, same address"
+CO062,DIFFERENT,R1 plainly different firms
+CO063,DIFFERENT,"R1 different names, different cities"
+CO064,DIFFERENT,"R1 designscapes vs dreamscapes, different cities"
+CO065,DIFFERENT,"R1/R5 qualified name, different cities"
+CO066,DIFFERENT,R1 plainly different firms
+CO067,SAME,"R2/R4 name extension, same city and ZIP"
+CO068,DIFFERENT,"R1 different names, different cities"
+CO069,DIFFERENT,"R1 different names, different cities"
+CO070,DIFFERENT,"R1 concrete vs construction, different cities"
+CO071,DIFFERENT,R1 plainly different firms
+CO072,DIFFERENT,R1 plainly different firms
+CO073,DIFFERENT,"R1 different names, different cities"
+CO074,SAME,"R2/R3 same name plus corporation clause, same ZIP"
+CO075,DIFFERENT,R1 plainly different firms
+CO076,DIFFERENT,R1 plainly different firms
+CO077,DIFFERENT,R1 plainly different firms
+CO078,DIFFERENT,R1 plainly different firms
+CO079,DIFFERENT,"R1 Stroh vs Strohauer, different cities"
+CO080,DIFFERENT,R1 plainly different firms
+CO081,DIFFERENT,R1 plainly different firms
+CO082,DIFFERENT,"R1 steel vs stone, different cities"
+CO083,DIFFERENT,R1 plainly different firms
+CO084,DIFFERENT,R1 plainly different firms
+CO085,DIFFERENT,R1 plainly different firms
+CO086,DIFFERENT,R1 plainly different firms
+CO087,DIFFERENT,R1 plainly different firms
+CO088,DIFFERENT,R1 plainly different firms
+CO089,DIFFERENT,R1 plainly different firms
+CO090,DIFFERENT,"R1 different names, different cities/states"
+CO091,DIFFERENT,R1 plainly different firms
+CO092,DIFFERENT,R1 plainly different firms
+CO093,DIFFERENT,R1 plainly different firms
+CO094,DIFFERENT,R1 plainly different firms
+CO095,DIFFERENT,"R1 paving vs pipeline, different cities"
+CO096,DIFFERENT,R1 plainly different firms
+CO097,DIFFERENT,R1 plainly different firms
+CO098,DIFFERENT,R1 plainly different firms
+CO099,DIFFERENT,"R1 industries vs farms, different cities"
+CO100,DIFFERENT,R1 plainly different firms
+CO101,DIFFERENT,R1 plainly different firms
+CO102,DIFFERENT,R1 plainly different firms
+CO103,DIFFERENT,R1 plainly different firms
+CO104,DIFFERENT,R1 builders vs machinery dealer
+CO105,DIFFERENT,R1 plainly different firms
+CO106,DIFFERENT,R1 plainly different firms
+CO107,DIFFERENT,R1 plainly different firms
+CO108,DIFFERENT,R1 plainly different firms
+CO109,DIFFERENT,R1 plainly different firms
+CO110,DIFFERENT,R1 plainly different firms
+CO111,DIFFERENT,R1 plainly different firms
+CO112,DIFFERENT,R1 plainly different firms
+CO113,DIFFERENT,R1 plainly different firms
+CO114,DIFFERENT,R1 plainly different firms
+CO115,DIFFERENT,"R1 concrete vs masonry, different cities"
+CO116,DIFFERENT,R1 plainly different firms
+CO117,DIFFERENT,R1 plainly different firms
+CO118,DIFFERENT,R1 plainly different firms
+CO119,DIFFERENT,R1 plainly different firms
+CO120,DIFFERENT,"R1 different firms, no shared address"
+CO121,DIFFERENT,"R1 drilling vs environmental svcs, different addresses"
+CO122,DIFFERENT,R1 different firms
+CO123,DIFFERENT,"R1 Diamond vs Diamondback, different towns"
+CO124,DIFFERENT,R1 different firms
+CO125,DIFFERENT,"R1 Gordon vs Gordon Goddard, different cities"
+CO126,DIFFERENT,R1 different firms
+CO127,DIFFERENT,"R1 Hammerskil vs Hammersmith, different cities"
+CO128,DIFFERENT,R1 Summers vs Summit Homes
+CO129,DIFFERENT,R1 Miller Decks vs Miller-HFI
+CO130,DIFFERENT,"R1 contracting vs landscaping, different cities"
+CO131,DIFFERENT,R1 dairy vs landscaping
+CO132,DIFFERENT,R1 different firms
+CO133,DIFFERENT,R1 different firms
+CO134,DIFFERENT,R1 different firms
+CO135,DIFFERENT,R1 Summers vs Summit Supply
+CO136,DIFFERENT,R1 different firms
+CO137,DIFFERENT,R1 different firms
+CO138,DIFFERENT,R1 different firms
+CO139,DIFFERENT,"R1 Mark vs Markel Homes, different cities"
+CO140,DIFFERENT,R1 different firms
+CO141,DIFFERENT,"R1 Earthwork vs Excavating, different cities"
+CO142,DIFFERENT,R1 concrete vs background services
+CO143,DIFFERENT,R1 different firms
+CO144,DIFFERENT,R1 different firms
+CO145,DIFFERENT,R1 different firms
+CO146,DIFFERENT,R1 different firms
+CO147,DIFFERENT,R1 different firms
+CO148,DIFFERENT,R1 different firms
+CO149,DIFFERENT,R1 different firms
+CO150,DIFFERENT,R1 different firms
+CO151,DIFFERENT,R1 different firms
+CO152,DIFFERENT,R1 concrete vs energy services
+CO153,SAME,R2 CORP = CORPORATION abbreviation
+CO154,DIFFERENT,R1 different firms
+CO155,DIFFERENT,R1 different firms
+CO156,DIFFERENT,"R7 Kubota Credit vs Kubota Tractor, separate entities"
+CO157,DIFFERENT,R1 different firms
+CO158,DIFFERENT,R1 different firms
+CO159,DIFFERENT,R1 Landess vs Landscapes Unlimited
+CO160,DIFFERENT,R1 excavation vs treescaping
+CO161,DIFFERENT,R1 different firms
+CO162,DIFFERENT,R1 different firms
+CO163,DIFFERENT,R1 different firms
+CO164,DIFFERENT,R1 different firms
+CO165,SAME,"R2 CORP=CORPORATION, FAA Blvd digit transposition"
+CO166,SAME,"R3 INC vs LLC, same Ceylon Way address"
+CO167,SAME,R2 truncation of COMPANY
+CO168,SAME,"R3 suffix INC added, same city"
+CO169,SAME,R3 INC vs LLC
+CO170,SAME,"R3 suffix only, same street"
+CO171,SAME,"R3 suffix only, same address"
+CO172,SAME,R3 CO vs LLC
+CO173,SAME,"R3 suffix only, same city"
+CO174,SAME,R3 suffix only
+CO175,SAME,R3 suffix only
+CO176,SAME,"R2 CO=COMPANY, same address"
+CO177,SAME,R3 suffix only
+CO178,SAME,R2 CORP=CORPORATION
+CO179,SAME,"R3 suffix INC added, same address"
+CO180,SAME,R3 INC vs LLC
+CO181,SAME,R3 suffix only
+CO182,SAME,R3 INC vs LLC
+CO183,SAME,"R2 CO=COMPANY, same address"
+CO184,SAME,"R3 suffix INC, identical address"
+CO185,SAME,R3 suffix CO; P4 blank fields not evidence
+CO186,SAME,R3 INC vs LLC
+CO187,SAME,"R2 truncation, same Nashville record"
+CO188,SAME,"R3 suffix INC, same PO box"
+CO189,SAME,R3 INC vs LLC
+CO190,SAME,"R3 INC vs LLC, same city"
+CO191,DIFFERENT,"R7 Corporation vs Limited, separate charters"
+CO192,SAME,"R2 truncation of COMPANY, same address"
+CO193,SAME,R3 suffix INC
+CO194,SAME,"R3 suffix INC, same highway address"
+CO195,SAME,"R3 suffix LLC, same city"
+CO196,SAME,R3 suffix LLC
+CO197,SAME,R3 suffix INC
+CO198,SAME,"R2/R3 variant, identical address"
+CO199,SAME,R3 INC vs LLC
+CO200,SAME,"R3 suffix LLC, same city"
+CO201,SAME,"R3 suffix INC, identical PO box"
+CO202,SAME,"R3 CO vs LLC, same PO box"
+CO203,SAME,"R3 suffix INC, same address"
+CO204,SAME,"R3 CO vs LLC, R4 same city"
+CO205,SAME,"R2 abbreviation, R4 same city"
+CO206,DIFFERENT,R7 -WCR is a distinct entity of the family
+CO207,DIFFERENT,"R1 added word Insight, distinct name"
+CO208,SAME,R2 EXCVATION typo
+CO209,SAME,"R2 MOFAT typo, identical PO box"
+CO210,SAME,R2 Tamerrel/Tamerrell spelling variant
+CO211,SAME,"R2 excavating/excavation variant, tested before R5"
+CO212,SAME,R2 Elevate/Elevated one-letter variant
+CO213,SAME,R2 HIGHPLAINES typo
+CO214,SAME,R2 GILBRT typo; P4 blank address
+CO215,DIFFERENT,"R1 Clarey vs Clark, different cities"
+CO216,SAME,"R2 name variant, identical address"
+CO217,DIFFERENT,"R1 Experts vs Express, different cities"
+CO218,SAME,"R2 truncation LANDSCAPI, same address"
+CO219,SAME,R2 Triston/Tristone variant
+CO220,SAME,"R2 Holstein/Holsteins, R4 same city CR 55"
+CO221,SAME,"R2 CONSTRUCITON typo, same city"
+CO222,DIFFERENT,"R1 Clarey vs Clark, different cities"
+CO223,SAME,"R2 Specialites typo, same street"
+CO224,SAME,"R2 EXCAVATIONG typo, same address"
+CO225,SAME,"R2 Holding/Holdings, R4 same city"
+CO226,SAME,"R2 excavating/excavation variant, tested before R5"
+CO227,DIFFERENT,R1 crushing vs truckwashing
+CO228,SAME,"R2 US tag added, R4 same city"
+CO229,DIFFERENT,"R1 construction vs contracting, different cities"
+CO230,SAME,R2 excavating/excavation variant
+CO231,SAME,"R2 EXCAVAATION typo, same city"
+CO232,SAME,"R2 CONTRACTNG typo, same city"
+CO233,SAME,R2 Coating/Coatings variant
+CO234,SAME,R2 punctuation-only variant; P4 blank address
+CO235,DIFFERENT,R7 separate Ag LLC in the same family
+CO236,SAME,"R2 COMANY typo, same address"
+CO237,SAME,"R2 CORPORTATION typo, same PO box"
+CO238,SAME,"R2 FIANCIAL typo, 2120/2121 street digit error"
+CO239,SAME,"R2 misspelling/truncation, same address"
+CO240,SAME,R2 misspelling; blank address is not evidence (P4)
+CO241,DIFFERENT,R7 '- Ag' divisional entity vs parent
+CO242,SAME,R2 spacing typo in CORPORATION
+CO243,SAME,R2 misspelling beats address difference
+CO244,SAME,"R2 misspelling, blank address (P4)"
+CO245,SAME,R2 FORSTRY typo
+CO246,SAME,"R2 FORESTY typo, same address"
+CO247,SEPARATE,unrelated GC names at a boulevard office address
+CO248,ONE-OP,"one truck-center site, dealership under two names"
+CO249,SEPARATE,unrelated trades sharing an industrial building
+CO250,ONE-OP,two construction LLCs at one small yard
+CO251,SEPARATE,same box number but different towns/post offices
+CO252,ONE-OP,"shared PO box in one small town, related filers"
+CO253,ONE-OP,"one residential yard, complementary boring trades"
+CO254,SEPARATE,"downtown office suite, unrelated businesses"
+CO255,SEPARATE,realty manager and tenant landscaper at one property
+CO256,ONE-OP,"home address, one family trade operation"
+CO257,ONE-OP,"one yard, drilling and pipe trades"
+CO258,ONE-OP,"one rural highway address, concrete and excavation"
+CO259,ONE-OP,"same PO box, same town, related filers"
+CO260,SEPARATE,"same box number, different towns"
+CO261,ONE-OP,"one rural address, same trade"
+CO262,ONE-OP,brand/division and group at one PO box
+CO263,ONE-OP,"same excavating yard, two names"
+CO264,ONE-OP,"same party, DBA variant"
+CO265,ONE-OP,"residential address, both concrete"
+CO266,SEPARATE,"multi-tenant industrial unit, unrelated names"
+CO267,ONE-OP,"one residential address, related finishing trades"
+CO268,ONE-OP,equipment holding LLC plus operating excavator
+CO269,SEPARATE,"same box number, different towns; county vs private"
+CO270,ONE-OP,"one farm address, dairy plus soil/seed"
+CO271,ONE-OP,one equipment dealership site
+CO272,SEPARATE,"same box number, different towns"
+CO273,SEPARATE,"same box number, different towns; unrelated persons"
+CO274,SEPARATE,"same box number, different towns/states of operation"
+CO275,ONE-OP,affiliated concrete pumping firms at one yard
+CO276,ONE-OP,"same suite, related building/concrete entities"
+CO277,ONE-OP,"one finance operation, renamed, same box"
+CO278,SEPARATE,"multi-tenant industrial unit, unrelated names"
+CO279,ONE-OP,"same address, same concrete trade"
+CO280,ONE-OP,leasing SPE plus operating company
+CO281,ONE-OP,shared ROBINS family name and PO box
+CO282,ONE-OP,"one rural residence, related construction/engineering"
+CO283,SEPARATE,two large independent contractors in one office park
+CO284,ONE-OP,"same person, name-order variant"
+CO285,ONE-OP,"one small-town builder yard, two names"
+CO286,ONE-OP,"same street address, excavating plus equipment LLC"
+CO287,ONE-OP,principals DBA the same landscaping name
+CO288,ONE-OP,"residential address, both construction"
+CO289,ONE-OP,"one shared yard, related trades"
+CO290,SEPARATE,equipment dealer and national traffic firm sharing a yard
+CO291,ONE-OP,"one rural address, excavation plus affiliate LLC"
+CO292,ONE-OP,"same address, operating co plus holding LLC"
+CO293,SEPARATE,"same box number, different towns"
+CO294,SEPARATE,"same box number, different towns"
+CO295,SEPARATE,"same box number, different towns"
+CO296,ONE-OP,"shared TAM- name and address, one operation"
+CO297,DIFFERENT,"R5 same name, different cities"
+CO298,SAME,"R3/R4 same name, same zip (Forestville is Bristol)"
+CO299,DIFFERENT,"R5 same name, different cities"
+CO300,SAME,R0 address formatting only (P1)
+CO301,SAME,"R0 same street by two names, same city"
+CO302,SAME,"R4 same name, same city, different street"
+CO303,SAME,R0 identical name and address
+CO304,DIFFERENT,"R5 same name, different cities"
+CO305,DIFFERENT,"R5 same name, different cities"
+CO306,SAME,"R4 same city, street vs PO box"
+CO307,SAME,"R4 same name, same city, different street"
+CO308,SAME,R0 unit formatting only (P1)
+CO309,SAME,"R3 suffix/entity-type wording, same PO box"
+CO310,SAME,"R0 same street, building suffix only"
+CO311,SAME,"R0 same street, floor suffix only"
+CO312,DIFFERENT,"R5 same name, different cities"
+CO313,SAME,"R2/R4 hyphen and AND/& variant, same city"
+CO314,SAME,"R0 same address, city duplicated in street field"
+CO315,SAME,"R4 same name, same city, different street number"
+CO316,DIFFERENT,"R5 same name, different cities"
+CO317,SAME,R0 identical name and address
+CO318,SAME,"R4 same zip/city (NEWTON typo), different street"
+CO319,SAME,"R2 Villiage typo, same street, same city"
+CO320,SAME,"R4 same city, street vs PO box"
+CO321,SAME,R0 address formatting only (P1)
+CO322,SAME,"R0 same address, suite suffix only"
+CO323,SAME,"R0 same street, PO box appended"
+CO324,DIFFERENT,"R5 same name, different cities"
+CO325,SAME,"R4 same name, same street, suite detail only"
+CO326,DIFFERENT,"R5 same name, different cities"
+CO327,SAME,"R2 & vs AND, same address"
+CO328,SAME,"R4 same city, street vs PO box"
+CO329,SAME,"R4 same name, same city, different street"
+CO330,SAME,"R4 same name, same city, different street"
+CO331,SAME,"R4 same city, street vs PO box"
+CO332,SAME,"R4 same name, same zip/locality"
+CO333,DIFFERENT,"R5 same name, different cities"
+CO334,SAME,"R4 same city (W HAVEN abbrev), different street"
+CO335,SAME,"R4 same name, same city, different street"
+CO336,SAME,"R2 Cpmmerce typo, same address"
+CO337,SAME,"R2/R4 same street and zip, Collinsville in Canton"
+CO338,SAME,"R2 one name contains the other, same city"
+CO339,SAME,"R4 same name plus 'THE', same city"
+CO340,DIFFERENT,"R1 different firms, different cities"
+CO341,DIFFERENT,R1 plainly different firms
+CO342,DIFFERENT,R1 different names and cities
+CO343,DIFFERENT,"R5 different word and different cities, not a typo"
+CO344,DIFFERENT,R1 plainly different firms
+CO345,SAME,"R3 CORP vs CORPORATION, same PO box and zip"
+CO346,DIFFERENT,"R1 different firms, different cities"
+CO347,SAME,"R2 SELEVTIVE typo, same address"
+CO348,DIFFERENT,R1 different names and cities
+CO349,SAME,"R0 same name and address, c/o line shifted"
+CO350,DIFFERENT,"R1 different firms, different cities"
+CO351,SAME,"R2 EXTREME/XTREME variant, same address"
+CO352,DIFFERENT,R1 different names and cities
+CO353,DIFFERENT,R1 plainly different firms
+CO354,DIFFERENT,R1 different names and cities
+CO355,DIFFERENT,R7 program of two distinct banks
+CO356,DIFFERENT,"R1 different firms, different cities"
+CO357,SAME,"R2 CORORATION typo, same address"
+CO358,SAME,"R2/R3 name extension, identical address"
+CO359,SAME,"R2 typo LANDSCAPNG, same address"
+CO360,DIFFERENT,"R5 same name, different cities"
+CO361,DIFFERENT,R1 plainly different firms
+CO362,DIFFERENT,R1 plainly different firms
+CO363,DIFFERENT,"R1 M&L vs M&W, different firms"
+CO364,DIFFERENT,"R5 different cities, name differs by MANAGEMENT"
+CO365,SAME,"R4 same name, same city, different address"
+CO366,DIFFERENT,"R1 CONSTRUCTION vs CONTRACTOR, different firms"
+CO367,DIFFERENT,R1 plainly different firms
+CO368,SAME,"R2 CT = CONNECTICUT, R4 same city"
+CO369,DIFFERENT,R1 Blue Lotus vs Blue Stone
+CO370,DIFFERENT,R1 C&C vs C&E
+CO371,DIFFERENT,R1 different names and cities
+CO372,DIFFERENT,"R7/R9 corporate family, neither name contains the other"
+CO373,SAME,"R2/R3 name extension, identical address"
+CO374,DIFFERENT,"R5 different cities, name differs by MANAGEMENT"
+CO375,SAME,"R2 typo CORPROATION, same address"
+CO376,DIFFERENT,R1 different names and cities
+CO377,DIFFERENT,R1 PASTURE vs VALLEY
+CO378,DIFFERENT,R1 different firms
+CO379,DIFFERENT,R1 different firms
+CO380,DIFFERENT,"R1 MONACO vs MONARCA, different firms"
+CO381,DIFFERENT,R1 different firms
+CO382,DIFFERENT,R1 different firms
+CO383,DIFFERENT,R1 different firms
+CO384,DIFFERENT,R1 different firms
+CO385,DIFFERENT,R1 different firms
+CO386,DIFFERENT,R1 D&D vs D&P
+CO387,DIFFERENT,R1 different firms
+CO388,DIFFERENT,R1 different firms
+CO389,DIFFERENT,R1 different firms
+CO390,DIFFERENT,R1 different firms
+CO391,DIFFERENT,R1 different firms
+CO392,DIFFERENT,R1 different firms
+CO393,DIFFERENT,R1 P&G vs P&M
+CO394,DIFFERENT,R1 different firms
+CO395,DIFFERENT,R1 different firms
+CO396,DIFFERENT,R1 B&J vs B&P
+CO397,DIFFERENT,R1 different firms
+CO398,DIFFERENT,R1 A&A vs A&H
+CO399,DIFFERENT,R1 different firms
+CO400,DIFFERENT,R1 different firms
+CO401,DIFFERENT,R1 different firms
+CO402,DIFFERENT,R1 different firms
+CO403,DIFFERENT,R1 different names and cities
+CO404,DIFFERENT,R1 different firms
+CO405,DIFFERENT,R1 different firms
+CO406,DIFFERENT,"R5 generic name, different cities"
+CO407,DIFFERENT,R1 different firms
+CO408,DIFFERENT,R1 different firms
+CO409,DIFFERENT,R1 different firms
+CO410,DIFFERENT,R1 different firms
+CO411,DIFFERENT,R1 J&M vs J&N
+CO412,DIFFERENT,R1 A&A vs A&G
+CO413,DIFFERENT,R1 different names and cities
+CO414,DIFFERENT,R1 C&G vs C&J
+CO415,DIFFERENT,R1 different firms
+CO416,DIFFERENT,R1 different firms
+CO417,DIFFERENT,R1 different firms
+CO418,DIFFERENT,R1 different firms
+CO419,DIFFERENT,R1 different firms
+CO420,DIFFERENT,R1 different firms
+CO421,DIFFERENT,R1 different firms
+CO422,DIFFERENT,R1 different firms
+CO423,DIFFERENT,R1 different names and cities
+CO424,DIFFERENT,R1 different firms
+CO425,DIFFERENT,"R1 different firms, same city only"
+CO426,DIFFERENT,R1 different names and cities
+CO427,DIFFERENT,R1 different names and cities
+CO428,DIFFERENT,R1 M&E vs M&M
+CO429,DIFFERENT,R1 M&G vs M&M
+CO430,DIFFERENT,R1 different firms
+CO431,DIFFERENT,R1 different firms
+CO432,DIFFERENT,R1 different firms
+CO433,DIFFERENT,R1 different names and cities
+CO434,DIFFERENT,R1 different firms
+CO435,DIFFERENT,R1 PINE HILL vs PINEWOOD
+CO436,DIFFERENT,R1 different firms
+CO437,DIFFERENT,R1 A&M vs A&T
+CO438,DIFFERENT,R1 different firms
+CO439,DIFFERENT,R1 North Star vs Northwest
+CO440,DIFFERENT,R1 different firms
+CO441,DIFFERENT,R1 different firms
+CO442,DIFFERENT,R1 different firms
+CO443,DIFFERENT,R1 different firms
+CO444,DIFFERENT,R8/R1 different person-names
+CO445,DIFFERENT,R1 GREEN LIFE vs GREEN VALLEY
+CO446,DIFFERENT,R1 different firms
+CO447,DIFFERENT,R1 different firms
+CO448,DIFFERENT,R1 different names and cities
+CO449,DIFFERENT,R1 different names and cities
+CO450,DIFFERENT,R1 Blue Lotus vs Bluestone
+CO451,DIFFERENT,R1 different firms
+CO452,SAME,"R2/R8 same party, C/O vs DBA form, identical address"
+CO453,DIFFERENT,R1 C&J vs C&W
+CO454,SAME,"R2 name extension, R4 same city"
+CO455,DIFFERENT,R1 B&D vs B&F
+CO456,DIFFERENT,R1 A&A vs A&D
+CO457,DIFFERENT,R1 different firms
+CO458,DIFFERENT,R1 different firms
+CO459,DIFFERENT,R1 different firms
+CO460,DIFFERENT,R1 different firms
+CO461,SAME,"R3 suffix only, same street and city"
+CO462,DIFFERENT,"R5 same name, different cities"
+CO463,SAME,"R3 suffix, R4 same city different address"
+CO464,SAME,"R2/R3 CO INC vs COMPANY, same city and route"
+CO465,SAME,"R3 suffix, R4 same city PO box vs street"
+CO466,DIFFERENT,"R5 different city strings, OLD MYSTIC vs MYSTIC"
+CO467,SAME,"R0/R3 same street and city, suffix and suite only"
+CO468,DIFFERENT,"R5 same name, different cities"
+CO469,DIFFERENT,"R5 same name, different cities"
+CO470,DIFFERENT,"R5 same name, different cities"
+CO471,DIFFERENT,"R5 same name, BRANFORD vs NORTH BRANFORD"
+CO472,SAME,"R3 suffix, R4 same city PO box vs street"
+CO473,DIFFERENT,"R5 same name, WATERTOWN vs OAKVILLE"
+CO474,SAME,"R2/R3 & vs AND plus suffix, R4 same city"
+CO475,SAME,"R3 LLC vs LTD, R4 same street and city"
+CO476,SAME,"R0/R3 identical name and address, suffix only"
+CO477,SAME,R3 suffix + AND/& variant
+CO478,SAME,"R2/R3 same street, ZIP data error P2"
+CO479,SAME,"R3 corp/inc, R4 same city"
+CO480,SAME,"R3 suffix, R4 same city"
+CO481,SAME,"R3 suffix, same address"
+CO482,SAME,"R2 CORP/CORPORATION, R4 same city"
+CO483,SAME,"R3 suffix, same address"
+CO484,SAME,R3 suffix-only beats R5
+CO485,SAME,"R3 suffix, R4 same city"
+CO486,SAME,"R3 suffix, same address"
+CO487,SAME,"R3 suffix, R4 same city"
+CO488,SAME,"R3 COMPANY/CORPORATION, same address"
+CO489,SAME,"R3 suffix, R4 same city"
+CO490,SAME,R3 INC/LLC suffix-only beats R5
+CO491,SAME,"R3 CORP/INC, same address"
+CO492,SAME,"R2 AND/& , same address"
+CO493,SAME,"R3 INC added, same address"
+CO494,SAME,"R3 INC vs LLC, same address"
+CO495,SAME,"R3 suffix, P1 DR/ROAD formatting"
+CO496,SAME,"R3 suffix, same address"
+CO497,SAME,"R3 INC added, same address"
+CO498,SAME,R3 suffix-only beats R5
+CO499,SAME,"R3 suffix, R4 same city"
+CO500,SAME,"R3 suffix, R4 same city Brookfield"
+CO501,SAME,"R3 suffix, R4 same city"
+CO502,SAME,"R2 possessive variant, same address"
+CO503,DIFFERENT,"R1 different name word, different city, nothing shared"
+CO504,SAME,"R3 LLC/INC, same address"
+CO505,SAME,"R2 spacing variant, same address"
+CO506,DIFFERENT,"R1 GROUP added, different city, nothing shared"
+CO507,SAME,R2 possessive variant + R3 suffix
+CO508,SAME,"R2 word-order typo, same address"
+CO509,SAME,"R3 COMPANY/DBA, R4 same city"
+CO510,DIFFERENT,"R1 different initials, different cities"
+CO511,SAME,"R2 plural variant, R4 same city"
+CO512,SAME,"R2 hyphen/spacing variant, same address"
+CO513,SAME,"R2 plural + R3 suffix, same city"
+CO514,DIFFERENT,"R1 different initials, different cities"
+CO515,DIFFERENT,"R1 different initials, different cities"
+CO516,SAME,R2 spacing + R3 CORP/CORPORATION
+CO517,SAME,R3 legal-form/DBA suffix only
+CO518,SAME,"R2 SERVICE/SERVICES, same address"
+CO519,DIFFERENT,"R1 different initials, different cities"
+CO520,DIFFERENT,"R1 different initials, different cities"
+CO521,DIFFERENT,"R1 CONSTRUCTION vs CONTRACTING, different cities"
+CO522,SAME,"R2 plural + R3 suffix, same street"
+CO523,SAME,"R2 singular/plural, same address"
+CO524,SAME,"R2 ASLPHALT typo, R4 same city"
+CO525,SAME,"R2 CONTRCTRS truncation, same address"
+CO526,SAME,"R2 spacing variant, same address"
+CO527,SAME,R2 LANSCAPE typo/truncation of LANDSCAPING
+CO528,SAME,"R3 suffix + CT tag, R4 same city"
+CO529,SAME,"R2 plural, same address"
+CO530,SAME,"R2 MASON truncation, same address"
+CO531,SAME,"R2 spacing variant, same address"
+CO532,SAME,"R2 missing space, same street"
+CO533,SAME,"R2/R8 one-letter surname typo, same person, same address"
+CO534,DIFFERENT,"R1 different initials, different cities"
+CO535,SAME,"R2 truncated suffix, same address"
+CO536,SAME,"R2 ASSOC abbreviation, same address"
+CO537,DIFFERENT,"R1 different initials, different cities"
+CO538,DIFFERENT,"R1 different initials, different cities"
+CO539,SAME,"R2 NIC typo of INC, R4 same city"
+CO540,SAME,"R2 spacing variant, R4 same city"
+CO541,SAME,"R2 plural + R3 suffix, same address"
+CO542,DIFFERENT,"R1 plainly different firms, different addresses"
+CO543,ONE-OP,two landscape firms sharing one yard address
+CO544,ONE-OP,DBA of the same trade name
+CO545,ONE-OP,person DBA and the DBA name
+CO546,ONE-OP,two concrete firms at one plant address
+CO547,SEPARATE,unrelated trades merely sharing a main-street address
+CO548,ONE-OP,two site-work trades at one rural yard
+CO549,ONE-OP,property SPE named for the address plus its operator
+CO550,ONE-OP,"same Zupan family/operator, one address"
+CO551,SEPARATE,unrelated names at a multi-tenant industrial address
+CO552,SEPARATE,"same box number in different towns, not one address"
+CO553,ONE-OP,"CONTRACTOR LLC is a truncation of the same filer, one PO box"
+CO554,ONE-OP,property SPE at the operator's address
+CO555,ONE-OP,"Fryer name shared, one PO box"
+CO556,ONE-OP,landscaping yard plus holding entity at one address
+CO557,SEPARATE,"same box number in different towns, not one address"
+CO558,ONE-OP,two construction firms at one small-street yard
+CO559,SEPARATE,unrelated contractors at a commercial strip address
+CO560,ONE-OP,"shared project/HQ office, one operation at the site"
+CO561,ONE-OP,two construction firms at one residential yard
+CO562,ONE-OP,same landscaping/snow trade at one address
+CO563,ONE-OP,"same Jones party, DBA variant"
+CO564,ONE-OP,person and his own company at one address
+CO565,ONE-OP,"two contractors at one address, same trade"
+CO566,ONE-OP,"same Rizzo electrical firm, name variant"
+CO567,ONE-OP,F & F family entities at one plant
+CO568,ONE-OP,URS/AECOM same operation at one office
+CO569,ONE-OP,Pasteryak family entities at one yard
+CO570,ONE-OP,"two construction LLCs on one PO box, same operator"
+CO571,ONE-OP,F & F family entities at one plant
+CO572,ONE-OP,URS/AECOM same operation at one site
+CO573,SEPARATE,unrelated builders in a shared industrial park
+CO574,ONE-OP,leasing affiliate and operating company at one address
+CO575,ONE-OP,person DBA and the DBA name
+CO576,ONE-OP,"overlapping initials, same construction yard"
+CO577,ONE-OP,DLTC is the acronym of Darien Lawn & Tree Care
+CO578,ONE-OP,"same R+U party, punctuation variant"
+CO579,ONE-OP,two construction firms at one yard
+CO580,ONE-OP,"Teofilo = T in T&J, one address"
+CO581,ONE-OP,two landscaping firms at one yard
+CO582,ONE-OP,"Donagher family landscaping, one address"
+CO583,ONE-OP,Garcia concrete and GDC contracting at one yard
+CO584,ONE-OP,CONTRACTOR INC is a truncation of the same filer
+CO585,ONE-OP,"Teofilo = T in T&J, one address"
+CO586,ONE-OP,"Fortaleza = Castle, same concrete operation"
+CO587,ONE-OP,"same Valace party, DBA variant"
+CO588,ONE-OP,two landscaping LLCs at one yard
+CO589,ONE-OP,two contracting firms at one residential yard
+CO590,ONE-OP,farm property LLC and septic business at one farmstead
+CO591,ONE-OP,related rental SPEs on one PO box
+CO592,SEPARATE,"same box number in different towns, not one address"
