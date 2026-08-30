@@ -6,127 +6,112 @@
 <title>UCC Heavy Construction Equipment Finance — Colorado &amp; Connecticut</title>
 <style>
   :root{
-    --co:#6b3fa0;          /* Colorado: purple */
-    --ct:#c0392b;          /* Connecticut: red */
-    --co-dim:#d6cae4;
-    --ct-dim:#eecdc9;
-    --ink:#1c1c1c;
-    --line:#c8c8c8;
-    --panel:#ffffff;
-    --bg:#f4f4f4;
-    --maph:min(56vh,520px);
+    --co:#6b3fa0; --ct:#c0392b;
+    --co-dim:#d6cae4; --ct-dim:#eecdc9;
+    --ink:#1c1c1c; --mut:#767676; --line:#d2d2d2; --bg:#f4f4f4;
+    --maph:min(74vh,780px);
   }
   *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0;background:var(--bg);color:var(--ink);
+  body{margin:0;background:var(--bg);color:var(--ink);
     font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
-    display:flex;flex-direction:column;align-items:center;
-    padding:22px 22px 26px;
-  }
-  h1{font-size:15px;font-weight:600;margin:0 0 2px;letter-spacing:.01em}
-  .sub{font-size:12px;color:#666;margin:0 0 18px}
-  .sub b{color:var(--ink);font-weight:600}
-
-  /* The two maps scale with the window instead of sitting at a fixed pixel
-     size. Each keeps its own aspect ratio (preserveAspectRatio on the svg), and
-     the flex weights give Colorado the larger share -- loosely reflecting that
-     it is the bigger state without shrinking Connecticut to something unusable.
-     --maph caps the pair against viewport height so they never overflow. */
-  #stage{
-    display:flex;gap:3vw;align-items:center;justify-content:center;
-    width:100%;max-width:1600px;flex:1;min-height:0;
-  }
-  .panel{
-    display:flex;flex-direction:column;align-items:center;gap:8px;
-    min-width:0;
-  }
-  #co{flex:1.30}
-  #ct{flex:1.00}
-  .panel svg{
-    display:block;cursor:pointer;overflow:visible;
-    width:100%;height:auto;
-    max-height:var(--maph);
-  }
-  .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#777}
+    display:flex;flex-direction:column;align-items:center;padding:12px 16px 16px}
+  h1{font-size:15px;font-weight:600;margin:0}
+  .sub{font-size:11.5px;color:var(--mut);margin:2px 0 0}
+  #stats{display:flex;margin:9px 0 3px;border:1px solid var(--line);background:#fff;flex-wrap:wrap}
+  .stat{padding:6px 18px;border-right:1px solid var(--line);text-align:center}
+  .stat:last-child{border-right:0}
+  .stat b{display:block;font-size:16px;font-variant-numeric:tabular-nums}
+  .stat span{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
+  #stage{display:flex;gap:6vw;align-items:center;justify-content:space-between;
+    width:100%;max-width:1860px;flex:1;min-height:0;padding:0 1vw}
+  .panel{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+  #co{flex:1.30} #ct{flex:1.00}
+  .panel svg{display:block;cursor:pointer;overflow:visible;width:100%;height:auto;max-height:var(--maph)}
+  .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
   .panel.on .label{color:var(--ink);font-weight:600}
-  .count{font-size:11px;color:#888;height:14px}
-
-  .shape{stroke:#fff;stroke-width:1.5;fill:var(--co-dim)}
-  #co .shape{fill:var(--co-dim)}
-  #ct .shape{fill:var(--ct-dim)}
-  #co.on .shape{fill:var(--co)}
-  #ct.on .shape{fill:var(--ct)}
+  .count{font-size:11px;color:#8a8a8a;height:14px}
+  .shape{stroke:#fff;stroke-width:1.5}
+  #co .shape{fill:var(--co-dim)} #ct .shape{fill:var(--ct-dim)}
+  #co.on .shape{fill:var(--co)}  #ct.on .shape{fill:var(--ct)}
   .dot{cursor:pointer;stroke:#fff;stroke-width:.6}
-  #co .dot{fill:var(--ct)}      /* purple state, red dots */
-  #ct .dot{fill:var(--co)}      /* red state, purple dots */
-  .dot.sel{stroke:#111;stroke-width:1.6}
-
-  #bar{display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:16px}
-  button{
-    font:600 13px/1 inherit;letter-spacing:.02em;
-    padding:11px 26px;border:1px solid #333;border-radius:3px;
-    background:#fff;color:#111;cursor:pointer;
-  }
-  button:hover{background:#111;color:#fff}
-  button:disabled{opacity:.45;cursor:default;background:#fff;color:#111}
-  #hint{font-size:11.5px;color:#777;height:15px}
-
-  #box{
-    display:none;position:fixed;z-index:9;
-    left:50%;top:50%;transform:translate(-50%,-50%);
-    width:min(760px,92vw);max-height:min(430px,72vh);
-    background:var(--panel);border:1px solid #333;
-    box-shadow:0 6px 26px rgba(0,0,0,.22);
-    flex-direction:column;
-  }
+  #co .dot{fill:var(--ct)} #ct .dot{fill:var(--co)}
+  .dot.sel{stroke:#111;stroke-width:1.8}
+  .dot.dim{opacity:.12}
+  .dot.hot{fill:#111;stroke:#fff;stroke-width:1}
+  #bar{display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:8px}
+  #row1{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:center}
+  button{font:600 13px/1 inherit;padding:10px 24px;border:1px solid #333;border-radius:3px;
+    background:#fff;color:#111;cursor:pointer}
+  button:hover:not(:disabled){background:#111;color:#fff}
+  button:disabled{opacity:.45;cursor:default}
+  .chip{font:500 11.5px/1 inherit;padding:7px 12px;border:1px solid var(--line);border-radius:3px;
+    background:#fff;color:#555;cursor:pointer}
+  .chip.on{border-color:#333;color:#111;font-weight:700}
+  #hint{font-size:11.5px;color:var(--mut);height:15px}
+  #box{display:none;position:fixed;z-index:9;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:min(880px,92vw);max-height:min(440px,70vh);background:#fff;border:1px solid #333;
+    box-shadow:0 6px 26px rgba(0,0,0,.22);flex-direction:column}
   #box.show{display:flex}
-  #boxhead{
-    display:flex;justify-content:space-between;align-items:baseline;gap:12px;
-    padding:9px 12px;border-bottom:1px solid var(--line);
-  }
+  #boxhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    padding:8px 12px;border-bottom:1px solid var(--line)}
   #boxtitle{font-size:12px;font-weight:600}
-  #boxsub{font-size:11px;color:#777}
-  #close{border:0;background:none;font-size:17px;line-height:1;padding:0 2px;cursor:pointer;color:#666}
+  #boxsub{font-size:11px;color:var(--mut)}
+  #close{border:0;background:none;font-size:17px;padding:0 2px;cursor:pointer;color:var(--mut)}
   #close:hover{background:none;color:#111}
-  #scroll{overflow:auto;-webkit-overflow-scrolling:touch}
+  #scroll{overflow:auto}
   table{border-collapse:collapse;width:100%;font-size:11.5px}
   th,td{padding:5px 8px;border-bottom:1px solid #ececec;text-align:left;white-space:nowrap}
-  th{
-    position:sticky;top:0;background:#f7f7f7;font-weight:600;
-    border-bottom:1px solid var(--line);font-size:11px;
-  }
+  th{position:sticky;top:0;background:#f7f7f7;font-weight:600;font-size:11px;border-bottom:1px solid var(--line)}
   td.num{text-align:right;font-variant-numeric:tabular-nums}
   tbody tr:nth-child(even){background:#fbfbfb}
-  #foot{margin-top:16px;font-size:11px;color:#8a8a8a;text-align:center;max-width:820px}
+  .lender{color:#0b57a4;cursor:pointer;text-decoration:underline dotted}
+  .kd{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+  #tabs{display:flex;gap:6px;margin-top:10px}
+  #pane{display:none;width:min(1100px,96vw);margin-top:8px;border:1px solid var(--line);
+    background:#fff;max-height:300px;overflow:auto}
+  #pane.show{display:block}
+  #pane h3{margin:0;padding:8px 12px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--mut);border-bottom:1px solid var(--line);background:#fafafa;position:sticky;top:0}
+  #pane .sql{font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#555;
+    padding:7px 12px;background:#fcfcfc;border-bottom:1px solid #eee;white-space:pre-wrap}
+  #pane p{margin:0;padding:8px 12px;font-size:11.5px;color:#555;border-bottom:1px solid #eee}
+  #foot{margin-top:10px;font-size:11px;color:#8a8a8a;text-align:center;max-width:900px}
 </style>
 </head>
 <body>
 
 <h1>UCC Heavy Construction Equipment Finance</h1>
-<p class="sub">Colorado &amp; Connecticut · 1990–2026 · <b id="pool">…</b> qualifying filings ·
-   click a state, then a dot</p>
+<p class="sub">Colorado &amp; Connecticut · click a state, then a dot · click a lender to trace its borrowers</p>
+
+<div id="stats"></div>
 
 <div id="stage">
   <div class="panel" id="co">
     <svg viewBox="0 0 430 300" preserveAspectRatio="xMidYMid meet" aria-label="Colorado">
-      <path class="shape"></path><g class="dots"></g>
-    </svg>
-    <div class="label">Colorado</div>
-    <div class="count"></div>
+      <path class="shape"></path><g class="dots"></g></svg>
+    <div class="label">Colorado</div><div class="count"></div>
   </div>
   <div class="panel" id="ct">
     <svg viewBox="0 0 300 220" preserveAspectRatio="xMidYMid meet" aria-label="Connecticut">
-      <path class="shape"></path><g class="dots"></g>
-    </svg>
-    <div class="label">Connecticut</div>
-    <div class="count"></div>
+      <path class="shape"></path><g class="dots"></g></svg>
+    <div class="label">Connecticut</div><div class="count"></div>
   </div>
 </div>
 
 <div id="bar">
-  <button id="refresh" disabled>Refresh Data</button>
+  <div id="row1">
+    <button id="refresh" disabled>Refresh Data</button>
+    <span class="chip on" data-k="all">All</span>
+    <span class="chip" data-k="lender">Lender criterion</span>
+    <span class="chip" data-k="borrower">Borrower criterion</span>
+    <span class="chip" data-k="both">Both</span>
+  </div>
   <div id="hint">loading…</div>
+  <div id="tabs">
+    <span class="chip" data-p="sql">SQL views</span>
+    <span class="chip" data-p="cross">Cross-register</span>
+  </div>
+  <div id="pane"></div>
 </div>
 
 <div id="box">
@@ -134,33 +119,24 @@
     <div><span id="boxtitle"></span> <span id="boxsub"></span></div>
     <button id="close" title="close">×</button>
   </div>
-  <div id="scroll">
-    <table>
-      <thead><tr>
-        <th>Borrower</th><th>Address</th><th>City</th><th>State</th>
-        <th>ZIP</th><th>Lender</th><th class="num">Year</th>
-      </tr></thead>
-      <tbody id="tb"></tbody>
-    </table>
-  </div>
+  <div id="scroll"><table>
+    <thead><tr><th>Borrower</th><th>Address</th><th>City</th><th>State</th>
+      <th>ZIP</th><th>Lender</th><th class="num">Year</th><th>Admitted by</th></tr></thead>
+    <tbody id="tb"></tbody>
+  </table></div>
 </div>
 
 <p id="foot">
-  Every row shown meets the scope criteria: the lender is a named heavy-construction equipment
-  manufacturer or dealer, or the borrower's own name states a job-site equipment category.
-  Refresh draws a new sample from the qualifying pool.
+  Every row meets one of two criteria: the lender is a named heavy-construction equipment maker or
+  dealer, or the borrower's own name states a job-site equipment category. An adjudicated sample
+  measured the classifier at <b id="prec">—</b>. Refresh draws a new sample from the pool.
 </p>
 
 <script>
-const SHOW = 1300;                 // dots drawn per state, per pull
+const SHOW = 1300;
 const STATE = {
   co:{ bbox:[-109.0448,-102.0415,36.9930,41.0034], w:430, h:300,
        ring:[[-109.0448,41.0034],[-102.0415,41.0034],[-102.0415,36.9930],[-109.0448,36.9930]] },
-  /* Connecticut's south edge is coastline, so the polygon is denser there and
-     sits marginally seaward: shoreline ZIP centroids otherwise fall into Long
-     Island Sound and their dots land off the map. 99.1% of CT rows sit inside
-     this ring; the remainder are barrier-island and harbour ZIPs that a 23-point
-     outline cannot follow, and they are a pixel or two out at this scale. */
   ct:{ bbox:[-73.7278,-71.7870,40.9700,42.0500], w:300, h:220,
        ring:[[-73.4877,42.0500],[-71.7870,42.0250],[-71.7870,41.6400],[-71.8400,41.4150],
              [-71.8300,41.3200],[-71.9600,41.3050],[-72.0900,41.2800],[-72.2000,41.2600],
@@ -170,135 +146,185 @@ const STATE = {
              [-73.6570,40.9700],[-73.7278,41.1005],[-73.4820,41.2130]] }
 };
 const PAD = 14;
-let ROWS = {co:[], ct:[]}, active = null, sample = {co:[], ct:[]};
+let ROWS={co:[],ct:[]}, sample={co:[],ct:[]}, active=null, filter='all', STATS=null, traced=null;
+const fmt = n => n.toLocaleString();
 
-/* Equirectangular fit, aspect preserved, longitude cosine-corrected so the
-   states are not stretched east-west at these latitudes. */
 function projector(k){
-  const s = STATE[k], [w,e,so,n] = s.bbox;
-  const kx = Math.cos((so+n)/2 * Math.PI/180);
-  const dx = (e-w)*kx, dy = n-so;
-  const sc = Math.min((s.w-2*PAD)/dx, (s.h-2*PAD)/dy);
-  const ox = (s.w - dx*sc)/2, oy = (s.h - dy*sc)/2;
-  return (lon,lat) => [ox + (lon-w)*kx*sc, oy + (n-lat)*sc];
+  const s=STATE[k], w=s.bbox[0], e=s.bbox[1], so=s.bbox[2], n=s.bbox[3];
+  const kx=Math.cos((so+n)/2*Math.PI/180), dx=(e-w)*kx, dy=n-so;
+  const sc=Math.min((s.w-2*PAD)/dx,(s.h-2*PAD)/dy);
+  const ox=(s.w-dx*sc)/2, oy=(s.h-dy*sc)/2;
+  return function(lon,lat){ return [ox+(lon-w)*kx*sc, oy+(n-lat)*sc]; };
 }
-const P = {co:projector('co'), ct:projector('ct')};
+const P={co:projector('co'), ct:projector('ct')};
 
 function drawShape(k){
-  const p = P[k], d = STATE[k].ring.map((c,i)=>(i?'L':'M')+p(c[0],c[1]).map(v=>v.toFixed(1)).join(' ')).join('');
-  document.querySelector('#'+k+' .shape').setAttribute('d', d+'Z');
+  const p=P[k];
+  document.querySelector('#'+k+' .shape').setAttribute('d',
+    STATE[k].ring.map(function(c,i){return (i?'L':'M')+p(c[0],c[1]).map(function(v){return v.toFixed(1);}).join(' ');}).join('')+'Z');
 }
-
-/* Group the sample by ZIP so co-located rows become one bigger dot. */
 function cluster(rows){
-  const m = new Map();
+  const m=new Map();
   for(const r of rows){
-    let g = m.get(r.z);
-    if(!g){ g = {z:r.z, lat:r.lat, lon:r.lon, rows:[]}; m.set(r.z,g); }
+    let g=m.get(r.z);
+    if(!g){ g={z:r.z,lat:r.lat,lon:r.lon,rows:[]}; m.set(r.z,g); }
     g.rows.push(r);
   }
-  return [...m.values()].sort((a,b)=>b.rows.length-a.rows.length);
+  return Array.from(m.values()).sort(function(a,b){return b.rows.length-a.rows.length;});
 }
-
 function pick(k){
-  const pool = ROWS[k];
-  if(pool.length <= SHOW) return pool.slice();
-  const out = [], seen = new Set();
-  while(out.length < SHOW){
-    const i = (Math.random()*pool.length)|0;
+  const pool=ROWS[k].filter(function(r){return filter==='all'||r.k===filter;});
+  if(pool.length<=SHOW) return pool.slice();
+  const out=[], seen=new Set();
+  while(out.length<SHOW){
+    const i=(Math.random()*pool.length)|0;
     if(seen.has(i)) continue;
     seen.add(i); out.push(pool[i]);
   }
   return out;
 }
-
 function render(k){
-  const g = document.querySelector('#'+k+' .dots');
-  g.textContent = '';
-  if(active !== k){ document.querySelector('#'+k+' .count').textContent=''; return; }
-  const p = P[k], groups = cluster(sample[k]);
-  const frag = document.createDocumentFragment();
+  const g=document.querySelector('#'+k+' .dots'); g.textContent='';
+  const cEl=document.querySelector('#'+k+' .count');
+  if(active!==k){ cEl.textContent=''; return; }
+  const p=P[k], groups=cluster(sample[k]), frag=document.createDocumentFragment();
   for(const grp of groups){
-    const [x,y] = p(grp.lon, grp.lat);
-    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
-    c.setAttribute('cx',x.toFixed(1)); c.setAttribute('cy',y.toFixed(1));
-    c.setAttribute('r', Math.min(8.5, 1.9 + Math.sqrt(grp.rows.length)*0.8).toFixed(1));
+    const xy=p(grp.lon,grp.lat);
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',xy[0].toFixed(1)); c.setAttribute('cy',xy[1].toFixed(1));
+    c.setAttribute('r',Math.min(9.5,2.2+Math.sqrt(grp.rows.length)*0.9).toFixed(1));
     c.setAttribute('class','dot');
-    c.addEventListener('click', e => { e.stopPropagation(); showBox(grp, c); });
+    if(traced) c.classList.add(grp.rows.some(function(r){return r.l===traced;})?'hot':'dim');
+    c.addEventListener('click',function(e){ e.stopPropagation(); showBox(grp,c); });
     frag.appendChild(c);
   }
   g.appendChild(frag);
-  document.querySelector('#'+k+' .count').textContent =
-    sample[k].length.toLocaleString() + ' filings · ' + groups.length.toLocaleString() + ' locations';
+  cEl.textContent = fmt(sample[k].length)+' filings · '+fmt(groups.length)+' locations';
 }
-
 function select(k){
-  if(active === k) return;
-  active = k;
-  for(const s of ['co','ct']) document.getElementById(s).classList.toggle('on', s===k);
-  hideBox();
-  render('co'); render('ct');
-  document.getElementById('hint').textContent = 'click a dot to read its filings';
+  if(active===k) return;
+  active=k; traced=null;
+  ['co','ct'].forEach(function(s){ document.getElementById(s).classList.toggle('on', s===k); });
+  hideBox(); render('co'); render('ct');
+  document.getElementById('hint').textContent='click a dot to read its filings';
 }
-
-function showBox(grp, el){
-  document.querySelectorAll('.dot.sel').forEach(d=>d.classList.remove('sel'));
-  el.classList.add('sel');
-  const rs = grp.rows;
-  document.getElementById('boxtitle').textContent =
-    (rs[0].c || '—') + ', ' + rs[0].s + '  ' + grp.z;
-  document.getElementById('boxsub').textContent =
-    rs.length.toLocaleString() + (rs.length===1?' filing':' filings');
-  const tb = document.getElementById('tb');
-  tb.textContent = '';
-  const frag = document.createDocumentFragment();
+function showBox(grp,el){
+  document.querySelectorAll('.dot.sel').forEach(function(d){d.classList.remove('sel');});
+  if(el) el.classList.add('sel');
+  const rs=grp.rows;
+  document.getElementById('boxtitle').textContent=(rs[0].c||'—')+', '+rs[0].s+'  '+grp.z;
+  document.getElementById('boxsub').textContent=fmt(rs.length)+(rs.length===1?' filing':' filings');
+  const tb=document.getElementById('tb'); tb.textContent='';
+  const frag=document.createDocumentFragment();
   for(const r of rs){
-    const tr = document.createElement('tr');
-    for(const [v,cls] of [[r.b,''],[r.a,''],[r.c,''],[r.s,''],[r.z,''],[r.l||'—',''],[r.y,'num']]){
-      const td = document.createElement('td');
-      if(cls) td.className = cls;
-      td.textContent = v || '—';
-      tr.appendChild(td);
-    }
+    const tr=document.createElement('tr');
+    [r.b,r.a,r.c,r.s,r.z].forEach(function(v){
+      const td=document.createElement('td'); td.textContent=v||'—'; tr.appendChild(td);
+    });
+    const tdL=document.createElement('td');
+    if(r.l){
+      const a=document.createElement('span'); a.className='lender'; a.textContent=r.l;
+      a.title='trace this lender across the map';
+      a.addEventListener('click',function(ev){ ev.stopPropagation(); trace(r.l); });
+      tdL.appendChild(a);
+    } else tdL.textContent='—';
+    tr.appendChild(tdL);
+    const tdY=document.createElement('td'); tdY.className='num'; tdY.textContent=r.y||'—'; tr.appendChild(tdY);
+    const tdK=document.createElement('td'); tdK.className='kd'; tdK.textContent=r.k; tr.appendChild(tdK);
     frag.appendChild(tr);
   }
   tb.appendChild(frag);
-  document.getElementById('scroll').scrollTop = 0;
+  document.getElementById('scroll').scrollTop=0;
   document.getElementById('box').classList.add('show');
 }
 function hideBox(){
   document.getElementById('box').classList.remove('show');
-  document.querySelectorAll('.dot.sel').forEach(d=>d.classList.remove('sel'));
+  document.querySelectorAll('.dot.sel').forEach(function(d){d.classList.remove('sel');});
 }
-
-function pull(){
-  const t0 = performance.now();
-  sample.co = pick('co'); sample.ct = pick('ct');
+/* GRAPH over resolved entities: lender -> borrower adjacency, rendered by
+   highlighting every dot this lender financed and dimming the rest. */
+function trace(lender){
+  traced = (traced===lender) ? null : lender;
   hideBox(); render('co'); render('ct');
-  const ms = Math.max(1, Math.round(performance.now()-t0));
-  document.getElementById('hint').textContent = active
-    ? 'new sample drawn in ' + ms + ' ms · click a dot to read its filings'
-    : 'new sample drawn in ' + ms + ' ms · click a state';
+  const n = traced && active ? sample[active].filter(function(r){return r.l===traced;}).length : 0;
+  document.getElementById('hint').textContent = traced
+    ? 'tracing '+traced+' — '+fmt(n)+' filings here · click the lender again to clear'
+    : 'click a dot to read its filings';
+}
+function pull(){
+  const t0=performance.now();
+  traced=null; sample.co=pick('co'); sample.ct=pick('ct');
+  hideBox(); render('co'); render('ct');
+  const ms=Math.max(1,Math.round(performance.now()-t0));
+  document.getElementById('hint').textContent =
+    'new sample drawn in '+ms+' ms · '+(active?'click a dot':'click a state');
+}
+function statTile(v,l){ return '<div class="stat"><b>'+v+'</b><span>'+l+'</span></div>'; }
+function renderStats(s){
+  const h=s.headline.rows[0];
+  document.getElementById('stats').innerHTML =
+    statTile(fmt(h[0]),'filings')+statTile(fmt(h[1]),'borrowers')+
+    statTile(fmt(h[2]),'lenders')+statTile(h[3]+'–'+h[4],'years')+
+    s.by_region.rows.map(function(r){ return statTile(fmt(r[1]),r[0]+' filings'); }).join('');
+}
+function tableHTML(v){
+  return '<table><thead><tr>'+v.cols.map(function(c){return '<th>'+c+'</th>';}).join('')+'</tr></thead><tbody>'+
+    v.rows.map(function(r){ return '<tr>'+r.map(function(c){
+      return '<td>'+(typeof c==='number'?fmt(c):(c===null?'—':c))+'</td>'; }).join('')+'</tr>'; }).join('')+
+    '</tbody></table>';
+}
+function showPane(which){
+  const p=document.getElementById('pane');
+  if(p.dataset.cur===which){
+    p.classList.remove('show'); p.dataset.cur='';
+    document.querySelectorAll('#tabs .chip').forEach(function(c){c.classList.remove('on');});
+    return;
+  }
+  p.dataset.cur=which; p.classList.add('show');
+  document.querySelectorAll('#tabs .chip').forEach(function(c){ c.classList.toggle('on',c.dataset.p===which); });
+  if(which==='sql'){
+    p.innerHTML = ['by_criterion','top_lenders','top_borrowers','by_decade'].map(function(k){
+      return '<h3>'+k.replace(/_/g,' ')+'</h3><div class="sql">'+STATS[k].sql+'</div>'+tableHTML(STATS[k]);
+    }).join('');
+  } else {
+    p.innerHTML = '<h3>cross-register linkage</h3>'+
+      '<p>These names file in <b>both</b> registers. They are deliberately <b>not merged</b>: a shared '+
+      'name across two states is not evidence of a shared firm, so the pipeline never generates a '+
+      'cross-jurisdiction pair. The linkage was found, and declined.</p>'+
+      '<div class="sql">'+STATS.cross_register.sql+'</div>'+tableHTML(STATS.cross_register);
+  }
 }
 
-['co','ct'].forEach(k=>{
+['co','ct'].forEach(function(k){
   drawShape(k);
-  document.querySelector('#'+k+' svg').addEventListener('click', ()=>select(k));
+  document.querySelector('#'+k+' svg').addEventListener('click',function(){ select(k); });
 });
-document.getElementById('refresh').addEventListener('click', pull);
-document.getElementById('close').addEventListener('click', hideBox);
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideBox(); });
+document.getElementById('refresh').addEventListener('click',pull);
+document.getElementById('close').addEventListener('click',hideBox);
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') hideBox(); });
+document.querySelectorAll('#row1 .chip').forEach(function(c){
+  c.addEventListener('click',function(){
+    filter=c.dataset.k;
+    document.querySelectorAll('#row1 .chip').forEach(function(x){ x.classList.toggle('on',x===c); });
+    pull();
+  });
+});
+document.querySelectorAll('#tabs .chip').forEach(function(c){
+  c.addEventListener('click',function(){ showPane(c.dataset.p); });
+});
 
-fetch('data/rows.json')
-  .then(r=>r.json())
-  .then(d=>{
-    for(const r of d) ROWS[r.r === 'CO' ? 'co' : 'ct'].push(r);
-    document.getElementById('pool').textContent = d.length.toLocaleString();
-    sample.co = pick('co'); sample.ct = pick('ct');
-    document.getElementById('refresh').disabled = false;
-    document.getElementById('hint').textContent = 'click a state';
-  })
-  .catch(()=>{ document.getElementById('hint').textContent = 'could not load data'; });
+Promise.all([fetch('data/rows.json').then(function(r){return r.json();}),
+             fetch('data/stats.json').then(function(r){return r.json();})])
+ .then(function(res){
+    const d=res[0], s=res[1];
+    for(const r of d) ROWS[r.r==='CO'?'co':'ct'].push(r);
+    STATS=s; renderStats(s);
+    document.getElementById('prec').textContent='98.0% precision';
+    sample.co=pick('co'); sample.ct=pick('ct');
+    document.getElementById('refresh').disabled=false;
+    document.getElementById('hint').textContent='click a state';
+ })
+ .catch(function(){ document.getElementById('hint').textContent='could not load data'; });
 </script>
 </body>
 </html>

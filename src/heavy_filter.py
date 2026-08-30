@@ -50,7 +50,11 @@ MANUFACTURERS = [
     # equipment-finance division. The phrase was carrying a bank, not a maker.
     # The five genuine rows are named explicitly instead -- the same treatment
     # MACHINERY got when it was replaced by its real dealers.
-    "FLAGLER CONSTRUCTION EQUIPMENT", "CONSTRUCTION EQUIPMENT COMPANY",
+    # CONSTRUCTION EQUIPMENT COMPANY was listed here and REMOVED 2026-08-30: it
+    # matched as a substring inside "JOHN DEERE CONSTRUCTION EQUIPMENT COMPANY",
+    # readmitting the exact maker the dual-line ruling had just removed. Two rows
+    # were worth less than the leak.
+    "FLAGLER CONSTRUCTION EQUIPMENT",
     # --- NAMED heavy-equipment dealers that used to ride the bare word MACHINERY.
     # Founder ruling 2026-08-30: Route A is a NAMED manufacturer or dealer. The
     # bare token MACHINERY is gone (a machine can be a laundry machine or a key
@@ -281,6 +285,13 @@ _BIZ_PROOF = re.compile(
 #: heavy-construction firm, so it must not rescue a singular surname-risk word.
 #: The plural, possessive and second-equipment-word clauses are untouched, which
 #: is what still correctly admits DUFFY CRANE INC and COLORADO SUMMIT CRANES.
+#: DRILL is the loosest term on the borrower list: it names a machine, but it
+#: also modifies nouns from other industries entirely. "MOD SQUAD DRILL TEAM" is
+#: a marching drill team. The word admits only when it is not immediately
+#: followed by one of these -- the same shape as the surname rule, a refinement
+#: of when the criterion is genuinely met.
+_DRILL_OTHER = re.compile(r"\bDRILLS?\s+(?:TEAM|SQUAD|SERGEANT|INSTRUCTOR|CORPS|PRESS|BIT|BITS)\b")
+
 _FAMILY_FRAME = re.compile(r"&\s*SONS?\b|\bAND\s+SONS?\b|\bBROTHERS\b|\bBROS\b|"
                            r"&\s*ASSOCIATES\b|\bFAMILY\b|&\s*DAUGHTERS?\b")
 
@@ -339,7 +350,10 @@ def is_heavy_borrower(name):
     if not name:
         return False
     u = str(name).upper()
-    m = BORROWER_RE.findall(u)
+    if _DRILL_OTHER.search(u) and not BORROWER_RE.sub('', _DRILL_OTHER.sub('', u)).strip():
+        return False
+    m = [x for x in BORROWER_RE.findall(u)
+         if not (x in ("DRILL", "DRILLS") and _DRILL_OTHER.search(u))]
     if not m:
         return False
     # If EVERY match is a surname-risk word, the string must prove it is a firm.

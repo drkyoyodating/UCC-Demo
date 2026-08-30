@@ -74,13 +74,14 @@ def main() -> int:
 
     rows = con.execute("""
         SELECT borrower, borrower_address, borrower_city, borrower_state,
-               zip5, coalesce(lender, ''), loan_year, region, lat, lon
+               zip5, coalesce(lender, ''), loan_year, region, lat, lon,
+               route_a, route_b
         FROM scope_geo
     """).fetchall()
     con.close()
 
     out, stats = [], {"zip": 0, "city": 0, "relocated": 0, "dropped": 0}
-    for b, addr, c, st, z, lend, yr, reg, la, lo in rows:
+    for b, addr, c, st, z, lend, yr, reg, la, lo, ra, rb in rows:
         placed = "zip"
         if la is None:
             key = (reg, (c or "").strip().upper())
@@ -99,6 +100,9 @@ def main() -> int:
         out.append({
             "b": b, "a": addr, "c": c, "s": st, "z": z,
             "l": lend, "y": yr, "r": reg,
+            # which criterion admitted the row -- this is the classifier's own
+            # output, carried through so the page can show it.
+            "k": ("both" if (ra and rb) else "lender" if ra else "borrower"),
             "lat": round(la, 4), "lon": round(lo, 4),
         })
 
