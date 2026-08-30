@@ -252,6 +252,79 @@
   #foot b{color:#141414;font-weight:750;letter-spacing:-.005em;
     text-shadow:-.5px -.5px 0 rgba(255,255,255,.95), 1px 1px 1.5px rgba(15,15,20,.20)}
   #foot em{font-style:normal;font-weight:650;color:#1c1c1c}
+
+  /* ==========================================================================
+     MOBILE PORTRAIT (<= 640px). Never evaluated above 640px, so the desktop
+     rendering cannot move. Tight, not cramped.
+     ========================================================================== */
+  @media (max-width:640px){
+
+    body{padding:14px 16px 18px}
+    h1,.sub,#foot,#hint{text-align:center}
+
+    /* One solid line across the top. The size is derived from the viewport
+       rather than hardcoded per device, so the line holds from 320px up:
+       the string is 48 uppercase characters, which at zero tracking needs
+       about width/32. Tracking is dropped because at 11px it costs ~1.5px of
+       type size and buys nothing. */
+    h1{font-size:calc((100vw - 38px)/32);letter-spacing:0;line-height:1.25;
+      margin:0 auto}
+    h1::after{content:' Tracker'}          /* mobile only; desktop heading untouched */
+    .sub{font-size:9.5px;letter-spacing:.06em;margin:5px auto 0;line-height:1.45}
+
+    /* Stat boxes: 4 across, then the remaining 2 centred beneath. */
+    #stats{gap:5px;margin:9px 0 5px;justify-content:center}
+    .stat{flex:0 0 calc((100% - 15px)/4);min-width:0;padding:5px 3px;border-radius:4px}
+    .stat b{font-size:12.5px;letter-spacing:-.02em;line-height:1.2}
+    .stat span{font-size:7px;letter-spacing:.05em}
+
+    /* Maps keep their side-by-side arrangement; only their names shrink. */
+    #stage{gap:4vw;padding:0}
+    .label{font-size:10.5px;letter-spacing:.08em}
+    .count{font-size:9px;height:12px}
+
+    /* Controls: 3 across, then the remaining 2 centred beneath. */
+    #bar{gap:6px;margin-top:8px}
+    /* stretch, not centre: a chip whose label wraps to two lines would
+       otherwise sit at a different height from its neighbours and the row
+       would read as ragged rather than tight. */
+    #row1{gap:6px;justify-content:center;align-items:stretch}
+    #row1>*{flex:0 0 calc((100% - 12px)/3);min-width:0}
+    button{font-size:8.5px;padding:7px 4px;letter-spacing:.05em;line-height:1.25}
+    .chip{font-size:8px;padding:7px 4px;letter-spacing:.05em;line-height:1.25;
+      text-align:center}
+    #hint{font-size:9px;height:12px;letter-spacing:.08em}
+
+    /* Then the two remaining boxes, then the prose, with a real bottom buffer. */
+    #tabs{gap:6px;margin-top:9px;justify-content:center}
+    #tabs .chip{flex:0 0 auto;padding:7px 12px;font-size:8.5px}
+    #foot{margin:11px auto 0;font-size:9.5px;line-height:1.55;max-width:none}
+
+    /* ---- The filings table: a locked square, centred ----------------------
+       Half-width is whatever it takes to reach the 16px buffer on left and
+       right; the same distance is then applied up and down from centre, so the
+       box is square by construction on any device. The gap above and below is
+       larger than the gap left and right -- that is the geometry, not a bug.
+       The box does not move or resize; the CONTENT slides inside it on both
+       axes. */
+    #box{width:calc(100vw - 32px);height:calc(100vw - 32px);max-height:none}
+    #boxhead{padding:7px 10px}
+    #boxtitle{font-size:11px}
+    #boxsub{font-size:9.5px}
+    #close{font-size:19px;padding:0 5px}
+    #scroll{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+    #box table{font-size:9.5px}
+    #box th,#box td{padding:4px 6px}
+    #box th{font-size:9px;padding-right:14px}
+    #box td.kd{font-size:8.5px}
+
+    /* SQL / cross-register panes, same reduction. */
+    #pane{max-height:240px}
+    #pane h3{font-size:9.5px;padding:7px 10px}
+    #pane table{font-size:9.5px}
+    #pane th,#pane td{padding:4px 6px}
+    #pane .sql{font-size:9px}
+  }
 </style>
 </head>
 <body>
