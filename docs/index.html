@@ -123,8 +123,9 @@
   .chip.on{border-color:rgba(15,15,20,.62);color:#111;font-weight:700;
     background:linear-gradient(158deg,#f0f0f0,#e4e4e4);
     box-shadow:0 1px 2px rgba(15,15,20,.16) inset}
-  #hint{font-size:12.5px;font-weight:550;color:#4f4f4f;height:16px;
-    text-shadow:0 1px 0 rgba(255,255,255,.85)}
+  #hint{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    color:#3a3a3a;height:17px;font-variant-numeric:tabular-nums;
+    text-shadow:-.5px -.5px 0 rgba(255,255,255,.95), 1px 1px 1.5px rgba(15,15,20,.20)}
   .count,#boxsub,#hint,#foot{font-variant-numeric:tabular-nums}
   /* Glass: a translucent plate with a blurred backdrop, a bright top rim and a
      deep shadow. It floats over the map, so it earns real elevation -- this is
@@ -185,19 +186,25 @@
     background:linear-gradient(158deg,#f6f6f6,#e9e9e9);
     text-shadow:0 1px 0 rgba(255,255,255,.9);
     border-bottom:1px solid rgba(15,15,20,.16)}
-  #pane .sql{font:11px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:#3f4b57;
+  #pane .sql{font:11.5px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;color:#33404d;
     padding:9px 13px;background:#f7f8fa;white-space:pre-wrap;
     border-bottom:1px solid rgba(15,15,20,.10);
     box-shadow:inset 0 1px 2px rgba(15,15,20,.05)}
-  #pane p{margin:0;padding:10px 13px;font-size:12px;line-height:1.55;color:#454545;
-    border-bottom:1px solid rgba(15,15,20,.10)}
+  #pane p{margin:0;padding:11px 14px;font-size:12.5px;line-height:1.6;color:#333333;
+    font-weight:500;border-bottom:1px solid rgba(15,15,20,.10);
+    text-shadow:0 1px 0 rgba(255,255,255,.9)}
+  #pane p b{color:#141414;font-weight:750;
+    text-shadow:-.5px -.5px 0 rgba(255,255,255,.95), 1px 1px 1.5px rgba(15,15,20,.20)}
   /* The footer carries the precision claim -- the single most load-bearing
      sentence for a technical reader -- and was set at 11px in grey, smaller than
      the table it describes. 12.5px at #4a4a4a reads as a statement rather than
      as fine print, and the claim itself is emphasised. */
-  #foot{margin-top:13px;font-size:12.5px;line-height:1.55;color:#4a4a4a;
-    text-align:center;max-width:940px}
-  #foot b{color:var(--ink);font-weight:650}
+  #foot{margin-top:14px;font-size:13.5px;line-height:1.6;color:#333333;
+    font-weight:500;text-align:center;max-width:960px;
+    text-shadow:0 1px 0 rgba(255,255,255,.9)}
+  #foot b{color:#141414;font-weight:750;letter-spacing:-.005em;
+    text-shadow:-.5px -.5px 0 rgba(255,255,255,.95), 1px 1px 1.5px rgba(15,15,20,.20)}
+  #foot em{font-style:normal;font-weight:650;color:#1c1c1c}
 </style>
 </head>
 <body>
@@ -287,9 +294,10 @@
 </div>
 
 <p id="foot">
-  Every row meets one of two criteria: the lender is a named heavy-construction equipment maker or
-  dealer, or the borrower's own name states a job-site equipment category. An adjudicated sample
-  measured the classifier at <b id="prec">—</b>. Refresh draws a new sample from the pool.
+  Every row meets one of two criteria: the lender is a <em>named heavy-construction equipment maker
+  or dealer</em>, or the borrower's own name states a <em>job-site equipment category</em>.
+  An adjudicated sample measured the classifier at <b id="prec">—</b>.
+  Refresh draws a new sample from the pool.
 </p>
 
 <script>
