@@ -1,3 +1,4 @@
 # Non-blocking: publish + chart export. Failure here must not stop the pipeline.
 datasette
 vl-convert-python
+openpyxl   # tooling only: builds the labelling workbook. NOT load-bearing for the pipeline.
