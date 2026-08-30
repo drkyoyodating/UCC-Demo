@@ -511,7 +511,7 @@ Promise.all([fetch('data/rows.json').then(function(r){return r.json();}),
     const d=res[0], s=res[1];
     for(const r of d) ROWS[r.r==='CO'?'co':'ct'].push(r);
     STATS=s; renderStats(s);
-    document.getElementById('prec').textContent='98.0% precision';
+    document.getElementById('prec').textContent='99.4% precision';
     sample.co=pick('co'); sample.ct=pick('ct');
     document.getElementById('refresh').disabled=false;
     document.getElementById('hint').textContent='click a state';
