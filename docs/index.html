@@ -257,13 +257,6 @@
      MOBILE PORTRAIT (<= 640px). Never evaluated above 640px, so the desktop
      rendering cannot move. Tight, not cramped.
      ========================================================================== */
-  /* The scroll lock is scoped to viewports tall enough to hold the layout.
-     Below ~600px of visible height the content genuinely does not fit, and
-     overflow:hidden there would strand it off-screen with no way to reach it,
-     so those devices keep their scrollbar. */
-  @media (max-width:640px) and (min-height:600px){
-    body{overflow:hidden}
-  }
   @media (max-width:640px){
 
     /* The footer group -- the control rows, the hint, the pane chips and the
@@ -291,8 +284,10 @@
        there is no page scrolling in portrait. Anything that does not fit would
        be unreachable rather than merely below the fold, so the pane below is
        capped in viewport units instead of pixels to keep it inside the lock. */
+    /* Deliberately NOT locked: overflow:hidden and a pinned height both kill the
+       native pull-to-refresh gesture. min-height keeps the footer anchored to the
+       bottom via #bar's auto margin without pinning the document. */
     html{height:100%}
-    body{height:100svh;max-height:100svh}
     #stage{flex:0 0 auto}
     h1,.sub,#foot,#hint{text-align:center}
 
@@ -385,7 +380,14 @@
        larger than the gap left and right -- that is the geometry, not a bug.
        The box does not move or resize; the CONTENT slides inside it on both
        axes. */
-    #box{width:calc(100vw - 32px);height:calc(100vw - 32px);max-height:none}
+    /* No longer square. Height is 75% of the old square edge -- 12.5% off the top
+       reach and 12.5% off the bottom, so 25% less vertical opening. Width is
+       125% of it -- 12.5% more each side -- but capped so it cannot run past the
+       screen: on a 440px viewport 125% would want 510px, so the cap takes over
+       and leaves a 4px margin rather than going flush to the bezel. Still
+       centred on both axes; content still slides both ways. */
+    #box{width:min(calc((100vw - 32px) * 1.25), calc(100vw - 8px));
+      height:calc((100vw - 32px) * .75);max-height:none}
     #boxhead{padding:7px 10px}
     #boxtitle{font-size:11px}
     #boxsub{font-size:9.5px}
