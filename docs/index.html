@@ -180,6 +180,21 @@
      background:linear-gradient(158deg,#efefef,#e2e2e2);
      text-shadow:0 1px 0 rgba(255,255,255,.9);
      border-bottom:0;box-shadow:inset 0 -1px 0 rgba(15,15,20,.20)}
+  /* Sort affordance. The caret stays latent until a head is hovered or is
+     actually doing the sorting, so eight column heads do not read as eight
+     pieces of chrome parked above the data. The right padding is reserved on
+     every sortable head whether or not its caret is showing, so the caret
+     arriving on hover cannot reflow the header row. */
+  th[data-k]{cursor:pointer;-webkit-user-select:none;user-select:none;padding-right:19px}
+  th[data-k]:hover{color:#111}
+  th[data-k]::after{content:'';position:absolute;right:7px;top:50%;margin-top:-2px;
+    width:0;height:0;opacity:0;transition:opacity .12s;
+    border-left:3.5px solid transparent;border-right:3.5px solid transparent;
+    border-bottom:4px solid currentColor}
+  th[data-k]:hover::after{opacity:.32}
+  th[data-k][aria-sort]::after{opacity:.9}
+  th[data-k][aria-sort="descending"]::after{border-bottom:0;border-top:4px solid currentColor}
+  th[data-k]:focus-visible{outline:2px solid rgba(107,63,160,.6);outline-offset:-2px}
   td.num{text-align:right;font-variant-numeric:tabular-nums;color:#3a3a3a}
   tbody tr:nth-child(even){background:rgba(15,15,20,.030)}
   tbody tr:hover{background:rgba(107,63,160,.10)}
@@ -300,8 +315,16 @@
     <button id="close" title="close">×</button>
   </div>
   <div id="scroll"><table>
-    <thead><tr><th>Borrower</th><th>Address</th><th>City</th><th>State</th>
-      <th>ZIP</th><th>Lender</th><th class="num">Year</th><th>Admitted by</th></tr></thead>
+    <thead><tr>
+      <th data-k="b" tabindex="0" title="sort by borrower">Borrower</th>
+      <th data-k="a" tabindex="0" title="sort by address">Address</th>
+      <th data-k="c" tabindex="0" title="sort by city">City</th>
+      <th data-k="s" tabindex="0" title="sort by state">State</th>
+      <th data-k="z" tabindex="0" title="sort by ZIP">ZIP</th>
+      <th data-k="l" tabindex="0" title="sort by lender">Lender</th>
+      <th class="num" data-k="y" tabindex="0" title="sort by year">Year</th>
+      <th data-k="k" tabindex="0" title="sort by admitting criterion">Admitted by</th>
+    </tr></thead>
     <tbody id="tb"></tbody>
   </table></div>
 </div>
@@ -400,12 +423,29 @@ function select(k){
   hideBox(); render('co'); render('ct');
   document.getElementById('hint').textContent='click a dot to read its filings';
 }
-function showBox(grp,el){
-  document.querySelectorAll('.dot.sel').forEach(function(d){d.classList.remove('sel');});
-  if(el) el.classList.add('sel');
-  const rs=grp.rows;
-  document.getElementById('boxtitle').textContent=(rs[0].c||'—')+', '+rs[0].s+'  '+grp.z;
-  document.getElementById('boxsub').textContent=fmt(rs.length)+(rs.length===1?' filing':' filings');
+/* SORTING the open panel. The commercial registers advertise sorting on lender
+   type and credit attributes that sit behind their paywall; we do not hold those
+   fields, so every column we DO hold is sortable instead. Sort state is kept
+   across selections on purpose -- someone who has ordered by Year expects the
+   next dot to open the same way rather than silently reverting. */
+let boxRows=[], sortKey=null, sortDir=1;
+const NUMERIC={y:true};
+const COLL=new Intl.Collator('en',{numeric:true,sensitivity:'base'});
+function cmpRows(a,b){
+  const x=a[sortKey], y=b[sortKey];
+  /* Blanks sink to the bottom under BOTH arrows. Letting them flip would open
+     the descending view on a block of em-dashes, burying the data the click
+     was asking to see. */
+  const ea=(x===undefined||x===null||x===''), eb=(y===undefined||y===null||y==='');
+  if(ea||eb) return (ea&&eb) ? 0 : (ea?1:-1);
+  if(NUMERIC[sortKey]) return (Number(x)-Number(y))*sortDir;
+  return COLL.compare(String(x),String(y))*sortDir;
+}
+function paintRows(){
+  /* Array.prototype.sort is stable, so rows tying on the sorted column hold
+     their as-filed order instead of reshuffling on every repaint. Sorting a
+     copy keeps the group's own row order intact for the map and the tracer. */
+  const rs = sortKey ? boxRows.slice().sort(cmpRows) : boxRows;
   const tb=document.getElementById('tb'); tb.textContent='';
   const frag=document.createDocumentFragment();
   for(const r of rs){
@@ -427,6 +467,14 @@ function showBox(grp,el){
   }
   tb.appendChild(frag);
   document.getElementById('scroll').scrollTop=0;
+}
+function showBox(grp,el){
+  document.querySelectorAll('.dot.sel').forEach(function(d){d.classList.remove('sel');});
+  if(el) el.classList.add('sel');
+  const rs=grp.rows;
+  document.getElementById('boxtitle').textContent=(rs[0].c||'—')+', '+rs[0].s+'  '+grp.z;
+  document.getElementById('boxsub').textContent=fmt(rs.length)+(rs.length===1?' filing':' filings');
+  boxRows=rs; paintRows();
   document.getElementById('box').classList.add('show');
 }
 function hideBox(){
@@ -503,6 +551,24 @@ document.querySelectorAll('#row1 .chip').forEach(function(c){
 });
 document.querySelectorAll('#tabs .chip').forEach(function(c){
   c.addEventListener('click',function(){ showPane(c.dataset.p); });
+});
+/* Scoped to the filings table: the SQL-view tables in #pane are fixed summaries
+   with no row array behind them. aria-sort is cleared off every head and re-set
+   on one, so the caret and the state it reports can never disagree. */
+document.querySelectorAll('#box thead th[data-k]').forEach(function(th){
+  function toggle(){
+    const k=th.dataset.k;
+    sortDir = (sortKey===k) ? -sortDir : 1;
+    sortKey = k;
+    document.querySelectorAll('#box thead th[data-k]')
+      .forEach(function(o){ o.removeAttribute('aria-sort'); });
+    th.setAttribute('aria-sort', sortDir===1?'ascending':'descending');
+    paintRows();
+  }
+  th.addEventListener('click',toggle);
+  th.addEventListener('keydown',function(e){
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); }
+  });
 });
 
 Promise.all([fetch('data/rows.json').then(function(r){return r.json();}),
