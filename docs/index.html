@@ -15,7 +15,7 @@
        2.25:1 luminance step against the bright fill instead of 1.72:1, so
        dim-vs-bright reads as the binary it is meant to be. */
     --co-dim:#a37fc4; --ct-dim:#e0907f;
-    --ink:#1c1c1c; --mut:#767676; --line:#d2d2d2; --bg:#f4f4f4;
+    --ink:#1c1c1c; --mut:#6b6b6b; --line:#d2d2d2; --bg:#f4f4f4;
     --maph:min(74vh,780px);
   }
   *{box-sizing:border-box}
@@ -36,25 +36,39 @@
   .panel svg{display:block;cursor:pointer;overflow:visible;width:100%;height:auto;max-height:var(--maph)}
   .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
   .panel.on .label{color:var(--ink);font-weight:600}
-  .count{font-size:11px;color:#8a8a8a;height:14px}
-  .shape{stroke:#fff;stroke-width:1.5}
-  #co .shape{fill:var(--co-dim)} #ct .shape{fill:var(--ct-dim)}
+  .count{font-size:11px;color:#6e6e6e;height:14px}
+  /* No white rim: it measured 1.10:1 on the ground, separating nothing outward
+     while eating into the fill inward. Each state instead carries a boundary in
+     a darkened value of its OWN hue, because both muted fills fall under the 3:1
+     graphics floor (CO-dim 2.99:1, CT-dim 2.26:1) and these are click targets. */
+  .shape{stroke-width:1.5}
+  #co .shape{fill:var(--co-dim);stroke:#502f78}
+  #ct .shape{fill:var(--ct-dim);stroke:#902b20}
   #co.on .shape{fill:var(--co)}  #ct.on .shape{fill:var(--ct)}
-  .dot{cursor:pointer;stroke:#fff;stroke-width:1.2;paint-order:stroke fill}
+  /* The white casing is load-bearing, not decoration: the two identity fills are
+     only 1.36:1 apart in luminance (1.02:1 simulated protanopia), so this ring is
+     the sole figure-ground cue on every dot. In SVG user units it scaled with the
+     viewBox and rendered 0.25px at a 375px viewport -- antialiasing to ~25% alpha
+     and flattening the field into a wash. non-scaling-stroke pins it to CSS px,
+     so widths below are px and were re-derived from their rendered size. */
+  .dot{cursor:pointer;stroke:#fff;stroke-width:2px;paint-order:stroke fill;
+       vector-effect:non-scaling-stroke}
   #co .dot{fill:var(--ct)} #ct .dot{fill:var(--co)}
-  .dot.sel{stroke:#111;stroke-width:1.8}
+  .dot.sel{stroke:#111;stroke-width:3px}
   .dot.dim{opacity:.12}
-  .dot.hot{fill:#111;stroke:#fff;stroke-width:1}
+  .dot.hot{fill:#111;stroke:#fff;stroke-width:2px}
   #bar{display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:8px}
   #row1{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:center}
   button{font:600 13px/1 inherit;padding:10px 24px;border:1px solid #333;border-radius:3px;
     background:#fff;color:#111;cursor:pointer}
   button:hover:not(:disabled){background:#111;color:#fff}
   button:disabled{opacity:.45;cursor:default}
-  .chip{font:500 11.5px/1 inherit;padding:7px 12px;border:1px solid var(--line);border-radius:3px;
+  button:focus-visible,.chip:focus-visible{outline:2px solid #1c1c1c;outline-offset:2px}
+  .chip{font:500 11.5px/1 inherit;padding:7px 12px;border:1px solid #8a8a8a;border-radius:3px;
     background:#fff;color:#555;cursor:pointer}
   .chip.on{border-color:#333;color:#111;font-weight:700}
   #hint{font-size:11.5px;color:var(--mut);height:15px}
+  .count,#boxsub,#hint,#foot{font-variant-numeric:tabular-nums}
   #box{display:none;position:fixed;z-index:9;left:50%;top:50%;transform:translate(-50%,-50%);
     width:min(880px,92vw);max-height:min(440px,70vh);background:#fff;border:1px solid #333;
     box-shadow:0 6px 26px rgba(0,0,0,.22);flex-direction:column}
@@ -66,13 +80,14 @@
   #close{border:0;background:none;font-size:17px;padding:0 2px;cursor:pointer;color:var(--mut)}
   #close:hover{background:none;color:#111}
   #scroll{overflow:auto}
-  table{border-collapse:collapse;width:100%;font-size:11.5px}
+  table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
   th,td{padding:5px 8px;border-bottom:1px solid #ececec;text-align:left;white-space:nowrap}
-  th{position:sticky;top:0;background:#f7f7f7;font-weight:600;font-size:11px;border-bottom:1px solid var(--line)}
+  th{position:sticky;top:0;background:#e8e8e8;font-weight:600;font-size:11px;
+     border-bottom:0;box-shadow:inset 0 -1px 0 var(--line)}
   td.num{text-align:right;font-variant-numeric:tabular-nums}
-  tbody tr:nth-child(even){background:#fbfbfb}
+  tbody tr:nth-child(even){background:#f2f2f2}
   .lender{color:#0b57a4;cursor:pointer;text-decoration:underline dotted}
-  .kd{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+  .kd{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
   #tabs{display:flex;gap:6px;margin-top:10px}
   #pane{display:none;width:min(1100px,96vw);margin-top:8px;border:1px solid var(--line);
     background:#fff;max-height:300px;overflow:auto}
@@ -82,7 +97,7 @@
   #pane .sql{font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#555;
     padding:7px 12px;background:#fcfcfc;border-bottom:1px solid #eee;white-space:pre-wrap}
   #pane p{margin:0;padding:8px 12px;font-size:11.5px;color:#555;border-bottom:1px solid #eee}
-  #foot{margin-top:10px;font-size:11px;color:#8a8a8a;text-align:center;max-width:900px}
+  #foot{margin-top:10px;font-size:11px;color:#6e6e6e;text-align:center;max-width:900px}
 </style>
 </head>
 <body>
