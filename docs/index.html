@@ -25,8 +25,7 @@
   /* iOS/Android engines auto-inflate text in some layouts, which would override
      the tuned scale and re-open the gap with the desktop. Desktop browsers do
      no text inflation, so this is inert there. */
-  html{-webkit-text-size-adjust:100%;text-size-adjust:100%;
-    -webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   body{margin:0;background:var(--bg);color:var(--ink);
     font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
     display:flex;flex-direction:column;align-items:center;padding:12px 16px 16px}
@@ -123,13 +122,7 @@
      That is why the phone and the laptop disagreed. These longhands pin the
      values Chrome was already computing, so the desktop rendering is unchanged
      and every other engine is pulled onto the same numbers. */
-  /* WebKit gives <button> `-webkit-appearance:button` in its UA sheet, and that
-     native control appearance overrides the background gradient, the border, the
-     radius and the box-shadow below -- reverting them to the platform default.
-     Blink's button default is far weaker, which is why the same CSS looks right
-     in Chrome on macOS and wrong in Safari and on iOS. */
-  button{-webkit-appearance:none;appearance:none;
-    font-family:Arial,Helvetica,sans-serif;font-size:13.3333px;
+  button{font-family:Arial,Helvetica,sans-serif;font-size:13.3333px;
     font-weight:400;line-height:normal;letter-spacing:.11em;text-transform:uppercase;
     padding:11px 26px;border:1px solid rgba(15,15,20,.55);
     border-radius:5px;color:#2e2e2e;cursor:pointer;
@@ -138,15 +131,9 @@
     box-shadow:0 1px 0 rgba(255,255,255,.95) inset, 1px 2px 4px rgba(15,15,20,.14)}
   /* On the dark hover fill the catch-light must invert: a white highlight would
      smear, so the raised effect comes from a dark drop only. */
-  /* Gated: WebKit LATCHES :hover on tap and holds it until you tap elsewhere,
-     so on a phone this state sticks instead of previewing. Wrapped in place
-     rather than moved, so source order -- and the Blink rendering -- is
-     unchanged. */
-  @media (hover:hover){
   button:hover:not(:disabled){background:#111;color:#fff;
     text-shadow:0 1px 1px rgba(0,0,0,.6);
     box-shadow:1px 2px 6px rgba(15,15,20,.28)}
-  }
   button:active:not(:disabled){box-shadow:0 1px 2px rgba(15,15,20,.22) inset;transform:translateY(1px)}
   button:disabled{opacity:.45;cursor:default}
   button:focus-visible,.chip:focus-visible{outline:2px solid #1c1c1c;outline-offset:2px}
@@ -161,7 +148,7 @@
     background:linear-gradient(158deg,#ffffff,#f4f4f4);
     text-shadow:0 1px 0 rgba(255,255,255,.92);
     box-shadow:0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(15,15,20,.09)}
-  @media (hover:hover){ .chip:hover{color:#2e2e2e;border-color:rgba(15,15,20,.45)} }
+  .chip:hover{color:#2e2e2e;border-color:rgba(15,15,20,.45)}
   /* Selected reads as physically depressed: inset shadow, and the catch-light
      removed because a raised highlight on a pressed surface fights itself. */
   .chip.on{border-color:rgba(15,15,20,.62);color:#141414;font-weight:750;
@@ -195,7 +182,7 @@
   #boxsub{font-size:11.5px;font-weight:600;color:#565656;
     font-variant-numeric:tabular-nums}
   #close{border:0;background:none;font-size:17px;padding:0 2px;cursor:pointer;color:var(--mut)}
-  @media (hover:hover){ #close:hover{background:none;color:#111} }
+  #close:hover{background:none;color:#111}
   #scroll{overflow:auto}
   table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
   /* Matched to the tiles and panels: translucent hairlines rather than a solid
@@ -218,24 +205,22 @@
      every sortable head whether or not its caret is showing, so the caret
      arriving on hover cannot reflow the header row. */
   th[data-k]{cursor:pointer;-webkit-user-select:none;user-select:none;padding-right:19px}
-  @media (hover:hover){ th[data-k]:hover{color:#111} }
+  th[data-k]:hover{color:#111}
   th[data-k]::after{content:'';position:absolute;right:7px;top:50%;margin-top:-2px;
     width:0;height:0;opacity:0;transition:opacity .12s;
     border-left:3.5px solid transparent;border-right:3.5px solid transparent;
     border-bottom:4px solid currentColor}
-  @media (hover:hover){ th[data-k]:hover::after{opacity:.32} }
+  th[data-k]:hover::after{opacity:.32}
   th[data-k][aria-sort]::after{opacity:.9}
   th[data-k][aria-sort="descending"]::after{border-bottom:0;border-top:4px solid currentColor}
   th[data-k]:focus-visible{outline:2px solid rgba(107,63,160,.6);outline-offset:-2px}
   td.num{text-align:right;font-variant-numeric:tabular-nums;color:#3a3a3a}
   tbody tr:nth-child(even){background:rgba(15,15,20,.030)}
-  @media (hover:hover){
-    tbody tr:hover{background:rgba(107,63,160,.10)}
-    tbody tr:hover td:first-child{color:#000}
-  }
+  tbody tr:hover{background:rgba(107,63,160,.10)}
+  tbody tr:hover td:first-child{color:#000}
   .lender{color:#0b4f96;font-weight:600;cursor:pointer;
     text-decoration:underline dotted rgba(11,79,150,.55);text-underline-offset:2px}
-  @media (hover:hover){ .lender:hover{color:#062f5c;text-decoration-color:#062f5c} }
+  .lender:hover{color:#062f5c;text-decoration-color:#062f5c}
   .kd{font-size:10.5px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:#5f5f5f}
   #tabs{display:flex;gap:6px;margin-top:10px}
   #pane{display:none;width:min(1100px,96vw);margin-top:8px;
