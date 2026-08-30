@@ -122,7 +122,13 @@
      That is why the phone and the laptop disagreed. These longhands pin the
      values Chrome was already computing, so the desktop rendering is unchanged
      and every other engine is pulled onto the same numbers. */
-  button{font-family:Arial,Helvetica,sans-serif;font-size:13.3333px;
+  /* WebKit gives <button> `-webkit-appearance:button` in its UA sheet, and that
+     native control appearance overrides the background gradient, the border, the
+     radius and the box-shadow below -- reverting them to the platform default.
+     Blink's button default is far weaker, which is why the same CSS looks right
+     in Chrome on macOS and wrong in Safari and on iOS. */
+  button{-webkit-appearance:none;appearance:none;
+    font-family:Arial,Helvetica,sans-serif;font-size:13.3333px;
     font-weight:400;line-height:normal;letter-spacing:.11em;text-transform:uppercase;
     padding:11px 26px;border:1px solid rgba(15,15,20,.55);
     border-radius:5px;color:#2e2e2e;cursor:pointer;
