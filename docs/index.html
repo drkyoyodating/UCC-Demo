@@ -109,22 +109,33 @@
   .dot.hot{fill:#111;stroke:#fff;stroke-width:2px}
   #bar{display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:8px}
   #row1{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:center}
-  button{font:600 13px/1 inherit;padding:10px 24px;border:1px solid rgba(15,15,20,.55);
-    border-radius:5px;color:#111;cursor:pointer;
+  button{font:750 12.5px/1 inherit;letter-spacing:.11em;text-transform:uppercase;
+    padding:11px 26px;border:1px solid rgba(15,15,20,.55);
+    border-radius:5px;color:#2e2e2e;cursor:pointer;
     background:linear-gradient(158deg,#ffffff,#f0f0f0);
+    text-shadow:-.5px -.5px 0 rgba(255,255,255,.95), 1px 1px 1.5px rgba(15,15,20,.20);
     box-shadow:0 1px 0 rgba(255,255,255,.95) inset, 1px 2px 4px rgba(15,15,20,.14)}
+  /* On the dark hover fill the catch-light must invert: a white highlight would
+     smear, so the raised effect comes from a dark drop only. */
   button:hover:not(:disabled){background:#111;color:#fff;
+    text-shadow:0 1px 1px rgba(0,0,0,.6);
     box-shadow:1px 2px 6px rgba(15,15,20,.28)}
   button:active:not(:disabled){box-shadow:0 1px 2px rgba(15,15,20,.22) inset;transform:translateY(1px)}
   button:disabled{opacity:.45;cursor:default}
   button:focus-visible,.chip:focus-visible{outline:2px solid #1c1c1c;outline-offset:2px}
-  .chip{font:500 11.5px/1 inherit;padding:7px 12px;border:1px solid rgba(15,15,20,.30);
-    border-radius:5px;color:#555;cursor:pointer;
+  .chip{font:650 10.5px/1 inherit;letter-spacing:.13em;text-transform:uppercase;
+    padding:8px 13px;border:1px solid rgba(15,15,20,.30);
+    border-radius:5px;color:#5a5a5a;cursor:pointer;
     background:linear-gradient(158deg,#ffffff,#f4f4f4);
+    text-shadow:0 1px 0 rgba(255,255,255,.92);
     box-shadow:0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(15,15,20,.09)}
-  .chip.on{border-color:rgba(15,15,20,.62);color:#111;font-weight:700;
-    background:linear-gradient(158deg,#f0f0f0,#e4e4e4);
-    box-shadow:0 1px 2px rgba(15,15,20,.16) inset}
+  .chip:hover{color:#2e2e2e;border-color:rgba(15,15,20,.45)}
+  /* Selected reads as physically depressed: inset shadow, and the catch-light
+     removed because a raised highlight on a pressed surface fights itself. */
+  .chip.on{border-color:rgba(15,15,20,.62);color:#141414;font-weight:750;
+    background:linear-gradient(158deg,#e9e9e9,#dedede);
+    text-shadow:0 1px 0 rgba(255,255,255,.65);
+    box-shadow:0 1px 2px rgba(15,15,20,.18) inset}
   #hint{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
     color:#3a3a3a;height:17px;font-variant-numeric:tabular-nums;
     text-shadow:-.5px -.5px 0 rgba(255,255,255,.95), 1px 1px 1.5px rgba(15,15,20,.20)}
