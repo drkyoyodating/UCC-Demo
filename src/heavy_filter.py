@@ -23,19 +23,18 @@ import re
 
 # --- ROUTE A: heavy construction equipment makers, captives, and major dealers ---
 MANUFACTURERS = [
-    "CATERPILLAR", "CAT FINANCIAL", "JOHN DEERE", "DEERE", "KOMATSU", "VOLVO",
+    "CATERPILLAR", "CAT FINANCIAL", "CAPTERPILLAR", "CETERPILLAR", "CATERPILLR", "KOMATSU", "VOLVO",
     # OCR corruptions of maker names, from the same distance-1 sweep. Only
     # non-words: DEER, VOGEL, MERLE, METRO, AZTEC, ALTEC, GENE and GROVER are
     # real words or real firms at distance 1 and are deliberately NOT listed.
     # DERE and DEEE were considered and REJECTED: both are short enough to be
     # real standalone tokens ("DERE VALLEY LLC"), and a whole-word match on them
     # admits unrelated firms. Only unambiguous long corruptions are listed.
-    "CAPTERPILLAR", "CETERPILLAR", "CATERPILLR", "DEEERE", "CEERE", "CDEERE",
-    "KUTOTA",
+    
     "HITACHI CONSTRUCTION", "LIEBHERR", "DOOSAN", "DEVELON", "HYUNDAI CONSTRUCTION", "KOBELCO",
-    "CASE CONSTRUCTION", "CASE CREDIT", "CNH", "NEW HOLLAND", "JCB", "TEREX",
+    "CASE CONSTRUCTION", "JCB", "TEREX",
     "GENIE INDUSTRIES", "JLG", "MANITOWOC", "GROVE U.S", "LINK-BELT", "LINK BELT", "SANY", "XCMG",
-    "ZOOMLION", "TAKEUCHI", "KUBOTA", "YANMAR", "BOBCAT", "WACKER NEUSON",
+    "ZOOMLION", "TAKEUCHI", "YANMAR", "BOBCAT", "WACKER NEUSON",
     "VERMEER", "DITCH WITCH", "ASTEC", "GRADALL", "GEHL", "MANITOU", "MERLO",
     "SKYJACK", "HAULOTTE", "BOMAG", "DYNAPAC", "WIRTGEN", "VOGELE", "HAMM",
     "SAKAI", "AMMANN", "ATLAS COPCO", "EPIROC", "SANDVIK", "METSO", "POWERSCREEN",
@@ -74,7 +73,6 @@ MANUFACTURERS = [
     # Short/ambiguous tokens are spelled out: ALAMO alone is a rental car and a
     # cinema chain, YALE alone is a university and a lock, WABASH alone is a
     # river and a valley, OSHKOSH alone is a childrenswear label.
-    "CNH INDUSTRIAL", "NEW HOLLAND CONSTRUCTION",          # CNH  (NYSE: CNH)
     "OSHKOSH CORPORATION", "OSHKOSH TRUCK", "MCNEILUS",     # Oshkosh (OSK)
     "ALAMO GROUP",                                          # Alamo (ALG)
     "VOLVO CONSTRUCTION",                                   # AB Volvo (VLVLY)
@@ -84,7 +82,7 @@ MANUFACTURERS = [
     "WABASH NATIONAL",                                      # Wabash National (WNC)
     "POWER MOTIVE", "RDO EQUIPMENT", "POTESTIO BROTHERS", "H & E EQUIPMENT",
     "H&E EQUIPMENT", "NORTH CENTRAL RENTAL", "COLORADO EQUIPMENT",
-    "21ST CENTURY EQUIPMENT", "CLARK EQUIPMENT", "UNITED RENTALS", "TADANO",
+    "CLARK EQUIPMENT", "UNITED RENTALS", "TADANO",
     "NATIONAL CRANE", "ELLIOTT EQUIPMENT", "PETTIBONE", "CLEVELAND BROTHERS",
     "SHAWMUT EQUIPMENT", "CROWN EQUIPMENT", "MONROE TRACTOR", "HYSTER",
     "INGERSOLL RAND",
@@ -224,6 +222,15 @@ BORROWER_SQL = BORROWER_RE.pattern
 LENDER_SQL = LENDER_RE.pattern
 
 
+#: Dealer entities that split their business into a construction LLC and a
+#: separate AGRICULTURE LLC, and file under whichever one sold the machine. The
+#: dealer name alone therefore does not establish criterion 1 -- "4 Rivers
+#: Equipment - Ag LLC" lending to JW Farms is a farm sale, not a job-site one.
+#: This is a refinement of the CRITERION, not a reject list: the criterion is
+#: "a named dealer of heavy CONSTRUCTION equipment", and the ag arm is not that.
+_AG_ARM = re.compile(r"-\s*AG\b|\bAG\s+LLC\b|\bAGRICULTURE\b|\bFARM\s+EQUIPMENT\b")
+
+
 def is_heavy_lender(name):
     """Route A criterion: is the LENDER a named maker or dealer of heavy
     construction equipment?
@@ -243,7 +250,12 @@ def is_heavy_lender(name):
     beside a bank ("Ditch Witch Financial Services, a program of Bank of the
     West"). Tight criteria need no reject list and cannot fail that way.
     """
-    return bool(name) and bool(LENDER_RE.search(str(name).upper()))
+    if not name:
+        return False
+    u = str(name).upper()
+    if _AG_ARM.search(u):
+        return False
+    return bool(LENDER_RE.search(u))
 
 
 #: Equipment words whose SINGULAR form is a plausible SURNAME. Founder ruling
@@ -264,33 +276,55 @@ _BIZ_PROOF = re.compile(
     r"SOLUTIONS|ASSOCIATES|PARTNERS|VENTURES|PROPERTIES|SALES|RENTAL|RENTALS)\b|\d")
 
 
+#: The classic family-firm frame. "CRANE & SON, INC." is the Crane family, not a
+#: crane company -- the corporate marker proves it is a FIRM but not that it is a
+#: heavy-construction firm, so it must not rescue a singular surname-risk word.
+#: The plural, possessive and second-equipment-word clauses are untouched, which
+#: is what still correctly admits DUFFY CRANE INC and COLORADO SUMMIT CRANES.
+_FAMILY_FRAME = re.compile(r"&\s*SONS?\b|\bAND\s+SONS?\b|\bBROTHERS\b|\bBROS\b|"
+                           r"&\s*ASSOCIATES\b|\bFAMILY\b|&\s*DAUGHTERS?\b")
+
+
 def _surname_risk_ok(u: str) -> bool:
     """Decide a Route B hit that rests ONLY on a surname-risk word.
 
-    Qualifies when any of these hold, each of which a person's name cannot have:
-      * the equipment word is PLURAL or possessive-plural -- BOBS CRANES;
-      * a corporate marker or a digit is present -- EAGLE CRANE, LLC;
-      * another token is possessive -- JIMS CRANE (the 's' is on the owner);
-      * a second, non-surname-risk equipment word is present -- CRANE & RIGGING.
+    Clauses are ordered so the strongest evidence wins first.
+      1. the equipment word is PLURAL -- BOBS CRANES, COLORADO SUMMIT CRANES.
+         A surname is never plural, so this settles it.
+      2. a SECOND, non-surname-risk equipment word -- CRANE & RIGGING. This is
+         also what rescues a genuine "Crane & Sons Rigging" from clause 3.
+      3. a FAMILY-FIRM frame -- CRANE & SON, CRANE BROTHERS. The corporate marker
+         proves it is a firm but not a heavy-construction firm, so it stops here.
+      4. a corporate marker or digit, but only when the risk word does not LEAD --
+         DUFFY CRANE INC qualifies; LOADER EMPLOYEE LEASING COMPANY does not.
+      5. another token is possessive -- JIMS CRANE, the 's' sitting on the owner.
     Otherwise it reads as a person: CRANE, ROBERT GALE / LOADER DINAH P.
     """
-    if _BIZ_PROOF.search(u):
-        return True
-    toks = [t.strip(",.") for t in u.replace(",", " ").split()]
+    toks = [t.strip(",.") for t in u.replace(",", " ").split() if t.strip(",.")]
+
+    def _sing(t):
+        return t[:-2] if t.endswith("ES") else t[:-1] if t.endswith("S") else None
+
+    # 1. the equipment word itself, pluralised
     for t in toks:
-        if not t:
-            continue
-        sing = t[:-2] if t.endswith("ES") else t[:-1] if t.endswith("S") else None
-        # the equipment word itself in plural form -> a business
-        if sing and sing in _SURNAME_RISK:
+        sg = _sing(t)
+        if sg and sg in _SURNAME_RISK:
             return True
-        # some OTHER token is a possessive/plural owner -> "JIMS CRANE"
-        if t.endswith("S") and t not in _SURNAME_RISK and sing and sing not in _SURNAME_RISK:
-            if not BORROWER_RE.fullmatch(t):
-                return True
-    # a second equipment word that is not itself surname-risk
+    # 2. a second equipment word that is not itself surname-risk
     for t in toks:
         if BORROWER_RE.fullmatch(t) and t not in _SURNAME_RISK:
+            return True
+    # 3. family-firm frame -- a firm, but not evidence of heavy construction
+    if _FAMILY_FRAME.search(u):
+        return False
+    # 4. corporate marker, only when the risk word is not in the surname slot
+    if _BIZ_PROOF.search(u) and not (toks and toks[0] in _SURNAME_RISK):
+        return True
+    # 5. a possessive owner token
+    for t in toks:
+        sg = _sing(t)
+        if (t.endswith("S") and t not in _SURNAME_RISK and sg
+                and sg not in _SURNAME_RISK and not BORROWER_RE.fullmatch(t)):
             return True
     return False
 

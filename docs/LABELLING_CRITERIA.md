@@ -32,27 +32,52 @@ Everything in the register is pulled and assessed. A row is ADDED only if it mee
 or criterion 2. Neither met → it is simply not added. A lender containing `BANK` is **not
 denied** — it just fails criterion 1, so the borrower's own name has to carry criterion 2.
 
-**The 12 NYSE-listed heavy construction equipment makers**, added by founder direction, listed
-by corporate parent *and* operating brand because the register files under either:
+**DUAL-LINE AND AGRICULTURAL MAKERS REMOVED** (founder ruling 2026-08-30). A maker that sells
+both job-site and farm/turf equipment does not tell you which one it financed, so its name no
+longer satisfies criterion 1. Removed outright: **DEERE and every variant** (including
+`JOHN DEERE CONSTRUCTION & FORESTRY`), **KUBOTA**, **CNH**, **CASE CONSTRUCTION**, **CASE CREDIT**,
+**NEW HOLLAND**, and the pure-agriculture dealer entries. Measured cause: 45 of 500 audited rows
+(9%) met criterion 1 exactly as written while financing farm or turf equipment - River Bend Ranch,
+Johnson Dairy, JW Farms, Spitzer Family Farms.
+
+**CATERPILLAR AND ITS VARIANTS PERSIST**, including the OCR corruptions `CAPTERPILLAR`,
+`CETERPILLAR`, `CATERPILLR`. Caterpillar has no agricultural line, so its name alone is sufficient
+evidence - which is exactly why single-line makers keep the borrower-irrelevant rule and dual-line
+parents lose it.
+
+**The 12 NYSE-listed makers**, minus the two removed above (Deere, CNH):
 
 | NYSE | parent | brands also listed |
 |---|---|---|
 | CAT | Caterpillar Inc. | Cat Financial |
-| DE | Deere & Company | John Deere Construction & Forestry |
-| CNH | CNH Industrial N.V. | Case Construction, New Holland Construction |
 | TEX | Terex Corporation | Genie Industries |
 | OSK | Oshkosh Corporation | McNeilus, JLG |
-| ALG | Alamo Group Inc. | — |
+| ALG | Alamo Group Inc. | - |
 | MTW | The Manitowoc Company | Grove U.S |
 | VLVLY | AB Volvo | Volvo Construction |
-| GRC | The Gorman-Rupp Company | — |
-| FSS | Federal Signal Corporation | — |
+| GRC | The Gorman-Rupp Company | - |
+| FSS | Federal Signal Corporation | - |
 | HY | Hyster-Yale Materials Handling | Yale Materials Handling, Hyster |
-| WNC | Wabash National Corporation | — |
+| WNC | Wabash National Corporation | - |
 
-Ambiguous short tokens are deliberately spelled out — `ALAMO GROUP` not `ALAMO` (rental cars,
-cinemas), `YALE MATERIALS HANDLING` not `YALE` (university, locks), `WABASH NATIONAL` not
-`WABASH` (river, valley), `OSHKOSH CORPORATION` not `OSHKOSH` (childrenswear).
+Ambiguous short tokens are deliberately spelled out - `ALAMO GROUP` not `ALAMO` (rental cars,
+cinemas), `YALE MATERIALS HANDLING` not `YALE` (university, locks), `WABASH NATIONAL` not `WABASH`
+(river, valley), `OSHKOSH CORPORATION` not `OSHKOSH` (childrenswear).
+
+**FIVE AUDIT FIXES**, applied after a 500-row review measured the pull at 98.0%:
+1. `DEERE PARK & ASSOCIATES` was matching the bare token `DEERE` - a finance firm lending to a
+   furniture retailer. Moot now that Deere is gone, but it was a substring-match defect.
+2. `21ST CENTURY EQUIPMENT` removed - a John Deere **agricultural** dealership, not a job-site
+   dealer. It had been added in error from an earlier audit's list.
+3. **Split ag/construction dealer arms**: a lender whose name carries `- AG`, `AG LLC`,
+   `AGRICULTURE` or `FARM EQUIPMENT` does not satisfy criterion 1. `4 Rivers Equipment - Ag LLC`
+   lending to JW Farms is a farm sale. This refines the criterion - *a named dealer of heavy
+   CONSTRUCTION equipment* - rather than adding a reject list.
+4. `NEW HOLLAND` removed - it was matching ag dealership DBAs such as
+   `Modern Farm Equipment Corp DBA High Plains New Holland`.
+5. **Family-firm frame**: `& SON`, `& SONS`, `BROTHERS`, `BROS`, `& ASSOCIATES` and `FAMILY` no
+   longer let a corporate marker rescue a singular surname-risk word. `Crane & Son, Inc.` is the
+   Crane family; `Crane & Sons Rigging` still qualifies on its second equipment word.
 
 **No descriptive phrase qualifies. Every lender criterion is a NAME.** Founder ruling
 2026-08-30: *"don't allow the 1ST SOURCE BANK, CONSTRUCTION EQUIPMENT DIVISION in — too vague
