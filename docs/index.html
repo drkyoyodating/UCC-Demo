@@ -321,7 +321,12 @@
        CO and CT already share a centreline, and the nameplates sit inside
        #stage, so all four move together and their relative spacing is
        untouched. */
-    #stage{gap:4vw;padding:0;margin-top:calc(50svh - 17.4vw - 176px)}
+    #stage{gap:4vw;padding:0;margin-top:calc(50svh - 17.4vw - 202px)}
+    /* The extra 26px lifts the maps and both nameplates so the gap ABOVE the
+       maps (stat boxes -> map border) and the gap BELOW them (nameplate -> the
+       controls row) are equal at ~146px. That deliberately puts the map centre
+       26px above the screen midline: equal gaps and a centred midline cannot
+       both hold while the header and footer blocks differ in height. */
     .label{font-size:10.5px;letter-spacing:.08em}
     .count{font-size:9px;height:12px}
 
