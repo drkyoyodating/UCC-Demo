@@ -183,7 +183,12 @@
     font-variant-numeric:tabular-nums}
   #close{border:0;background:none;font-size:17px;padding:0 2px;cursor:pointer;color:var(--mut)}
   #close:hover{background:none;color:#111}
-  #scroll{overflow:auto}
+  /* A flex item defaults to min-height:auto, so #scroll refuses to shrink below
+     its content and never becomes a scroller -- #box's overflow:hidden then just
+     clips it. flex+min-height:0 is what actually makes it scrollable. Blink is
+     forgiving about this; iOS is not, which is why dragging inside the table
+     does nothing there. touch-action states both axes explicitly. */
+  #scroll{overflow:auto;flex:1 1 auto;min-height:0;touch-action:pan-x pan-y}
   table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
   /* Matched to the tiles and panels: translucent hairlines rather than a solid
      grey rule, so a row edge picks up what is behind it and reads as a seam in an
@@ -386,13 +391,18 @@
        screen: on a 440px viewport 125% would want 510px, so the cap takes over
        and leaves a 4px margin rather than going flush to the bezel. Still
        centred on both axes; content still slides both ways. */
-    #box{width:min(calc((100vw - 32px) * 1.25), calc(100vw - 8px));
-      height:calc((100vw - 32px) * .75);max-height:none}
+    /* Width: 5% back off each side from the widened value, so 10% narrower
+       overall (the 1.25 and the screen cap are each scaled by .9, which keeps
+       the cap doing its job on any viewport). Height: a further 20% off the top
+       reach and 20% off the bottom on top of the earlier 12.5% each, so
+       .75 x .6 = .45 of the old square edge. */
+    #box{width:min(calc((100vw - 32px) * 1.125), calc((100vw - 8px) * .9));
+      height:calc((100vw - 32px) * .45);max-height:none}
     #boxhead{padding:7px 10px}
     #boxtitle{font-size:11px}
     #boxsub{font-size:9.5px}
     #close{font-size:19px;padding:0 5px}
-    #scroll{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+    #scroll{overscroll-behavior:contain}
     #box table{font-size:9.5px}
     #box th,#box td{padding:4px 6px}
     #box th{font-size:9px;padding-right:14px}
