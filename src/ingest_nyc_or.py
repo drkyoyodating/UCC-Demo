@@ -59,9 +59,9 @@ def main():
     walk("nyc_parties", "https://data.cityofnewyork.us/resource/nbbg-wtuz.csv",
          "document_id,party_type,name,address_1,city,state,zip", "document_id")
     walk("nyc_master", "https://data.cityofnewyork.us/resource/sv7x-dduq.csv",
-         "document_id,doc_type,document_date,recorded_datetime", "document_id")
+         "document_id,doc_type,recorded_datetime,ucc_collateral,document_amt,recorded_borough", "document_id")
     walk("or_sp", "https://data.oregon.gov/resource/2kf7-i54h.csv",
-         "secured_party,addr1,city,state,postalcode,lapse_date", ":id")
+         "lt_cd,filenumber,filing_date,secured_party,addr1,city,state,postalcode", ":id")
 
     con = duckdb.connect(str(ROOT / "ucc.duckdb")); con.execute("SET memory_limit='3GB'")
     for t, p in [("nyc_parties", "nyc_parties"), ("nyc_master", "nyc_master"), ("or_sp", "or_sp")]:

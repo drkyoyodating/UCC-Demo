@@ -93,7 +93,7 @@ def build(con: duckdb.DuckDBPyConnection, source: str, pk: str, extra: str, out:
 
 def main() -> int:
     con = duckdb.connect(str(ROOT / "ucc.duckdb"))
-    con.execute("SET memory_limit='6GB'")
+    con.execute("SET memory_limit='2GB'")
     eq_files = con.execute(
         "SELECT count(DISTINCT fileid) FROM collateral WHERE collateraldescription='EQUIPMENT'"
     ).fetchone()[0]

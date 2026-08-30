@@ -16,6 +16,12 @@ from splink_contract import SEED  # noqa: E402
 
 m = pd.read_csv(ROOT / "labels_joined.csv")
 m = m[m.label != "UNSURE"].copy()
+# DROP THE 30 HIDDEN REPEATS BEFORE SPLITTING. They are byte-identical
+# re-presentations of other pairs; leaving them in put 20 in train and 10 in test,
+# so 14 distinct pair-contents appeared on BOTH sides and the "held-out" set was
+# not held out. Every number scored on the old split is contaminated.
+if "is_repeat" in m.columns:
+    m = m[~m.is_repeat.fillna(False).astype(bool)].copy()
 tr, te = [], []
 for s, g in m.groupby("stratum"):                      # stratified: preserves the design
     g = g.sample(frac=1.0, random_state=SEED).reset_index(drop=True)
