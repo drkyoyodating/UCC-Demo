@@ -283,7 +283,10 @@
        lowest element sits clear of the floor on every screen instead of landing
        on -- or just past -- it. #bar's auto margin absorbs the change, so the
        group rises as one. */
-    body{padding:14px 16px 15svh;min-height:100vh;min-height:100svh}
+    /* Top and bottom buffers are mirrored: the gap from the screen edge to the
+       first line of header text equals the gap from the last line of footer
+       text to the bottom edge. */
+    body{padding:14px 16px 13px;min-height:100vh;min-height:100svh}
     /* Locked to the visible screen: the floor of the viewport IS the base, and
        there is no page scrolling in portrait. Anything that does not fit would
        be unreachable rather than merely below the fold, so the pane below is
