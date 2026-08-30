@@ -622,3 +622,58 @@ cross-phase audit found that **96 of 330 pairs (29%) matched no rule at all** �
 simply different-name/different-address, the commonest case in the file. All amendments were made with
 **zero labels in existence**, and none can affect which pairs were drawn: strata are selected on match
 weight and record patterns, never on the rule.
+
+## P6 — RESULTS (2026-08-30). 381/381 labelled. Both key hashes verified unchanged.
+Anti-tamper: `labels_key.csv` → `c297165…` and `labels_key_batch2.csv` → `e41b011…` both still match the
+hashes committed **before** labelling. Strata, weights and repeat structure are provably unaltered.
+**UNSURE: 3 of 381 (0.8%)**, excluded from all rates. **Intra-rater agreement: 30/30 (100%)** on the hidden
+repeats. Strata were re-binned onto fine weight bands because batch 1's coarse lender bands overlapped
+batch 2's — a random draw from [2,6) restricted to those landing in [4,6) is still a random sample of
+[4,6), so the two pool correctly at different sampling rates.
+
+### The headline numbers, stratum-weighted, with intervals and denominators
+| | precision @ shipped threshold | 95% CI | n | est. recall |
+|---|---|---|---|---|
+| **Lenders** (T=8.0) | **0.812** | 0.705–0.919 | 49 | 0.246 |
+| **Debtors** (T=6.0) | **0.325** | 0.224–0.425 | 86 | 0.629 |
+
+Full curve — **and the debtor row is non-monotonic, which is the finding:**
+
+| T | debtor precision | debtor recall | lender precision | lender recall |
+|---|---|---|---|---|
+| 4 | **0.398** | 0.864 | 0.750 | 0.763 |
+| 6 | 0.325 | 0.629 | 0.810 | 0.390 |
+| 7 | 0.293 | 0.510 | 0.808 | 0.303 |
+| 8 | 0.200 | 0.308 | 0.812 | 0.246 |
+| 10 | 0.200 | 0.147 | **0.917** | 0.130 |
+
+**Raising the debtor threshold makes precision WORSE.** That inverts the usual trade-off and it is not an
+artefact: the defects live at HIGH weights, because they are pairs the model is most confident about.
+
+### Why: the debtor model is an address matcher wearing a name matcher's costume
+**73.7% of all debtor pairs merged at 6.0 share an identical `address1`** (8,957 of 12,156). This is the
+direct consequence of the trained parameters already disclosed in P5 — exact-name-match carries
+`m=0.002741`, so a total name mismatch costs **~0.016 bits** and address agreement decides the pair. Two
+distinct defect classes fall out of it, and the band composition is unambiguous:
+
+- **Class 1 — same address, DISSIMILAR names (JW < 0.7).** 4,217 pairs, **83.7% of the entire [8,10)
+  band**. Measured error rate on 42 labels: **97.6% are DIFFERENT firms.** Registered agents, franchise
+  HQs, medical groups. Documented in P5.
+- **Class 2 — same address, SIMILAR names. PREVIOUSLY UNDOCUMENTED, found by these labels.**
+  **4,625 pairs = 100% of the [10,999) band.** Family members and related-but-distinct entities:
+  `SCHULTE MARY J`/`SCHULTE ALLEN J`, `LEY HENRY JR`/`LEY BARBARA`,
+  `PEAKVIEW APARTMENTS`/`WESTRIDGE APARTMENTS`, `BRADY BROTHERS`/`BRADY DENOYER`. The JW<0.7 filter that
+  defined Class 1 could never catch these — **their names genuinely ARE similar.** To the model a
+  near-identical name at an identical address is exactly what a true match looks like, which is why they
+  score highest and why precision falls as the threshold rises.
+
+### Recall, conditional on blocking and on the candidate set
+Both recall probes came back **100% SAME** — 40/40 debtor, 24/24 lender — confirming that identical-name +
+identical-ZIP pairs really are true matches. They sit at weights [4,8), so the shipped thresholds discard
+many of them. **Lender recall at T=8.0 is 0.246**: the league table is built from roughly a quarter of the
+true matches available. That is a front-page caveat, not a footnote.
+
+### What ships
+Both numbers ship as measured. The thresholds are frozen and were set before any label existed; nothing is
+retuned now. The write-up leads with the mechanism, not the metric: *the debtor model scores address
+agreement far above name agreement, so its most confident predictions are its worst ones.*

@@ -25,4 +25,3 @@ artifact-data-verification.md
 
 # P6: the answer key stays private until the labels are in. Its sha256 is committed at
 # docs/labels_key.sha256 BEFORE labelling, which proves the strata were fixed in advance.
-labels_key.csv
