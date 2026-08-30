@@ -42,7 +42,16 @@ MANUFACTURERS = [
     "MOROOKA", "PRINOTH", "MUSTANG MANUFACTURING", "ALLIED CONSTRUCTION",
     "WAGNER EQUIPMENT", "FARIS MACHINERY", "POWER EQUIPMENT COMPANY", "4 RIVERS EQUIPMENT",
     "HONNEN EQUIPMENT", "COLORADO MACHINERY", "RMS RENTALS", "WESTERN STATES EQUIPMENT",
-    "CONSTRUCTION EQUIPMENT", "HEAVY EQUIPMENT", "HEAVY CONSTRUCTION EQUIPMENT",
+    # --- REMOVED 2026-08-30 by founder ruling: "don't allow the 1ST SOURCE
+    # BANK, CONSTRUCTION EQUIPMENT DIVISION in, too vague with the data we have
+    # access to -- we work with what we have, not what we want."
+    # CONSTRUCTION EQUIPMENT / HEAVY EQUIPMENT / HEAVY CONSTRUCTION EQUIPMENT
+    # were the last three DESCRIPTIVE phrases among otherwise-named criteria.
+    # Measured: of 767 rows qualifying on them alone, 762 were 1st Source Bank's
+    # equipment-finance division. The phrase was carrying a bank, not a maker.
+    # The five genuine rows are named explicitly instead -- the same treatment
+    # MACHINERY got when it was replaced by its real dealers.
+    "FLAGLER CONSTRUCTION EQUIPMENT", "CONSTRUCTION EQUIPMENT COMPANY",
     # --- NAMED heavy-equipment dealers that used to ride the bare word MACHINERY.
     # Founder ruling 2026-08-30: Route A is a NAMED manufacturer or dealer. The
     # bare token MACHINERY is gone (a machine can be a laundry machine or a key

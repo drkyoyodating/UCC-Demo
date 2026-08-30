@@ -54,8 +54,14 @@ Ambiguous short tokens are deliberately spelled out — `ALAMO GROUP` not `ALAMO
 cinemas), `YALE MATERIALS HANDLING` not `YALE` (university, locks), `WABASH NATIONAL` not
 `WABASH` (river, valley), `OSHKOSH CORPORATION` not `OSHKOSH` (childrenswear).
 
-**Descriptive phrases that also qualify** (founder ruling 2026-08-30): `CONSTRUCTION EQUIPMENT`,
-`HEAVY EQUIPMENT`, `HEAVY CONSTRUCTION EQUIPMENT`.
+**No descriptive phrase qualifies. Every lender criterion is a NAME.** Founder ruling
+2026-08-30: *"don't allow the 1ST SOURCE BANK, CONSTRUCTION EQUIPMENT DIVISION in — too vague
+with the data we have access to. We work with what we have, not what we want."*
+`CONSTRUCTION EQUIPMENT`, `HEAVY EQUIPMENT` and `HEAVY CONSTRUCTION EQUIPMENT` were the last
+three descriptive phrases and are gone. Measured: of 767 rows qualifying on them alone, **762
+were 1st Source Bank's equipment-finance division** — the phrase was carrying a bank, not a
+maker. The five genuine rows are now named explicitly (`FLAGLER CONSTRUCTION EQUIPMENT`,
+`CONSTRUCTION EQUIPMENT COMPANY`), the same treatment `MACHINERY` got.
 
 **`FORKLIFT` IS a borrower qualifier** (founder ruling 2026-08-30) — Hyster-Yale is a listed maker and its forklifts work job sites and building yards.
 
