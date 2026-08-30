@@ -265,7 +265,14 @@
        the end of the page. #stage is stopped from flex-growing first, or the
        maps would swallow that slack and the gap would open between the stat
        boxes and the maps instead of below them. */
-    body{padding:14px 16px 18px;min-height:100vh}
+    /* NOT 100vh. On iOS (and Android Chrome) 100vh is the viewport with the
+       address bar and toolbar COLLAPSED -- 100-150px taller than what is
+       actually on screen at load -- so anything pinned to its bottom sits below
+       the fold, behind the browser chrome. 100svh is the small viewport: the
+       height with the address bar showing, which is exactly what the user sees
+       when the page opens. The plain vh line stays first as a fallback for
+       engines that predate svh. */
+    body{padding:14px 16px 18px;min-height:100vh;min-height:100svh}
     #stage{flex:0 0 auto}
     h1,.sub,#foot,#hint{text-align:center}
 
