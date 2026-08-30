@@ -14,6 +14,7 @@
     --line:#c8c8c8;
     --panel:#ffffff;
     --bg:#f4f4f4;
+    --maph:min(56vh,520px);
   }
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -27,12 +28,26 @@
   .sub{font-size:12px;color:#666;margin:0 0 18px}
   .sub b{color:var(--ink);font-weight:600}
 
+  /* The two maps scale with the window instead of sitting at a fixed pixel
+     size. Each keeps its own aspect ratio (preserveAspectRatio on the svg), and
+     the flex weights give Colorado the larger share -- loosely reflecting that
+     it is the bigger state without shrinking Connecticut to something unusable.
+     --maph caps the pair against viewport height so they never overflow. */
   #stage{
-    display:flex;gap:44px;align-items:center;justify-content:center;
-    width:100%;max-width:1180px;flex:1;min-height:0;
+    display:flex;gap:3vw;align-items:center;justify-content:center;
+    width:100%;max-width:1600px;flex:1;min-height:0;
   }
-  .panel{display:flex;flex-direction:column;align-items:center;gap:8px}
-  .panel svg{display:block;cursor:pointer;overflow:visible}
+  .panel{
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+    min-width:0;
+  }
+  #co{flex:1.30}
+  #ct{flex:1.00}
+  .panel svg{
+    display:block;cursor:pointer;overflow:visible;
+    width:100%;height:auto;
+    max-height:var(--maph);
+  }
   .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#777}
   .panel.on .label{color:var(--ink);font-weight:600}
   .count{font-size:11px;color:#888;height:14px}
@@ -94,14 +109,14 @@
 
 <div id="stage">
   <div class="panel" id="co">
-    <svg viewBox="0 0 430 300" width="430" height="300" aria-label="Colorado">
+    <svg viewBox="0 0 430 300" preserveAspectRatio="xMidYMid meet" aria-label="Colorado">
       <path class="shape"></path><g class="dots"></g>
     </svg>
     <div class="label">Colorado</div>
     <div class="count"></div>
   </div>
   <div class="panel" id="ct">
-    <svg viewBox="0 0 300 220" width="300" height="220" aria-label="Connecticut">
+    <svg viewBox="0 0 300 220" preserveAspectRatio="xMidYMid meet" aria-label="Connecticut">
       <path class="shape"></path><g class="dots"></g>
     </svg>
     <div class="label">Connecticut</div>
@@ -207,7 +222,7 @@ function render(k){
     const [x,y] = p(grp.lon, grp.lat);
     const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
     c.setAttribute('cx',x.toFixed(1)); c.setAttribute('cy',y.toFixed(1));
-    c.setAttribute('r', Math.min(9, 2.1 + Math.sqrt(grp.rows.length)*0.85).toFixed(1));
+    c.setAttribute('r', Math.min(8.5, 1.9 + Math.sqrt(grp.rows.length)*0.8).toFixed(1));
     c.setAttribute('class','dot');
     c.addEventListener('click', e => { e.stopPropagation(); showBox(grp, c); });
     frag.appendChild(c);
