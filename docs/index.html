@@ -1,43 +1,289 @@
 <!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Who finances equipment in Colorado</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UCC Heavy Construction Equipment Finance — Colorado &amp; Connecticut</title>
 <style>
-:root{--bg:#fbfbfa;--fg:#1a1a18;--mut:#6b6b66;--line:#e3e3df;--acc:#7a5c2e}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#131311;--fg:#eceae4;--mut:#9a978e;--line:#2c2c28;--acc:#c9a765}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-main{max-width:60rem;margin:0 auto;padding:4rem 1.5rem}
-h1{font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.15;letter-spacing:-.02em;margin:0 0 .75rem;font-weight:650}
-.sub{color:var(--mut);font-size:1.05rem;margin:0 0 2.5rem;max-width:44rem}
-.badge{display:inline-block;font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--acc);border:1px solid var(--line);border-radius:2rem;padding:.3rem .8rem;margin-bottom:1.5rem}
-.card{border:1px solid var(--line);border-radius:.6rem;padding:1.5rem;background:color-mix(in srgb,var(--fg) 2.5%,transparent)}
-dt{font-weight:600;margin-top:1rem}dd{margin:.15rem 0 0;color:var(--mut)}
-footer{margin-top:3.5rem;padding-top:1.5rem;border-top:1px solid var(--line);color:var(--mut);font-size:.85rem}
-a{color:var(--acc)}
-</style></head><body><main>
-<div class="badge">Build in progress</div>
-<h1>Who finances equipment in Colorado</h1>
-<p class="sub">Entity resolution over Colorado's public lien register. <strong>8.38&nbsp;million rows /
-4.09&nbsp;million party records</strong> ingested, of which 2.99&nbsp;million carry an organization name.
-<strong>82,506 party rows on equipment filings resolve to 25,409 canonical firms</strong>
-(21,033 debtor + 4,376 secured-party clusters, from 38,334 distinct party records).
-Precision, recall and canonical-ID stability will be published here with their confidence intervals,
-denominators and the defects that limit them.</p>
-<div class="card">
-<p style="margin-top:0"><strong>This page is a placeholder.</strong> The pipeline is being built in the open; this
-shell exists to verify the deploy path. The finished page will carry:</p>
-<dl>
-<dt>Lender league table</dt><dd>Top canonical secured parties on equipment filings, with cumulative market share.</dd>
-<dt>Entity timeline</dt><dd>Filings per year for a given canonical firm, with continuation and termination.</dd>
-<dt>Refinancing window</dt><dd>Active equipment filings approaching their five-year lapse.</dd>
-<dt>The numbers, and what is wrong with them</dt><dd>Precision and recall on blind hand-labelled pairs with
-confidence intervals and stated denominators, plus canonical-ID stability across re-resolution.</dd>
-</dl>
+  :root{
+    --co:#6b3fa0;          /* Colorado: purple */
+    --ct:#c0392b;          /* Connecticut: red */
+    --co-dim:#d6cae4;
+    --ct-dim:#eecdc9;
+    --ink:#1c1c1c;
+    --line:#c8c8c8;
+    --panel:#ffffff;
+    --bg:#f4f4f4;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    display:flex;flex-direction:column;align-items:center;
+    padding:22px 22px 26px;
+  }
+  h1{font-size:15px;font-weight:600;margin:0 0 2px;letter-spacing:.01em}
+  .sub{font-size:12px;color:#666;margin:0 0 18px}
+  .sub b{color:var(--ink);font-weight:600}
+
+  #stage{
+    display:flex;gap:44px;align-items:center;justify-content:center;
+    width:100%;max-width:1180px;flex:1;min-height:0;
+  }
+  .panel{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .panel svg{display:block;cursor:pointer;overflow:visible}
+  .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#777}
+  .panel.on .label{color:var(--ink);font-weight:600}
+  .count{font-size:11px;color:#888;height:14px}
+
+  .shape{stroke:#fff;stroke-width:1.5;fill:var(--co-dim)}
+  #co .shape{fill:var(--co-dim)}
+  #ct .shape{fill:var(--ct-dim)}
+  #co.on .shape{fill:var(--co)}
+  #ct.on .shape{fill:var(--ct)}
+  .dot{cursor:pointer;stroke:#fff;stroke-width:.6}
+  #co .dot{fill:var(--ct)}      /* purple state, red dots */
+  #ct .dot{fill:var(--co)}      /* red state, purple dots */
+  .dot.sel{stroke:#111;stroke-width:1.6}
+
+  #bar{display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:16px}
+  button{
+    font:600 13px/1 inherit;letter-spacing:.02em;
+    padding:11px 26px;border:1px solid #333;border-radius:3px;
+    background:#fff;color:#111;cursor:pointer;
+  }
+  button:hover{background:#111;color:#fff}
+  button:disabled{opacity:.45;cursor:default;background:#fff;color:#111}
+  #hint{font-size:11.5px;color:#777;height:15px}
+
+  #box{
+    display:none;position:fixed;z-index:9;
+    left:50%;top:50%;transform:translate(-50%,-50%);
+    width:min(760px,92vw);max-height:min(430px,72vh);
+    background:var(--panel);border:1px solid #333;
+    box-shadow:0 6px 26px rgba(0,0,0,.22);
+    flex-direction:column;
+  }
+  #box.show{display:flex}
+  #boxhead{
+    display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    padding:9px 12px;border-bottom:1px solid var(--line);
+  }
+  #boxtitle{font-size:12px;font-weight:600}
+  #boxsub{font-size:11px;color:#777}
+  #close{border:0;background:none;font-size:17px;line-height:1;padding:0 2px;cursor:pointer;color:#666}
+  #close:hover{background:none;color:#111}
+  #scroll{overflow:auto;-webkit-overflow-scrolling:touch}
+  table{border-collapse:collapse;width:100%;font-size:11.5px}
+  th,td{padding:5px 8px;border-bottom:1px solid #ececec;text-align:left;white-space:nowrap}
+  th{
+    position:sticky;top:0;background:#f7f7f7;font-weight:600;
+    border-bottom:1px solid var(--line);font-size:11px;
+  }
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr:nth-child(even){background:#fbfbfb}
+  #foot{margin-top:16px;font-size:11px;color:#8a8a8a;text-align:center;max-width:820px}
+</style>
+</head>
+<body>
+
+<h1>UCC Heavy Construction Equipment Finance</h1>
+<p class="sub">Colorado &amp; Connecticut · 1990–2026 · <b id="pool">…</b> qualifying filings ·
+   click a state, then a dot</p>
+
+<div id="stage">
+  <div class="panel" id="co">
+    <svg viewBox="0 0 430 300" width="430" height="300" aria-label="Colorado">
+      <path class="shape"></path><g class="dots"></g>
+    </svg>
+    <div class="label">Colorado</div>
+    <div class="count"></div>
+  </div>
+  <div class="panel" id="ct">
+    <svg viewBox="0 0 300 220" width="300" height="220" aria-label="Connecticut">
+      <path class="shape"></path><g class="dots"></g>
+    </svg>
+    <div class="label">Connecticut</div>
+    <div class="count"></div>
+  </div>
 </div>
-<footer>
-Source data: Colorado Secretary of State via <a href="https://data.colorado.gov">data.colorado.gov</a> (public record).
-Not affiliated with, endorsed by, or sponsored by the State of Colorado.
-&middot; <a href="https://github.com/drkyoyodating/UCC-Demo">Repository and write-up</a>
-</footer>
-</main></body></html>
+
+<div id="bar">
+  <button id="refresh" disabled>Refresh Data</button>
+  <div id="hint">loading…</div>
+</div>
+
+<div id="box">
+  <div id="boxhead">
+    <div><span id="boxtitle"></span> <span id="boxsub"></span></div>
+    <button id="close" title="close">×</button>
+  </div>
+  <div id="scroll">
+    <table>
+      <thead><tr>
+        <th>Borrower</th><th>Address</th><th>City</th><th>State</th>
+        <th>ZIP</th><th>Lender</th><th class="num">Year</th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+  </div>
+</div>
+
+<p id="foot">
+  Every row shown meets the scope criteria: the lender is a named heavy-construction equipment
+  manufacturer or dealer, or the borrower's own name states a job-site equipment category.
+  Refresh draws a new sample from the qualifying pool.
+</p>
+
+<script>
+const SHOW = 1300;                 // dots drawn per state, per pull
+const STATE = {
+  co:{ bbox:[-109.0448,-102.0415,36.9930,41.0034], w:430, h:300,
+       ring:[[-109.0448,41.0034],[-102.0415,41.0034],[-102.0415,36.9930],[-109.0448,36.9930]] },
+  /* Connecticut's south edge is coastline, so the polygon is denser there and
+     sits marginally seaward: shoreline ZIP centroids otherwise fall into Long
+     Island Sound and their dots land off the map. 99.1% of CT rows sit inside
+     this ring; the remainder are barrier-island and harbour ZIPs that a 23-point
+     outline cannot follow, and they are a pixel or two out at this scale. */
+  ct:{ bbox:[-73.7278,-71.7870,40.9700,42.0500], w:300, h:220,
+       ring:[[-73.4877,42.0500],[-71.7870,42.0250],[-71.7870,41.6400],[-71.8400,41.4150],
+             [-71.8300,41.3200],[-71.9600,41.3050],[-72.0900,41.2800],[-72.2000,41.2600],
+             [-72.3400,41.2550],[-72.4700,41.2450],[-72.5800,41.2500],[-72.6900,41.2400],
+             [-72.8100,41.2450],[-72.9000,41.2300],[-73.0300,41.1500],[-73.1100,41.1400],
+             [-73.1800,41.1200],[-73.2800,41.1000],[-73.4000,41.0300],[-73.5200,40.9900],
+             [-73.6570,40.9700],[-73.7278,41.1005],[-73.4820,41.2130]] }
+};
+const PAD = 14;
+let ROWS = {co:[], ct:[]}, active = null, sample = {co:[], ct:[]};
+
+/* Equirectangular fit, aspect preserved, longitude cosine-corrected so the
+   states are not stretched east-west at these latitudes. */
+function projector(k){
+  const s = STATE[k], [w,e,so,n] = s.bbox;
+  const kx = Math.cos((so+n)/2 * Math.PI/180);
+  const dx = (e-w)*kx, dy = n-so;
+  const sc = Math.min((s.w-2*PAD)/dx, (s.h-2*PAD)/dy);
+  const ox = (s.w - dx*sc)/2, oy = (s.h - dy*sc)/2;
+  return (lon,lat) => [ox + (lon-w)*kx*sc, oy + (n-lat)*sc];
+}
+const P = {co:projector('co'), ct:projector('ct')};
+
+function drawShape(k){
+  const p = P[k], d = STATE[k].ring.map((c,i)=>(i?'L':'M')+p(c[0],c[1]).map(v=>v.toFixed(1)).join(' ')).join('');
+  document.querySelector('#'+k+' .shape').setAttribute('d', d+'Z');
+}
+
+/* Group the sample by ZIP so co-located rows become one bigger dot. */
+function cluster(rows){
+  const m = new Map();
+  for(const r of rows){
+    let g = m.get(r.z);
+    if(!g){ g = {z:r.z, lat:r.lat, lon:r.lon, rows:[]}; m.set(r.z,g); }
+    g.rows.push(r);
+  }
+  return [...m.values()].sort((a,b)=>b.rows.length-a.rows.length);
+}
+
+function pick(k){
+  const pool = ROWS[k];
+  if(pool.length <= SHOW) return pool.slice();
+  const out = [], seen = new Set();
+  while(out.length < SHOW){
+    const i = (Math.random()*pool.length)|0;
+    if(seen.has(i)) continue;
+    seen.add(i); out.push(pool[i]);
+  }
+  return out;
+}
+
+function render(k){
+  const g = document.querySelector('#'+k+' .dots');
+  g.textContent = '';
+  if(active !== k){ document.querySelector('#'+k+' .count').textContent=''; return; }
+  const p = P[k], groups = cluster(sample[k]);
+  const frag = document.createDocumentFragment();
+  for(const grp of groups){
+    const [x,y] = p(grp.lon, grp.lat);
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',x.toFixed(1)); c.setAttribute('cy',y.toFixed(1));
+    c.setAttribute('r', Math.min(9, 2.1 + Math.sqrt(grp.rows.length)*0.85).toFixed(1));
+    c.setAttribute('class','dot');
+    c.addEventListener('click', e => { e.stopPropagation(); showBox(grp, c); });
+    frag.appendChild(c);
+  }
+  g.appendChild(frag);
+  document.querySelector('#'+k+' .count').textContent =
+    sample[k].length.toLocaleString() + ' filings · ' + groups.length.toLocaleString() + ' locations';
+}
+
+function select(k){
+  if(active === k) return;
+  active = k;
+  for(const s of ['co','ct']) document.getElementById(s).classList.toggle('on', s===k);
+  hideBox();
+  render('co'); render('ct');
+  document.getElementById('hint').textContent = 'click a dot to read its filings';
+}
+
+function showBox(grp, el){
+  document.querySelectorAll('.dot.sel').forEach(d=>d.classList.remove('sel'));
+  el.classList.add('sel');
+  const rs = grp.rows;
+  document.getElementById('boxtitle').textContent =
+    (rs[0].c || '—') + ', ' + rs[0].s + '  ' + grp.z;
+  document.getElementById('boxsub').textContent =
+    rs.length.toLocaleString() + (rs.length===1?' filing':' filings');
+  const tb = document.getElementById('tb');
+  tb.textContent = '';
+  const frag = document.createDocumentFragment();
+  for(const r of rs){
+    const tr = document.createElement('tr');
+    for(const [v,cls] of [[r.b,''],[r.a,''],[r.c,''],[r.s,''],[r.z,''],[r.l||'—',''],[r.y,'num']]){
+      const td = document.createElement('td');
+      if(cls) td.className = cls;
+      td.textContent = v || '—';
+      tr.appendChild(td);
+    }
+    frag.appendChild(tr);
+  }
+  tb.appendChild(frag);
+  document.getElementById('scroll').scrollTop = 0;
+  document.getElementById('box').classList.add('show');
+}
+function hideBox(){
+  document.getElementById('box').classList.remove('show');
+  document.querySelectorAll('.dot.sel').forEach(d=>d.classList.remove('sel'));
+}
+
+function pull(){
+  const t0 = performance.now();
+  sample.co = pick('co'); sample.ct = pick('ct');
+  hideBox(); render('co'); render('ct');
+  const ms = Math.max(1, Math.round(performance.now()-t0));
+  document.getElementById('hint').textContent = active
+    ? 'new sample drawn in ' + ms + ' ms · click a dot to read its filings'
+    : 'new sample drawn in ' + ms + ' ms · click a state';
+}
+
+['co','ct'].forEach(k=>{
+  drawShape(k);
+  document.querySelector('#'+k+' svg').addEventListener('click', ()=>select(k));
+});
+document.getElementById('refresh').addEventListener('click', pull);
+document.getElementById('close').addEventListener('click', hideBox);
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') hideBox(); });
+
+fetch('data/rows.json')
+  .then(r=>r.json())
+  .then(d=>{
+    for(const r of d) ROWS[r.r === 'CO' ? 'co' : 'ct'].push(r);
+    document.getElementById('pool').textContent = d.length.toLocaleString();
+    sample.co = pick('co'); sample.ct = pick('ct');
+    document.getElementById('refresh').disabled = false;
+    document.getElementById('hint').textContent = 'click a state';
+  })
+  .catch(()=>{ document.getElementById('hint').textContent = 'could not load data'; });
+</script>
+</body>
+</html>
