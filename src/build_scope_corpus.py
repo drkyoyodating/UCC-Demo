@@ -179,7 +179,22 @@ def build(con: duckdb.DuckDBPyConnection) -> dict:
     # `scope_all`, never from this corpus.
     dup = int(df["unique_id"].duplicated().sum())
     if dup:
-        df = df.drop_duplicates("unique_id")
+        # DETERMINISM. drop_duplicates keeps the FIRST row, and row order comes
+        # from the SQL query, which DuckDB parallelises -- so without an explicit
+        # sort it kept whichever lender the parallel scan happened to emit first.
+        # The borrower set was unaffected, which is exactly why it survived: row
+        # counts, borrower counts and cluster counts are identical either way, so
+        # nothing we measured could see it. Only the lender ATTACHED to a party
+        # record moved, and a re-pull could silently change a lender's borrower
+        # count with no reason a viewer could understand.
+        #
+        # Same defect class as score.py's drop_duplicates("pair_id"), which was
+        # flipping baseline recall between 0.703 and 0.730 across identical runs.
+        # Sorting first makes the survivor the alphabetically-first lender, which
+        # is arbitrary but STABLE -- the same one on every pull, forever.
+        df = df.sort_values(["unique_id", "lender"], kind="stable")
+        df = df.drop_duplicates("unique_id", keep="first")
+        df = df.sort_values("unique_id", kind="stable").reset_index(drop=True)
 
     con.register("_scp", df)
     con.execute(f"CREATE OR REPLACE TABLE {OUT} AS SELECT * FROM _scp")
