@@ -313,7 +313,15 @@
     .stat span{font-size:7px;letter-spacing:.05em}
 
     /* Maps keep their side-by-side arrangement; only their names shrink. */
-    #stage{gap:4vw;padding:0}
+    /* Drop the maps so the screen's vertical midline slices through the CENTRE
+       of the map render boxes. The offset cannot be a fixed pixel value -- it
+       ranges from ~96px to ~225px depending on viewport -- so it is derived:
+       half a map's height is consistently ~17.4% of viewport width, and the
+       header block above measures ~176px, so the map centre lands on 50svh.
+       CO and CT already share a centreline, and the nameplates sit inside
+       #stage, so all four move together and their relative spacing is
+       untouched. */
+    #stage{gap:4vw;padding:0;margin-top:calc(50svh - 17.4vw - 176px)}
     .label{font-size:10.5px;letter-spacing:.08em}
     .count{font-size:9px;height:12px}
 
