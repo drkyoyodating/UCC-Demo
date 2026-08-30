@@ -26,17 +26,45 @@ listed by name: Wyoming Machinery · Carter Machinery · Nebraska Machinery · B
 Warren Power · Linder Industrial · Road Machinery · Titan Machinery · Pape Machinery ·
 Blanchard Machinery · Denver East Machinery · Blaw-Knox.
 
-**LENDER DENYLIST — checked BEFORE the whitelist, and it wins.**
-Required because some denied lenders *contain* a whitelisted phrase:
-`1ST SOURCE BANK, CONSTRUCTION EQUIPMENT DIVISION` matches `CONSTRUCTION EQUIPMENT` and is a bank.
-- **Banks and leasing arms:** BANK · BANCORP · CREDIT UNION · FINANCIAL FEDERAL · DE LAGE LANDEN,
-  plus the OCR corruptions that occur in the real register (BNAK, BANKS, BANC, BAMK, …).
-- **Machine tools** (founder: *"machine tools no go"*): Stiles · Kitamura · Matsuura ·
-  MC Machinery · Engel · Sumitomo Demag · Hanwha · Fuchs · Automatics · Mitsui · Arthur · Arrow.
-- **Pure agriculture** (founder, after weighing it: farm tractors are heavy iron, but pure ag is a
-  *different market*, not construction-adjacent): AGCO · Kuhn Farm Machinery · Stotz · Agpro ·
-  Livingston Machinery · Arizona Machinery · any `FARM MACHINERY`.
-  **Dual-line dealers are KEPT** — Titan and Butler sell construction iron alongside ag.
+**THERE IS NO REJECT LIST. THIS IS A QUALIFIER LIST.** Founder ruling 2026-08-30:
+*"we don't have a reject database, we have criteria that must be met to qualify."*
+Everything in the register is pulled and assessed. A row is ADDED only if it meets criterion 1
+or criterion 2. Neither met → it is simply not added. A lender containing `BANK` is **not
+denied** — it just fails criterion 1, so the borrower's own name has to carry criterion 2.
+
+**The 12 NYSE-listed heavy construction equipment makers**, added by founder direction, listed
+by corporate parent *and* operating brand because the register files under either:
+
+| NYSE | parent | brands also listed |
+|---|---|---|
+| CAT | Caterpillar Inc. | Cat Financial |
+| DE | Deere & Company | John Deere Construction & Forestry |
+| CNH | CNH Industrial N.V. | Case Construction, New Holland Construction |
+| TEX | Terex Corporation | Genie Industries |
+| OSK | Oshkosh Corporation | McNeilus, JLG |
+| ALG | Alamo Group Inc. | — |
+| MTW | The Manitowoc Company | Grove U.S |
+| VLVLY | AB Volvo | Volvo Construction |
+| GRC | The Gorman-Rupp Company | — |
+| FSS | Federal Signal Corporation | — |
+| HY | Hyster-Yale Materials Handling | Yale Materials Handling, Hyster |
+| WNC | Wabash National Corporation | — |
+
+Ambiguous short tokens are deliberately spelled out — `ALAMO GROUP` not `ALAMO` (rental cars,
+cinemas), `YALE MATERIALS HANDLING` not `YALE` (university, locks), `WABASH NATIONAL` not
+`WABASH` (river, valley), `OSHKOSH CORPORATION` not `OSHKOSH` (childrenswear).
+
+**Descriptive phrases that also qualify** (founder ruling 2026-08-30): `CONSTRUCTION EQUIPMENT`,
+`HEAVY EQUIPMENT`, `HEAVY CONSTRUCTION EQUIPMENT`.
+
+**Products named by those makers that are NOT borrower qualifiers**, and why — each would
+reverse an earlier founder ruling, so the maker qualifies as a *lender* while the product word
+does not qualify a *borrower*:
+- `FORKLIFT` — Hyster-Yale is a listed maker, but a firm *named* Forklift is a warehouse
+  business. Removed under the "equipment used on job sites" rule.
+- `MOWING` — Alamo makes highway mowers, but the word pulls lawn-care firms.
+- `TRAILER` / `FLATBED` — Wabash makes them, but the founder ruled out freight
+  ("we aren't looking for freight trucks"), which is why `HEAVY HAUL` was removed.
 
 ### ROUTE B — an equipment or trade word appears in the BORROWER'S OWN NAME
 The borrower qualifies on its own name, **whatever the lender is**, because the name states the business.

@@ -22,7 +22,7 @@ import duckdb
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from heavy_filter import (BORROWER_SQL, LENDER_SQL,           # noqa: E402
-                          is_heavy_borrower, is_heavy_lender)
+                          heavy_row, is_heavy_borrower, is_heavy_lender)
 
 JUNK = ("'','NONE','NONE PROVIDED','NA','N/A','UNKNOWN','SAME','COMPANY',"
         "'NOT PROVIDED','TBD','X','XX','NO ADDRESS','ADDRESS UNKNOWN','VARIOUS'")
@@ -74,8 +74,7 @@ con.execute("CREATE OR REPLACE TABLE scope_all AS SELECT * FROM scope_co UNION A
 # maintaining the same logic twice, so instead the regex pre-filters 8.4M source
 # rows down to ~110k and the authoritative Python predicates decide those.
 _cand = con.execute("SELECT * FROM scope_all").df()
-_keep = [bool(is_heavy_lender(l) or is_heavy_borrower(b))
-         for b, l in zip(_cand.borrower, _cand.lender)]
+_keep = [bool(heavy_row(b, l)) for b, l in zip(_cand.borrower, _cand.lender)]
 _cand = _cand[_keep]
 # route flags must agree with the predicates that actually decided the row
 _cand["route_a"] = [bool(is_heavy_lender(l)) for l in _cand.lender]

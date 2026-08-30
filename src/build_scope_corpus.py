@@ -57,7 +57,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from heavy_filter import (BORROWER_SQL, LENDER_SQL,          # noqa: E402
-                          is_heavy_borrower, is_heavy_lender)
+                          heavy_row, is_heavy_borrower, is_heavy_lender)
 from normalize import normalize_name                # noqa: E402
 from splink_contract import SEED                    # noqa: E402
 
@@ -143,8 +143,7 @@ def build(con: duckdb.DuckDBPyConnection) -> dict:
     # pure agriculture) nor the personal-name guard. Without this the corpus
     # would be WIDER than the scope it is supposed to mirror.
     for _d in (co, ct):
-        _keep = [bool(is_heavy_lender(l) or is_heavy_borrower(b))
-                 for b, l in zip(_d.name_raw, _d.lender)]
+        _keep = [bool(heavy_row(b, l)) for b, l in zip(_d.name_raw, _d.lender)]
         _d.drop(_d.index[[not k for k in _keep]], inplace=True)
 
     import pandas as pd

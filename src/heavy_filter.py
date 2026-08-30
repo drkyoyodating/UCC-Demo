@@ -32,17 +32,17 @@ MANUFACTURERS = [
     # admits unrelated firms. Only unambiguous long corruptions are listed.
     "CAPTERPILLAR", "CETERPILLAR", "CATERPILLR", "DEEERE", "CEERE", "CDEERE",
     "KUTOTA",
-    "HITACHI", "LIEBHERR", "DOOSAN", "DEVELON", "HYUNDAI CONSTRUCTION", "KOBELCO",
+    "HITACHI CONSTRUCTION", "LIEBHERR", "DOOSAN", "DEVELON", "HYUNDAI CONSTRUCTION", "KOBELCO",
     "CASE CONSTRUCTION", "CASE CREDIT", "CNH", "NEW HOLLAND", "JCB", "TEREX",
-    "GENIE", "JLG", "MANITOWOC", "GROVE", "LINK-BELT", "LINK BELT", "SANY", "XCMG",
+    "GENIE INDUSTRIES", "JLG", "MANITOWOC", "GROVE U.S", "LINK-BELT", "LINK BELT", "SANY", "XCMG",
     "ZOOMLION", "TAKEUCHI", "KUBOTA", "YANMAR", "BOBCAT", "WACKER NEUSON",
     "VERMEER", "DITCH WITCH", "ASTEC", "GRADALL", "GEHL", "MANITOU", "MERLO",
     "SKYJACK", "HAULOTTE", "BOMAG", "DYNAPAC", "WIRTGEN", "VOGELE", "HAMM",
     "SAKAI", "AMMANN", "ATLAS COPCO", "EPIROC", "SANDVIK", "METSO", "POWERSCREEN",
     "MOROOKA", "PRINOTH", "MUSTANG MANUFACTURING", "ALLIED CONSTRUCTION",
-    "WAGNER EQUIPMENT", "FARIS MACHINERY", "POWER EQUIPMENT", "4 RIVERS EQUIPMENT",
+    "WAGNER EQUIPMENT", "FARIS MACHINERY", "POWER EQUIPMENT COMPANY", "4 RIVERS EQUIPMENT",
     "HONNEN EQUIPMENT", "COLORADO MACHINERY", "RMS RENTALS", "WESTERN STATES EQUIPMENT",
-    "CONSTRUCTION EQUIPMENT", "HEAVY EQUIPMENT",
+    "CONSTRUCTION EQUIPMENT", "HEAVY EQUIPMENT", "HEAVY CONSTRUCTION EQUIPMENT",
     # --- NAMED heavy-equipment dealers that used to ride the bare word MACHINERY.
     # Founder ruling 2026-08-30: Route A is a NAMED manufacturer or dealer. The
     # bare token MACHINERY is gone (a machine can be a laundry machine or a key
@@ -53,6 +53,32 @@ MANUFACTURERS = [
     "ROAD MACHINERY", "TITAN MACHINERY", "PAPE MACHINERY",
     "BLANCHARD MACHINERY", "TRACTOR AND EQUIPMENT CO", "BLAW-KNOX", "BLAW KNOX",
     "DENVER EAST MACHINERY",
+    # --- Named dealers and OEMs found MISSING by the P5 audit 2026-08-30. These
+    # are recall losses, not precision ones: 1,268 party-sides from a 20-name
+    # hand probe were failing BOTH criteria only because the dealer was absent
+    # from this list. POWER MOTIVE is the Denver Volvo/Case/Doosan dealer, in the
+    # same class as WAGNER; NORTH CENTRAL RENTAL is Butler Machinery's own
+    # leasing arm and carried 363 rows while BUTLER MACHINERY itself carried 3.
+    # --- THE 12 NYSE-LISTED HEAVY CONSTRUCTION EQUIPMENT MAKERS, added by
+    # founder direction 2026-08-30, with their operating brands. Corporate
+    # parents AND brands are both listed because the register files under either.
+    # Short/ambiguous tokens are spelled out: ALAMO alone is a rental car and a
+    # cinema chain, YALE alone is a university and a lock, WABASH alone is a
+    # river and a valley, OSHKOSH alone is a childrenswear label.
+    "CNH INDUSTRIAL", "NEW HOLLAND CONSTRUCTION",          # CNH  (NYSE: CNH)
+    "OSHKOSH CORPORATION", "OSHKOSH TRUCK", "MCNEILUS",     # Oshkosh (OSK)
+    "ALAMO GROUP",                                          # Alamo (ALG)
+    "VOLVO CONSTRUCTION",                                   # AB Volvo (VLVLY)
+    "GORMAN-RUPP", "GORMAN RUPP",                           # Gorman-Rupp (GRC)
+    "FEDERAL SIGNAL",                                       # Federal Signal (FSS)
+    "HYSTER-YALE", "YALE MATERIALS HANDLING",               # Hyster-Yale (HY)
+    "WABASH NATIONAL",                                      # Wabash National (WNC)
+    "POWER MOTIVE", "RDO EQUIPMENT", "POTESTIO BROTHERS", "H & E EQUIPMENT",
+    "H&E EQUIPMENT", "NORTH CENTRAL RENTAL", "COLORADO EQUIPMENT",
+    "21ST CENTURY EQUIPMENT", "CLARK EQUIPMENT", "UNITED RENTALS", "TADANO",
+    "NATIONAL CRANE", "ELLIOTT EQUIPMENT", "PETTIBONE", "CLEVELAND BROTHERS",
+    "SHAWMUT EQUIPMENT", "CROWN EQUIPMENT", "MONROE TRACTOR", "HYSTER",
+    "INGERSOLL RAND",
     # --- PURE AGRICULTURE IS OUT. Founder ruling 2026-08-30, after weighing it:
     # farm tractors are heavy iron, but pure agriculture is a DIFFERENT MARKET,
     # not construction-adjacent -- separate dealers, separate buyers, and Deere
@@ -66,37 +92,6 @@ MANUFACTURERS = [
     # equipment too, which qualifies them regardless of also selling ag.
 ]
 
-#: Lender strings that must NEVER qualify, checked BEFORE the manufacturer list.
-#: A denylist is required because some of these CONTAIN a whitelisted token:
-#: "1ST SOURCE BANK, CONSTRUCTION EQUIPMENT DIVISION" contains CONSTRUCTION
-#: EQUIPMENT, and it is a bank. Founder ruling: if the lender is a bank and the
-#: borrower name carries no equipment category, the row does not get in.
-LENDER_DENY = [
-    # Banks and their leasing arms -- they finance anything.
-    "BANK", "CREDIT UNION", "BANCORP", "FINANCIAL FEDERAL", "DE LAGE LANDEN",
-    # OCR corruptions of BANK / CREDIT / UNION / BANCORP that occur in the real
-    # register. Added 2026-08-30 from an edit-distance-1 sweep of all 100,733
-    # distinct lender strings. ONLY non-words are listed: BANKS and BANC are
-    # included because in a lender slot they are always a bank, but FIRM, BACK,
-    # BAND and FORM are REAL WORDS at distance 1 from FARM/BANK and are
-    # deliberately EXCLUDED -- adding them would deny "LAW FIRM" and worse.
-    "BNAK", "BANKS", "BANC", "BANKCORP", "BANKL", "BANL", "BANKI", "BANKK",
-    "BANKE", "BAMK", "CREDI", "CRDIT", "CREIT", "CEDIT", "CREDT",
-    "UNON", "UNIOIN", "UNIION", "UION",
-    # BNAK is not a typo in THIS file -- it is an OCR typo in the Colorado
-    # register ("1ST SOURCE BNAK, CONSTRUCTION EQUIPMENT DIVISION") and the only
-    # way to deny a bank whose name is misspelled in the source data.
-    # MACHINE TOOLS. Founder ruling 2026-08-30: "machine tools no go."
-    # Lathes, mills, EDM, injection moulding, woodworking -- not site iron.
-    # Pure-agriculture dealers -- see the note in MANUFACTURERS.
-    "FARM MACHINERY", "STOTZ", "AGPRO", "AGCO", "LIVINGSTON MACHINERY",
-    "ARIZONA MACHINERY", "KUHN",
-    "STILES MACHINERY", "KITAMURA", "MATSUURA", "MC MACHINERY", "ENGEL MACHINERY",
-    "SUMITOMO", "DEMAG PLASTICS", "HANWHA", "FUCHS MACHINERY", "AUTOMATICS",
-    "MITSUI MACHINERY", "EIDE MACHINERY", "FOOTHILLS MACHINERY", "FUCHS",
-    "AMERICAN MACHINERY WORKS", "ARTHUR MACHINERY", "ARROW MACHINERY",
-    "AK MACHINERY", "USED MACHINERY", "BLACKHAWK INDUSTRIAL",
-]
 # REMOVED 2026-08-30 after auditing the v4 label pull against real lender strings:
 #   EQUIPMENT FINANCE / EQUIPMENT LEASING
 #       Route A is defined as "the LENDER is a heavy-construction manufacturer,
@@ -122,11 +117,20 @@ LENDER_DENY = [
 EQUIPMENT_WORDS = [
     "EXCAVATOR", "EXCAVATION", "EXCAVATING", "BACKHOE", "BULLDOZER", "DOZER",
     "LOADER", "SKIDSTEER", "SKID STEER", "GRADER", "SCRAPER", "TRENCHER",
-    "CRANE", "RIGGING", "HOIST", "TELEHANDLER", "FORKLIFT",
+    "CRANE", "RIGGING", "HOIST", "TELEHANDLER",
     "BOOMLIFT", "BOOM LIFT", "MANLIFT", "SCISSOR LIFT", "AERIAL LIFT",
     "COMPACTOR", "PAVING", "CRUSHING",
     "DRILL", "DRILLING", "BORING",
     "PILE DRIVER", "PILING", "SHORING", "DREDGE", "DREDGING",
+    # --- Product categories named in the founder's NYSE-manufacturer brief,
+    # 2026-08-30. Each is a machine a job site actually runs, and each is a
+    # multi-word phrase or an unambiguous noun -- no bare surname risk.
+    "WHEEL LOADER", "CRAWLER DOZER", "CRAWLER CRANE", "TOWER CRANE",
+    "ROUGH TERRAIN CRANE", "MOBILE CRANE", "HYDRAULIC EXCAVATOR",
+    "ARTICULATED DUMP TRUCK", "ARTICULATED HAULER", "MINING TRUCK",
+    "AERIAL WORK PLATFORM", "CONCRETE MIXER", "MIXER TRUCK",
+    "MATERIALS PROCESSING", "VACUUM EXCAVATION", "STREET SWEEPER",
+    "DEWATERING",
 ]
 # REMOVED after auditing every word against real Colorado borrower names:
 #   FOUNDATION  4,647 hits, almost all charities -- FOUNDATION FOR SENIOR CITIZENS,
@@ -211,31 +215,27 @@ BORROWER_SQL = BORROWER_RE.pattern
 LENDER_SQL = LENDER_RE.pattern
 
 
-#: Also whole-word anchored, for the same reason: BANL must not fire inside an
-#: unrelated token. A denylist that over-matches silently deletes good rows.
-DENY_RE = re.compile(r"\b(?:" + "|".join(re.escape(d).replace(r"\ ", r"\s+")
-                                        for d in LENDER_DENY) + r")\b")
-
-
 def is_heavy_lender(name):
-    """Route A. The denylist is checked FIRST and wins.
+    """Route A criterion: is the LENDER a named maker or dealer of heavy
+    construction equipment?
 
-    Order matters: "1ST SOURCE BANK, CONSTRUCTION EQUIPMENT DIVISION" matches the
-    whitelist token CONSTRUCTION EQUIPMENT and the denylist token BANK. It is a
-    bank, so it must lose. Whitelist-then-denylist would admit it.
+    THERE IS NO REJECT LIST. A row is never "excluded" -- it simply fails to meet
+    a criterion. Every string in the register is pulled and assessed; only an
+    explicit match is added.
+
+    That is why MANUFACTURERS carries construction-SPECIFIC strings and no bare
+    parent-company names: "DEERE & COMPANY" does not say which division filed, so
+    it does not qualify, while "JOHN DEERE CONSTRUCTION & FORESTRY" does.
+
+    Measured: an earlier reject list of banks, machine tools and agriculture
+    killed 23,714 distinct lender strings, of which a construction-specific
+    criterion list would have admitted only 22 anyway -- it was compensating for
+    loose criteria. Worse, it deleted 406 real party rows whose maker name sits
+    beside a bank ("Ditch Witch Financial Services, a program of Bank of the
+    West"). Tight criteria need no reject list and cannot fail that way.
     """
-    if not name:
-        return False
-    u = str(name).upper()
-    if DENY_RE.search(u):
-        return False
-    return bool(LENDER_RE.search(u))
-#: Corporate markers. If any is present the name is a business, so the
-#: personal-name guard must not fire.
-_BIZ_MARK = re.compile(
-    r"\b(?:INC|LLC|LLLP|LLP|LP|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|PLLC|PC|"
-    r"TRUST|PARTNERSHIP|ENTERPRISES|INDUSTRIES|GROUP|HOLDINGS|SERVICES|SYSTEMS|"
-    r"SOLUTIONS|ASSOCIATES|PARTNERS|VENTURES|PROPERTIES|AND|&)\b|\d")
+    return bool(name) and bool(LENDER_RE.search(str(name).upper()))
+
 
 #: Equipment words whose SINGULAR form is a plausible SURNAME. Founder ruling
 #: 2026-08-30: "a guy can be named Jim Crane but not Jim Cranes -- nobody is
@@ -315,3 +315,19 @@ if __name__ == "__main__":
     for t in ["CATERPILLAR FINANCIAL SERVICES", "JOHN DEERE CONSTRUCTION & FORESTRY",
               "WAGNER EQUIPMENT CO", "WELLS FARGO BANK NA", "KUBOTA CREDIT CORPORATION"]:
         print(f"  lender   {t:34s} -> {'IN ' if is_heavy_lender(t) else 'out'}")
+
+
+def heavy_row(borrower, lender) -> bool:
+    """A row qualifies if EITHER criterion is met. Nothing rejects a row.
+
+    Founder's model, 2026-08-30: *"we don't have a reject database, we have
+    criteria that must be met to qualify."* Everything is pulled; a row is added
+    only when the lender is a named heavy-construction maker or dealer, or the
+    borrower's own name states an explicit job-site equipment category.
+
+    The two criteria are independent. A named manufacturer makes the borrower
+    name irrelevant -- Terex sells cranes, so "BOBS COOKIES <- TEREX" qualifies.
+    An equipment category in the borrower name makes the lender irrelevant --
+    "BOBS EXCAVATION" qualifies with no lender at all. Neither met, not added.
+    """
+    return is_heavy_lender(lender) or is_heavy_borrower(borrower)
