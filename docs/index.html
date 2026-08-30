@@ -22,6 +22,10 @@
     --maph:min(74vh,780px);
   }
   *{box-sizing:border-box}
+  /* iOS/Android engines auto-inflate text in some layouts, which would override
+     the tuned scale and re-open the gap with the desktop. Desktop browsers do
+     no text inflation, so this is inert there. */
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   body{margin:0;background:var(--bg);color:var(--ink);
     font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
     display:flex;flex-direction:column;align-items:center;padding:12px 16px 16px}
@@ -109,7 +113,17 @@
   .dot.hot{fill:#111;stroke:#fff;stroke-width:2px}
   #bar{display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:8px}
   #row1{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:center}
-  button{font:750 12.5px/1 inherit;letter-spacing:.11em;text-transform:uppercase;
+  /* The shorthand here used to read `font:750 12.5px/1 inherit`, which is
+     INVALID -- `inherit` is a CSS-wide keyword, not a <family-name>, so it is
+     only legal as an entire value, never as one component of the shorthand.
+     Every engine therefore discarded the WHOLE declaration, and because a
+     <button> does not inherit fonts from the page, each one substituted its own
+     control default: Blink hands it Arial 13.3333px/400, WebKit something else.
+     That is why the phone and the laptop disagreed. These longhands pin the
+     values Chrome was already computing, so the desktop rendering is unchanged
+     and every other engine is pulled onto the same numbers. */
+  button{font-family:Arial,Helvetica,sans-serif;font-size:13.3333px;
+    font-weight:400;line-height:normal;letter-spacing:.11em;text-transform:uppercase;
     padding:11px 26px;border:1px solid rgba(15,15,20,.55);
     border-radius:5px;color:#2e2e2e;cursor:pointer;
     background:linear-gradient(158deg,#ffffff,#f0f0f0);
@@ -123,7 +137,12 @@
   button:active:not(:disabled){box-shadow:0 1px 2px rgba(15,15,20,.22) inset;transform:translateY(1px)}
   button:disabled{opacity:.45;cursor:default}
   button:focus-visible,.chip:focus-visible{outline:2px solid #1c1c1c;outline-offset:2px}
-  .chip{font:650 10.5px/1 inherit;letter-spacing:.13em;text-transform:uppercase;
+  /* Same invalid shorthand. A .chip is a <span>, so it kept the page face by
+     inheritance but lost its declared size and weight, taking body's 14px/400
+     instead. Pinned to exactly what Chrome resolves today. `.chip.on` still
+     raises the weight to 750 -- it is a separate, valid rule and outranks this. */
+  .chip{font-family:inherit;font-size:14px;font-weight:400;line-height:1.45;
+    letter-spacing:.13em;text-transform:uppercase;
     padding:8px 13px;border:1px solid rgba(15,15,20,.30);
     border-radius:5px;color:#5a5a5a;cursor:pointer;
     background:linear-gradient(158deg,#ffffff,#f4f4f4);
