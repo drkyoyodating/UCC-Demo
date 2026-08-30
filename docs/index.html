@@ -54,24 +54,22 @@
   .shape{stroke-width:1.5;filter:url(#lift)}
   .panel.on .shape{filter:url(#lift-on)}
   .gloss{pointer-events:none}
-  /* A shaded-relief surface computed from the FILINGS, not from elevation.
-     Terrain looked right but was irrelevant to lien filings -- decoration on a
-     thematic map. This is a kernel-density field of the qualifying filings,
-     hillshaded, so concentrations of lending read as raised ground. The peaks
-     are real: Colorado's is at (39.82, -104.96), which is Denver; Connecticut's
-     at (41.59, -72.81), which is Hartford. The relief IS the data.
+  /* Real SRTM shaded relief. Founder's choice between two working surfaces:
+     this one (src/build_relief.py, actual elevation) and a filing-density field
+     (src/build_density_relief.py, which peaks correctly at Denver and Hartford).
+     Both are built from real data and both remain in the repo -- switching is
+     the two image hrefs below plus this blend rule.
 
-     Bandwidth is 5.5% of panel width, putting the smallest blob near 8% of the
-     panel -- an order of magnitude coarser than a dot at 1-2%, which is the
-     spatial-frequency separation that keeps it ground rather than a competitor.
-
-     MULTIPLY, so it only ever darkens. Darkening the fill can only INCREASE the
-     white dot-ring's contrast against it, so no density value anywhere can
-     degrade dot legibility -- the layer is structurally safe over the data.
-     Where there are no filings the field is flat, the hillshade sits at its
-     neutral value and the overlay does nothing: ~39% of Colorado and ~48% of
-     Connecticut are left untouched rather than tinted. */
-  .relief{pointer-events:none;mix-blend-mode:multiply;opacity:.38}
+     SOFT-LIGHT, not multiply. Multiply is safer -- it only darkens, so it can
+     only raise the ring's contrast -- but it also only darkens, so a ridge is
+     shaded on both flanks and lit on neither. Imhof's rule is that the
+     three-dimensional impression comes from light and dark being PAIRED and
+     adjacent across a ridge under one light; a darken-only operator cannot make
+     that pair. Per Compositing L1 a source value of exactly 0.5 is a no-op, so
+     flat ground is untouched -- Imhof's medium-grey-for-flats rule as a blend
+     mode. Measured at .55 the white dot-ring holds 4.76:1 on Colorado and
+     4.33:1 on Connecticut at their lightest points, against a 3:1 floor. */
+  .relief{pointer-events:none;mix-blend-mode:soft-light;opacity:.55}
   #co .shape{fill:var(--co-dim);stroke:#502f78}
   #ct .shape{fill:var(--ct-dim);stroke:#902b20}
   #co.on .shape{fill:var(--co)}  #ct.on .shape{fill:var(--ct)}
@@ -172,7 +170,7 @@
     <svg viewBox="0 0 430 300" preserveAspectRatio="xMidYMid meet" aria-label="Colorado">
       <path class="shape"></path>
       <image class="relief" clip-path="url(#clip-co)" preserveAspectRatio="none"
-             href="data/density_co.png"></image>
+             href="data/relief_co.png"></image>
       <path class="gloss" fill="url(#gloss)"></path>
       <g class="dots"></g></svg>
     <div class="label">Colorado</div><div class="count"></div>
@@ -181,7 +179,7 @@
     <svg viewBox="0 0 300 220" preserveAspectRatio="xMidYMid meet" aria-label="Connecticut">
       <path class="shape"></path>
       <image class="relief" clip-path="url(#clip-ct)" preserveAspectRatio="none"
-             href="data/density_ct.png"></image>
+             href="data/relief_ct.png"></image>
       <path class="gloss" fill="url(#gloss)"></path>
       <g class="dots"></g></svg>
     <div class="label">Connecticut</div><div class="count"></div>
