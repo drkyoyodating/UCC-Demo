@@ -198,3 +198,49 @@ Root: `DECISIONS.md` (**the running log — read P5/P6**) · `STATUS.md` · `ucc
 5. Build P7 views + the interactive page **to the founder's direction**.
 6. P8, then P9 skill closure (classification is the one listed skill with zero coverage).
 7. Draft the email — **the founder sends it, never the agent.**
+
+---
+# 11. REMAINING WORK — corrected 2026-08-30, read this before planning anything
+
+**The founder's assumption was "P7 and P8 are all that's left." That is wrong, and the correction
+matters: P5/P5b MUST BE RE-RUN, and it gates everything downstream.**
+
+## Why the models are stale
+The shipped models were trained on `corpus_debtors_eq` (37,587 rows) and `corpus_lenders_eq` (44,919) —
+**the OLD Colorado-only, EQUIPMENT-collateral-only corpus.** Every cluster, prediction and precision
+figure in `parquet/` and `models/` rests on that.
+
+The scope is now `scope_all` — **137,236 rows across CO + CT, 49,959 entities** — built on the two-route
+heavy-construction filter, with **Connecticut reinstated** and **post-2012 kept**.
+
+**These do not overlap cleanly.** The trained models have never seen Connecticut, and they include
+Colorado records the current filter excludes. **You cannot publish views over entities the model never
+resolved.**
+
+## The accurate remaining list
+| | work | state |
+|---|---|---|
+| **P5 / P5b** | **Re-run resolution on `scope_all`** (CO + CT). Use **`combo_pf` @4.0** (`src/variant_combo.py`), NOT the shipped baseline | **OUTSTANDING — blocks P7** |
+| **P6** | Re-evaluate against the founder's 1300 labels. **Fix `src/score.py` FIRST** — it is non-deterministic and every number depends on it. **Check R5 violations explicitly this time** | waiting on labels |
+| **P7** | The views + the interactive page. `docs/index.html` is still a placeholder: 0 charts, 0 tables, 0 scripts | **not started** |
+| **P8** | Stretch — largely overtaken. Its items were the full-state lender pass and "P5b if it slipped"; both are moot now | mostly moot |
+| **P9** | Skill closure. **Classification is the only listed skill with zero coverage** | not started, genuinely optional |
+| **—** | **Publication blockers** from the 43-agent sweep: `README.md` is **31 bytes** while three documents cite it as carrying caveats; `docs/eda.md` record-level figures were computed on a 4-column record key P5 replaced with 6; retracted claims still live in `resolve.py` and `DECISIONS.md` §319-322 | **BLOCKS PUBLICATION** |
+
+## Dependency order — do not reorder
+```
+fix score.py  ->  P5/P5b re-run on scope_all  ->  P6 re-score  ->  P7 views  ->  publish
+```
+**The re-run is the gate. Nothing downstream is real until the models match the corpus.**
+
+## Effort
+P5/P5b re-run ~1h · P6 re-score ~30 min once labels land · P7 ~3–4h · publication blockers ~1h.
+P8 mostly moot. P9 optional — it only matters if *"none of the listed skills is missing"* has to be
+defensible in full.
+
+## On the visual layer — division of labour
+**The agent builds it; the founder directs it.** He has been the one catching what is wrong all session —
+the premises model, entity type in the dedup key, the name-string matching rule, killing the placeholder
+rows, the concrete ruling, spotting that Route B brings Connecticut back. What is needed from him at P7 is
+the same: **which views earn their place, what the page leads with, and what gets cut.** Do not build the
+display unilaterally.
