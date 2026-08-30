@@ -54,6 +54,12 @@
   .shape{stroke-width:1.5;filter:url(#lift)}
   .panel.on .shape{filter:url(#lift-on)}
   .gloss{pointer-events:none}
+  /* Real SRTM shaded relief, multiplied into the fill. MULTIPLY is chosen over
+     overlay or soft-light because it only ever DARKENS -- and darkening the fill
+     can only INCREASE the white dot-ring's contrast against it, so the page's
+     figure-ground mechanism cannot be harmed by any relief strength. The
+     opacity ceiling is therefore set by the dot FILL, not the ring. */
+  .relief{pointer-events:none;mix-blend-mode:multiply;opacity:.42}
   #co .shape{fill:var(--co-dim);stroke:#502f78}
   #ct .shape{fill:var(--ct-dim);stroke:#902b20}
   #co.on .shape{fill:var(--co)}  #ct.on .shape{fill:var(--ct)}
@@ -115,22 +121,26 @@
 <body>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-  <filter id="lift" x="-12%" y="-12%" width="126%" height="126%">
-    <feDropShadow dx="0" dy="1.5" stdDeviation="1.8" flood-color="#000" flood-opacity=".16"/>
+  <filter id="lift" x="-18%" y="-18%" width="138%" height="138%">
+    <feDropShadow dx="0" dy="2.5" stdDeviation="3" flood-color="#000" flood-opacity=".26"/>
   </filter>
-  <filter id="lift-on" x="-16%" y="-16%" width="134%" height="134%">
-    <feDropShadow dx="0" dy="3" stdDeviation="3.4" flood-color="#000" flood-opacity=".28"/>
+  <filter id="lift-on" x="-26%" y="-26%" width="155%" height="155%">
+    <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000" flood-opacity=".40"/>
   </filter>
   <!-- One light source from above. Strengths are MEASURED, not chosen: at 30%
        top-white the highlight halved the white dot-ring's contrast against the
        fill (7.38:1 -> 3.64:1) and pushed both muted states under the 3:1
-       graphics floor. At 14% the ring holds 5.28:1 at the lightest point, and
-       deepening the bottom shade costs nothing because it only adds contrast. -->
+       graphics floor. 18% is the CEILING: the last value where both states keep
+       a >=4:1 ring margin (CO 4.80:1, CT 4.02:1). Deepening the bottom to 30%
+       is free -- shade only ADDS contrast (10.9:1 / 8.9:1) -- and the wider
+       top-to-bottom range is what actually sells the curved surface. -->
+  <clipPath id="clip-co"><path id="clipco-p"></path></clipPath>
+  <clipPath id="clip-ct"><path id="clipct-p"></path></clipPath>
   <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0"   stop-color="#fff" stop-opacity=".14"/>
-    <stop offset=".45" stop-color="#fff" stop-opacity=".03"/>
+    <stop offset="0"   stop-color="#fff" stop-opacity=".18"/>
+    <stop offset=".45" stop-color="#fff" stop-opacity=".05"/>
     <stop offset=".60" stop-color="#000" stop-opacity="0"/>
-    <stop offset="1"   stop-color="#000" stop-opacity=".20"/>
+    <stop offset="1"   stop-color="#000" stop-opacity=".30"/>
   </linearGradient>
 </defs></svg>
 
@@ -142,13 +152,19 @@
 <div id="stage">
   <div class="panel" id="co">
     <svg viewBox="0 0 430 300" preserveAspectRatio="xMidYMid meet" aria-label="Colorado">
-      <path class="shape"></path><path class="gloss" fill="url(#gloss)"></path>
+      <path class="shape"></path>
+      <image class="relief" clip-path="url(#clip-co)" preserveAspectRatio="none"
+             href="data/relief_co.png"></image>
+      <path class="gloss" fill="url(#gloss)"></path>
       <g class="dots"></g></svg>
     <div class="label">Colorado</div><div class="count"></div>
   </div>
   <div class="panel" id="ct">
     <svg viewBox="0 0 300 220" preserveAspectRatio="xMidYMid meet" aria-label="Connecticut">
-      <path class="shape"></path><path class="gloss" fill="url(#gloss)"></path>
+      <path class="shape"></path>
+      <image class="relief" clip-path="url(#clip-ct)" preserveAspectRatio="none"
+             href="data/relief_ct.png"></image>
+      <path class="gloss" fill="url(#gloss)"></path>
       <g class="dots"></g></svg>
     <div class="label">Connecticut</div><div class="count"></div>
   </div>
@@ -221,6 +237,14 @@ function drawShape(k){
   }).join('')+'Z';
   document.querySelector('#'+k+' .shape').setAttribute('d', d);
   document.querySelector('#'+k+' .gloss').setAttribute('d', d);
+  document.getElementById('clip'+k+'-p').setAttribute('d', d);
+  // Register the relief image to the same bbox the projector uses, so the
+  // hillshade lands exactly on the geography it describes.
+  const b=STATE[k].bbox, tl=p(b[0],b[3]), br=p(b[1],b[2]);
+  const im=document.querySelector('#'+k+' .relief');
+  im.setAttribute('x',tl[0].toFixed(1)); im.setAttribute('y',tl[1].toFixed(1));
+  im.setAttribute('width',(br[0]-tl[0]).toFixed(1));
+  im.setAttribute('height',(br[1]-tl[1]).toFixed(1));
 }
 function cluster(rows){
   const m=new Map();
