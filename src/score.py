@@ -38,19 +38,42 @@ def _pairs(corpus):
     return te.merge(b, on="pair_id")
 
 
-def score_model(tag: str, corpus: str = "debtor", threshold: float = 6.0, verbose=True):
+def score_model(tag: str, corpus: str = "debtor", threshold: float = 6.0, verbose=True,
+                corpus_table: str | None = None):
+    """Score a prediction set against the held-out labels.
+
+    `corpus_table` overrides the physical table the records are read from. It
+    defaults to the historical `corpus_{kind}_eq`, which is the STALE
+    Colorado-only EQUIPMENT-collateral corpus; pass "corpus_scope_all" to score
+    a model resolved on the current CO+CT heavy-construction scope.
+    """
     kind = "debtors" if corpus == "debtor" else "lenders"
     te = _pairs(corpus)
     d = duckdb.connect()
     sys.path.insert(0, str(ROOT / "src"))
     from resolve import build_records
     con = duckdb.connect(str(ROOT / "ucc.duckdb"), read_only=True)
-    rec = build_records(con, f"corpus_{kind}_eq"); con.close()
+    rec = build_records(con, corpus_table or f"corpus_{kind}_eq"); con.close()
     d.register("r", rec[["unique_id", "name_clean", "suffix", "address1", "city", "state", "zipcode"]])
     d.register("te", te)
     pq = f"{ROOT}/parquet/predictions_{tag}.parquet"
+    # DETERMINISM FIX (2026-08-30). The joins below match a labelled pair to
+    # records by TEXT, so when several records share one (name, address, city,
+    # zip) tuple a single pair_id yields several rows. The old code ended with
+    # .drop_duplicates("pair_id"), which kept whichever row the PARALLEL join
+    # emitted first -- baseline recall flipped between 0.703 and 0.730 across
+    # identical runs, and every downstream number inherited that.
+    #
+    # Aggregating with MAX over the group is order-independent, so the result is
+    # now byte-identical run to run. MAX is also the right semantics: a labelled
+    # pair counts as merged if ANY record combination of it scored at or above
+    # the threshold. `label` and `stratum` are functionally dependent on
+    # pair_id, so any_value on them is exact, not a sample.
     j = d.execute(f"""
-        SELECT te.pair_id, te.label, te.stratum, p.match_weight w
+        SELECT te.pair_id,
+               any_value(te.label)   AS label,
+               any_value(te.stratum) AS stratum,
+               max(p.match_weight)   AS w
         FROM te
         JOIN r a ON a.name_clean=te.a_name AND coalesce(a.address1,'')=coalesce(te.a_address,'')
                 AND coalesce(a.city,'')=coalesce(te.a_city,'') AND coalesce(a.zipcode,'')=coalesce(te.a_zip,'')
@@ -58,7 +81,8 @@ def score_model(tag: str, corpus: str = "debtor", threshold: float = 6.0, verbos
                 AND coalesce(b.city,'')=coalesce(te.b_city,'') AND coalesce(b.zipcode,'')=coalesce(te.b_zip,'')
         LEFT JOIN '{pq}' p ON (p.unique_id_l=a.unique_id AND p.unique_id_r=b.unique_id)
                            OR (p.unique_id_l=b.unique_id AND p.unique_id_r=a.unique_id)
-    """).df().drop_duplicates("pair_id")
+        GROUP BY te.pair_id
+    """).df()
     d.close()
     merged = j[j.w.notna() & (j.w >= threshold)]
     tp = int((merged.label == "SAME").sum()); fp = int((merged.label == "DIFFERENT").sum())

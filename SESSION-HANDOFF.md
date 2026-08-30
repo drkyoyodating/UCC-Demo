@@ -60,9 +60,14 @@ Instant discard: no address · placeholder address · **both** person and busine
 ## 3. THE CORPUS AS BUILT
 | region | rows | filings | borrowers | route A | route B | 2013+ | span |
 |---|---:|---:|---:|---:|---:|---:|---|
-| CO | 113,037 | 109,417 | 36,962 | 97,086 | 30,367 | 74,767 | 1990–2026 |
-| CT | 24,199 | 15,619 | 7,590 | 19,186 | 6,874 | 23,133 | 1990–2026 |
-| **total** | **137,236** | **125,036** | **44,478** | | | | |
+| CO | 88,162 | 85,612 | 26,436 | 71,033 | 29,801 | 58,621 | 1990–2026 |
+| CT | 17,173 | 10,989 | 5,120 | 11,820 | 6,702 | 16,205 | 1990–2026 |
+| **total** | **105,335** | **96,601** | **31,538** | | | | |
+
+**⚠ REBUILT 2026-08-30 after the filter was tightened.** The previous figures (137,236 rows /
+44,478 borrowers) included bank leasing arms, machine-tool dealers, pure-agriculture dealers,
+auto-salvage yards, hardscape paver retailers, flour mills and freight haulers. Strict pull
+precision went **72.19% → 99.99%**. Any figure quoting 137,236 or 44,478 is stale.
 
 **→ 49,959 entities at 2.75 loans each** (CO 42,123 · CT 7,836). Tables: `scope_co`, `scope_ct`,
 `scope_all`, `co_entities`, `co_machinery_loans` in `ucc.duckdb` (gitignored).
@@ -220,8 +225,8 @@ resolved.**
 ## The accurate remaining list
 | | work | state |
 |---|---|---|
-| **P5 / P5b** | **Re-run resolution on `scope_all`** (CO + CT). Use **`combo_pf` @4.0** (`src/variant_combo.py`), NOT the shipped baseline | **OUTSTANDING — blocks P7** |
-| **P6** | Re-evaluate against the founder's 1300 labels. **Fix `src/score.py` FIRST** — it is non-deterministic and every number depends on it. **Check R5 violations explicitly this time** | waiting on labels |
+| **P5 / P5b** | Re-run resolution on `scope_all` (CO + CT) | ✅ **DONE 2026-08-30.** `src/build_scope_corpus.py` (new, additive) builds `corpus_scope_all`; `run_p5_scope_all.py` resolves it. 46,540 records from 98,571 rows · 5.1M scored pairs · 20,766 clusters · 14,487 singletons · largest 0.625% → non-degeneracy **PASS**. `combo_pf` still needs its component parquets rebuilt on this corpus |
+| **P6** | Re-evaluate against the 1300 labels. **Check R5 violations explicitly** | `score.py` determinism ✅ **FIXED** (was `drop_duplicates("pair_id")` keeping whichever row the parallel join emitted first; now `GROUP BY pair_id` with `max(match_weight)`, verified byte-identical across 3 runs, recall stable at 0.730). Scoring outstanding |
 | **P7** | The views + the interactive page. `docs/index.html` is still a placeholder: 0 charts, 0 tables, 0 scripts | **not started** |
 | **P8** | Stretch — largely overtaken. Its items were the full-state lender pass and "P5b if it slipped"; both are moot now | mostly moot |
 | **P9** | Skill closure. **Classification is the only listed skill with zero coverage** | not started, genuinely optional |

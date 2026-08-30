@@ -21,7 +21,8 @@ import duckdb
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from heavy_filter import BORROWER_SQL, LENDER_SQL  # noqa: E402
+from heavy_filter import (BORROWER_SQL, LENDER_SQL,           # noqa: E402
+                          is_heavy_borrower, is_heavy_lender)
 
 JUNK = ("'','NONE','NONE PROVIDED','NA','N/A','UNKNOWN','SAME','COMPANY',"
         "'NOT PROVIDED','TBD','X','XX','NO ADDRESS','ADDRESS UNKNOWN','VARIOUS'")
@@ -60,6 +61,30 @@ WHERE substr(dt_accept,1,4) >= '1990'
     OR regexp_matches(upper(debtor_nm_bus), '{BORROWER_SQL}'))""")
 
 con.execute("CREATE OR REPLACE TABLE scope_all AS SELECT * FROM scope_co UNION ALL SELECT * FROM scope_ct")
+
+# --- EXACT-PREDICATE PASS -------------------------------------------------
+# The SQL above uses the raw LENDER_SQL / BORROWER_SQL regexes, which are a
+# fast SUPERSET. They do NOT carry the two guards that live in Python:
+#   * LENDER_DENY  -- banks, machine tools and pure agriculture, checked BEFORE
+#                     the manufacturer whitelist ("1ST SOURCE BANK, CONSTRUCTION
+#                     EQUIPMENT DIVISION" matches the whitelist and is a bank).
+#   * the personal-name guard -- "CRANE, ROBERT GALE" is not a crane firm.
+# Without this pass the guards are decorative: they would filter is_heavy_*()
+# callers while the actual pull kept every row. Applying them in SQL would mean
+# maintaining the same logic twice, so instead the regex pre-filters 8.4M source
+# rows down to ~110k and the authoritative Python predicates decide those.
+_cand = con.execute("SELECT * FROM scope_all").df()
+_keep = [bool(is_heavy_lender(l) or is_heavy_borrower(b))
+         for b, l in zip(_cand.borrower, _cand.lender)]
+_cand = _cand[_keep]
+# route flags must agree with the predicates that actually decided the row
+_cand["route_a"] = [bool(is_heavy_lender(l)) for l in _cand.lender]
+_cand["route_b"] = [bool(is_heavy_borrower(b)) for b in _cand.borrower]
+con.register("_scope_exact", _cand)
+con.execute("CREATE OR REPLACE TABLE scope_all AS SELECT * FROM _scope_exact")
+con.unregister("_scope_exact")
+con.execute("CREATE OR REPLACE TABLE scope_co AS SELECT * FROM scope_all WHERE region='CO'")
+con.execute("CREATE OR REPLACE TABLE scope_ct AS SELECT * FROM scope_all WHERE region='CT'")
 
 print("=== IN-SCOPE CORPUS: heavy construction equipment finance ===")
 print(f"{'region':8s} {'rows':>9s} {'filings':>9s} {'borrowers':>10s} {'lenders':>8s} "

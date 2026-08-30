@@ -18,8 +18,25 @@ Bomag · Dynapac · Wirtgen · Vögele · Hamm · Sakai · Ammann · Atlas Copco
 Powerscreen · Morooka · Prinoth
 **Colorado dealers:** Wagner Equipment (Caterpillar's CO dealer) · Faris Machinery · Honnen Equipment ·
 4 Rivers Equipment · Power Equipment · Colorado Machinery · Western States Equipment
-**Generic lender phrases that also qualify:** …Machinery · …Construction Equipment · …Heavy Equipment ·
-…Equipment Finance · …Equipment Leasing
+**NAMED dealers only — generic phrases NO LONGER qualify.** Founder ruling 2026-08-30:
+Route A is a *named* manufacturer or franchised dealer. The bare tokens `MACHINERY`,
+`EQUIPMENT FINANCE` and `EQUIPMENT LEASING` were removed — a machine can be a laundry machine,
+and a bank's leasing arm finances anything. Real dealers that used to ride `MACHINERY` are now
+listed by name: Wyoming Machinery · Carter Machinery · Nebraska Machinery · Butler Machinery ·
+Warren Power · Linder Industrial · Road Machinery · Titan Machinery · Pape Machinery ·
+Blanchard Machinery · Denver East Machinery · Blaw-Knox.
+
+**LENDER DENYLIST — checked BEFORE the whitelist, and it wins.**
+Required because some denied lenders *contain* a whitelisted phrase:
+`1ST SOURCE BANK, CONSTRUCTION EQUIPMENT DIVISION` matches `CONSTRUCTION EQUIPMENT` and is a bank.
+- **Banks and leasing arms:** BANK · BANCORP · CREDIT UNION · FINANCIAL FEDERAL · DE LAGE LANDEN,
+  plus the OCR corruptions that occur in the real register (BNAK, BANKS, BANC, BAMK, …).
+- **Machine tools** (founder: *"machine tools no go"*): Stiles · Kitamura · Matsuura ·
+  MC Machinery · Engel · Sumitomo Demag · Hanwha · Fuchs · Automatics · Mitsui · Arthur · Arrow.
+- **Pure agriculture** (founder, after weighing it: farm tractors are heavy iron, but pure ag is a
+  *different market*, not construction-adjacent): AGCO · Kuhn Farm Machinery · Stotz · Agpro ·
+  Livingston Machinery · Arizona Machinery · any `FARM MACHINERY`.
+  **Dual-line dealers are KEPT** — Titan and Butler sell construction iron alongside ag.
 
 ### ROUTE B — an equipment or trade word appears in the BORROWER'S OWN NAME
 The borrower qualifies on its own name, **whatever the lender is**, because the name states the business.
@@ -36,8 +53,31 @@ tilt up · rebar · post tension
 
 **Trades that own and run the equipment:** demolition · demo · earthwork · earthmoving · sitework ·
 site work · dirt work · grading · trenching · asphalt · aggregate · quarry · gravel · sand and gravel ·
-ready mix · pipeline · underground utilities · underground utility · heavy haul · heavy hauling ·
+ready mix · pipeline · underground utilities · underground utility ·
 mining · reclamation · land clearing · septic · well drilling · utility contractor
+
+### 1.2b The singular/plural surname rule — founder ruling 2026-08-30
+*"A guy can be named Jim Crane but not Jim Cranes. Nobody is named a plural."*
+
+A handful of equipment words are also plausible **surnames** in the singular:
+`CRANE · LOADER · GRADER · DOZER · QUARRY · MIXER`.
+These qualify **only** when the string proves it is a firm, by any one of:
+- the equipment word is **plural or possessive-plural** — `BOBS CRANES`, `RMS CRANES`;
+- a **corporate marker or digit** is present — `EAGLE CRANE, LLC`;
+- **another token is possessive** — `JIMS CRANE` (the *s* is on the owner);
+- a **second equipment word** is present — `CRANE & RIGGING`.
+
+Otherwise the row reads as a person and is rejected: `CRANE, ROBERT GALE`, `LOADER DINAH P`.
+
+**Words nobody is ever named qualify in every form** — *"nobody in the history of the world has the
+last name Excavation"*: `EXCAVATION · EXCAVATING · DEMOLITION · CONCRETE · PAVING · EARTHMOVING`…
+This is why `DERRICK` and `AUGER` had to be deleted outright: they are surnames whose plural
+never appears.
+
+**Route A is independent of all of this.** If the lender is a named manufacturer or dealer, the
+borrower's name is irrelevant — Terex sells cranes, so `BOBS COOKIES ← TEREX` is in scope. If the
+lender is a bank and the borrower name carries no equipment category, **neither qualifier is met
+and the row does not get in**.
 
 ### 1.2 Word-form allowances (the "exemption logic")
 A word matches in **any** of these forms:
@@ -62,6 +102,10 @@ Each was audited against real borrower names and pulled the wrong industry:
 | **CRUSHER** | car crushers — *Bonnie's Car Crushers*. (`CRUSHING` is kept; that one is aggregate) |
 | **SCREENING** | *American Pre-Employment Screening* |
 | **CONVEYOR** | industrial belt suppliers, not site equipment |
+| **PAVER** | brick / hardscape retailers — *Reis Bricks and Pavers*, *System Pavers of Colorado*, *The Stone & Paver Company*. `PAVING` is KEPT and still catches every real road-paving firm |
+| **MILLING** | flour and grain milling — *Panhandle Milling*. Real road-milling firms carry `PAVING` or `CONCRETE` too |
+| **HEAVY HAUL / HEAVY HAULING** | over-the-road transport of oversize loads. Founder: *"we aren't looking for freight trucks, we are looking for equipment used on job sites."* `TRUCKING` was never a qualifier and stays unlisted |
+| **CONSTRUCTION** | too vague — most construction firms run nothing heavier than a van. Never was a Route B word; recorded here so it is never added. `BOBS CONSTRUCTION` is out; `BOBS EXCAVATION` is in |
 
 ### 1.4 Also out of scope entirely
 IRS liens · hospital liens · consumer goods · general accounts-receivable lending · pure crop and
