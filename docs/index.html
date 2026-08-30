@@ -15,7 +15,10 @@
        2.25:1 luminance step against the bright fill instead of 1.72:1, so
        dim-vs-bright reads as the binary it is meant to be. */
     --co-dim:#a37fc4; --ct-dim:#e0907f;
-    --ink:#1c1c1c; --mut:#6b6b6b; --line:#d2d2d2; --bg:#f4f4f4;
+    --ink:#1c1c1c; --mut:#6b6b6b; --line:#d2d2d2;
+    /* White ground. Every grey below was re-derived for #f4f4f4; on white they
+       all gain contrast, so the accessibility work holds and improves. */
+    --bg:#ffffff;
     --maph:min(74vh,780px);
   }
   *{box-sizing:border-box}
@@ -34,14 +37,23 @@
   .panel{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
   #co{flex:1.30} #ct{flex:1.00}
   .panel svg{display:block;cursor:pointer;overflow:visible;width:100%;height:auto;max-height:var(--maph)}
-  .label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
-  .panel.on .label{color:var(--ink);font-weight:600}
+  .label{font-size:15px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+    color:#3a3a3a}
+  .panel.on .label{color:var(--ink)}
+  #co.on .label{color:#502f78} #ct.on .label{color:#902b20}
   .count{font-size:11px;color:#6e6e6e;height:14px}
   /* No white rim: it measured 1.10:1 on the ground, separating nothing outward
      while eating into the fill inward. Each state instead carries a boundary in
      a darkened value of its OWN hue, because both muted fills fall under the 3:1
      graphics floor (CO-dim 2.99:1, CT-dim 2.26:1) and these are click targets. */
-  .shape{stroke-width:1.5}
+  /* Depth without decoration. The drop shadow is an ELEVATION cue -- it says the
+     state is a raised, clickable object -- and the gradient overlay is a single
+     light source from above, which is how a physical surface reads. Both sit
+     UNDER the dots and are deliberately shallow: the dot-on-fill separation is
+     already only 1.36:1, so anything stronger would eat the data layer. */
+  .shape{stroke-width:1.5;filter:url(#lift)}
+  .panel.on .shape{filter:url(#lift-on)}
+  .gloss{pointer-events:none}
   #co .shape{fill:var(--co-dim);stroke:#502f78}
   #ct .shape{fill:var(--ct-dim);stroke:#902b20}
   #co.on .shape{fill:var(--co)}  #ct.on .shape{fill:var(--ct)}
@@ -102,6 +114,26 @@
 </head>
 <body>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="lift" x="-12%" y="-12%" width="126%" height="126%">
+    <feDropShadow dx="0" dy="1.5" stdDeviation="1.8" flood-color="#000" flood-opacity=".16"/>
+  </filter>
+  <filter id="lift-on" x="-16%" y="-16%" width="134%" height="134%">
+    <feDropShadow dx="0" dy="3" stdDeviation="3.4" flood-color="#000" flood-opacity=".28"/>
+  </filter>
+  <!-- One light source from above. Strengths are MEASURED, not chosen: at 30%
+       top-white the highlight halved the white dot-ring's contrast against the
+       fill (7.38:1 -> 3.64:1) and pushed both muted states under the 3:1
+       graphics floor. At 14% the ring holds 5.28:1 at the lightest point, and
+       deepening the bottom shade costs nothing because it only adds contrast. -->
+  <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0"   stop-color="#fff" stop-opacity=".14"/>
+    <stop offset=".45" stop-color="#fff" stop-opacity=".03"/>
+    <stop offset=".60" stop-color="#000" stop-opacity="0"/>
+    <stop offset="1"   stop-color="#000" stop-opacity=".20"/>
+  </linearGradient>
+</defs></svg>
+
 <h1>UCC Heavy Construction Equipment Finance</h1>
 <p class="sub">Colorado &amp; Connecticut · click a state, then a dot · click a lender to trace its borrowers</p>
 
@@ -110,12 +142,14 @@
 <div id="stage">
   <div class="panel" id="co">
     <svg viewBox="0 0 430 300" preserveAspectRatio="xMidYMid meet" aria-label="Colorado">
-      <path class="shape"></path><g class="dots"></g></svg>
+      <path class="shape"></path><path class="gloss" fill="url(#gloss)"></path>
+      <g class="dots"></g></svg>
     <div class="label">Colorado</div><div class="count"></div>
   </div>
   <div class="panel" id="ct">
     <svg viewBox="0 0 300 220" preserveAspectRatio="xMidYMid meet" aria-label="Connecticut">
-      <path class="shape"></path><g class="dots"></g></svg>
+      <path class="shape"></path><path class="gloss" fill="url(#gloss)"></path>
+      <g class="dots"></g></svg>
     <div class="label">Connecticut</div><div class="count"></div>
   </div>
 </div>
@@ -182,8 +216,11 @@ const P={co:projector('co'), ct:projector('ct')};
 
 function drawShape(k){
   const p=P[k];
-  document.querySelector('#'+k+' .shape').setAttribute('d',
-    STATE[k].ring.map(function(c,i){return (i?'L':'M')+p(c[0],c[1]).map(function(v){return v.toFixed(1);}).join(' ');}).join('')+'Z');
+  const d = STATE[k].ring.map(function(c,i){
+    return (i?'L':'M')+p(c[0],c[1]).map(function(v){return v.toFixed(1);}).join(' ');
+  }).join('')+'Z';
+  document.querySelector('#'+k+' .shape').setAttribute('d', d);
+  document.querySelector('#'+k+' .gloss').setAttribute('d', d);
 }
 function cluster(rows){
   const m=new Map();
