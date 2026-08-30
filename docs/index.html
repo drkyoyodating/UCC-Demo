@@ -189,6 +189,7 @@
      forgiving about this; iOS is not, which is why dragging inside the table
      does nothing there. touch-action states both axes explicitly. */
   #scroll{overflow:auto;flex:1 1 auto;min-height:0;touch-action:pan-x pan-y}
+
   table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
   /* Matched to the tiles and panels: translucent hairlines rather than a solid
      grey rule, so a row edge picks up what is behind it and reads as a seam in an
@@ -393,16 +394,24 @@
        centred on both axes; content still slides both ways. */
     /* Width: 5% back off each side from the widened value, so 10% narrower
        overall (the 1.25 and the screen cap are each scaled by .9, which keeps
-       the cap doing its job on any viewport). Height: a further 20% off the top
-       reach and 20% off the bottom on top of the earlier 12.5% each, so
-       .75 x .6 = .45 of the old square edge. */
+       the cap doing its job on any viewport). Height: 12.5% off each end, then a
+       further 20% off each end, then 5% back on each end --
+       .75 x .6 x 1.1 = .495 of the old square edge. */
     #box{width:min(calc((100vw - 32px) * 1.125), calc((100vw - 8px) * .9));
-      height:calc((100vw - 32px) * .45);max-height:none}
+      height:calc((100vw - 32px) * .495);max-height:none}
     #boxhead{padding:7px 10px}
     #boxtitle{font-size:11px}
     #boxsub{font-size:9.5px}
     #close{font-size:19px;padding:0 5px}
     #scroll{overscroll-behavior:contain}
+    /* When a ZIP group is short the table does not fill the panel, and the dead
+       area beneath it is not part of the table -- so a finger landing there had
+       nothing to drag. Stretching the table to the scroller's full height makes
+       every pixel a drag target; the slack lands on a spacer row, so no real row
+       is distorted. Mobile only: a mouse wheel scrolls the container regardless
+       of what sits under the cursor, so the desktop never had this problem. */
+    #scroll table{min-height:100%}
+    #scroll tbody:after{content:'';display:table-row;height:100%}
     #box table{font-size:9.5px}
     #box th,#box td{padding:4px 6px}
     #box th{font-size:9px;padding-right:14px}
