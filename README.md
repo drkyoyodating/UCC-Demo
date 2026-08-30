@@ -15,16 +15,16 @@ takes a security interest in a borrower's equipment. The registers are enormous,
 uncategorised, and mostly irrelevant — Colorado alone carries 2.6M filings covering
 everything from office copiers to cattle.
 
-This project reduces that to **74,308 filings by 21,221 borrowers** who verifiably
+This project reduces that to **80,971 filings by 22,774 borrowers** who verifiably
 finance job-site machinery, resolves the duplicate name variants into **~21,000
 distinct firms**, and publishes the result as a map you can interrogate.
 
 | | |
 |---|---:|
 | source filings ingested | 3,432,167 |
-| qualifying filings | 74,308 |
-| distinct borrowers | 21,221 |
-| distinct lenders | 3,405 |
+| qualifying filings | 80,971 |
+| distinct borrowers | 22,774 |
+| distinct lenders | 3,431 |
 | resolved entities | ~21,000 |
 | years covered | 1990–2026 |
 
@@ -63,10 +63,11 @@ with zero overturns in either direction:
 | | |
 |---|---:|
 | **precision** | **99.4%** (357/359 resolvable) |
-| rows meeting neither criterion | **0 of 74,308** |
+| **recall** | **~86%** (95% CI 53–97%) |
+| rows meeting neither criterion | **0 of 80,971** |
 | non-degeneracy (largest cluster) | 0.62% — passes the <1% bar |
 
-The number moved 72.19% → 98.0% → 99.4% across three rounds. Each round used the
+Precision moved 72.19% → 98.0% → 99.4% across three rounds. Each round used the
 failures as the blueprint: every defect was traced to the exact term that admitted
 it, the term was tightened, and the pull was re-measured. Defects closed this way
 included bank leasing arms riding a generic phrase, an agricultural dealership added
@@ -92,6 +93,18 @@ Open the demo and:
 6. **SQL views** and **Cross-register** tabs show the relational analytics with the
    queries printed, and the firms that file in *both* registers — deliberately **not**
    merged, because a shared name across two states is not evidence of a shared firm.
+
+**Recall is the honest caveat.** A separate measurement judged 313 *rejected* rows to find what
+the criteria miss. It found 7 genuine misses, giving ~86% recall — but the estimate rests on a
+single miss in a 120-row random stratum, so the 95% interval is wide (53–97%). No filter defect
+was found; every miss was a gap in the term lists, not a matching bug. The largest single gap,
+John Deere Construction & Forestry, has since been closed by restoring that exact entity string
+(8,855 rows) while the Deere parent, `DEERE CREDIT` and the ag-and-turf division stay excluded.
+Remaining known gaps are small and named: `TRENCHLESS`, `STEEL ERECTION`, forklift captives.
+
+The trade is deliberate. This project optimises for **precision over recall** — a buyer cares more
+that what they receive is clean than that it is exhaustive. "I can tell you which 3% matter" is a
+precision claim.
 
 ## Caveats, stated plainly
 

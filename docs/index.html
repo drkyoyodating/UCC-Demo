@@ -7,7 +7,14 @@
 <style>
   :root{
     --co:#6b3fa0; --ct:#c0392b;
-    --co-dim:#d6cae4; --ct-dim:#eecdc9;
+    /* Muted variants, computed not chosen. The originals (#d6cae4 / #eecdc9)
+       failed four of six checks in the dataviz validator: chroma 0.038, below
+       the floor, so BOTH read as grey -- the two unselected states were the same
+       colour -- and a normal-vision separation of dE 5.2 against a hard-fail
+       line of 15. These pass chroma, CVD and the dE 15 floor (15.9), and give a
+       2.25:1 luminance step against the bright fill instead of 1.72:1, so
+       dim-vs-bright reads as the binary it is meant to be. */
+    --co-dim:#a37fc4; --ct-dim:#e0907f;
     --ink:#1c1c1c; --mut:#767676; --line:#d2d2d2; --bg:#f4f4f4;
     --maph:min(74vh,780px);
   }
@@ -33,7 +40,7 @@
   .shape{stroke:#fff;stroke-width:1.5}
   #co .shape{fill:var(--co-dim)} #ct .shape{fill:var(--ct-dim)}
   #co.on .shape{fill:var(--co)}  #ct.on .shape{fill:var(--ct)}
-  .dot{cursor:pointer;stroke:#fff;stroke-width:.6}
+  .dot{cursor:pointer;stroke:#fff;stroke-width:1.2;paint-order:stroke fill}
   #co .dot{fill:var(--ct)} #ct .dot{fill:var(--co)}
   .dot.sel{stroke:#111;stroke-width:1.8}
   .dot.dim{opacity:.12}

@@ -23,7 +23,16 @@ import re
 
 # --- ROUTE A: heavy construction equipment makers, captives, and major dealers ---
 MANUFACTURERS = [
-    "CATERPILLAR", "CAT FINANCIAL", "CAPTERPILLAR", "CETERPILLAR", "CATERPILLR", "KOMATSU", "VOLVO",
+    "CATERPILLAR", "CAT FINANCIAL", "CAPTERPILLAR", "CETERPILLAR", "CATERPILLR",
+    # --- Deere's CONSTRUCTION entity ONLY, by exact string, restored 2026-08-30.
+    # Deere as a parent was removed because it sells farm and turf equipment too,
+    # so its bare name does not say what was financed. These two strings do: the
+    # entity books construction and forestry iron exclusively, no ag, no turf.
+    # A recall measurement found this the single largest gap -- 4 of 313 sampled
+    # rejected rows, and ~6,662 rows in the pull. Bare DEERE, DEERE & COMPANY,
+    # DEERE CREDIT, JOHN DEERE FINANCIAL and JOHN DEERE COMPANY (the ag-and-turf
+    # division) all remain excluded; only the construction entity qualifies.
+    "JOHN DEERE CONSTRUCTION", "DEERE CONSTRUCTION", "KOMATSU", "VOLVO",
     # OCR corruptions of maker names, from the same distance-1 sweep. Only
     # non-words: DEER, VOGEL, MERLE, METRO, AZTEC, ALTEC, GENE and GROVER are
     # real words or real firms at distance 1 and are deliberately NOT listed.
