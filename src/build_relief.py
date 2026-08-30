@@ -102,7 +102,14 @@ def hillshade(z: np.ndarray, box: dict) -> np.ndarray:
     dx = (box["e"] - box["w"]) * 111_320 * np.cos(mid) / max(z.shape[1] - 1, 1)
     gy, gx = np.gradient(z * Z_FACTOR, dy, dx)
     slope = np.arctan(np.hypot(gx, gy))
-    aspect = np.arctan2(-gx, gy)
+    # GDAL's aspect convention. An earlier version used arctan2(-gx, gy), which
+    # is rotated 90 degrees and lit the scene from the SOUTH-EAST -- verified
+    # against a synthetic cone, whose NW flank came out DARKER than its SE flank.
+    # That is the classic relief inversion: under a lower-right light the visual
+    # system reads hills as hollows (Imhof; Sun & Perona, Nature Neuroscience
+    # 1998, on the assumed above-left light). Caught by testing the function
+    # against a known surface rather than by looking at the output.
+    aspect = np.arctan2(gy, -gx)
     az, alt = np.radians(360.0 - AZIMUTH + 90.0), np.radians(ALTITUDE)
     sh = (np.sin(alt) * np.cos(slope)
           + np.cos(alt) * np.sin(slope) * np.cos(az - aspect))
