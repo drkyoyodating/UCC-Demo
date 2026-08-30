@@ -259,7 +259,14 @@
      ========================================================================== */
   @media (max-width:640px){
 
-    body{padding:14px 16px 18px}
+    /* The footer group -- the control rows, the hint, the pane chips and the
+       prose -- is pushed down to sit flush against the bottom buffer, so the
+       slack on a tall phone lands in ONE gap above it instead of trailing off
+       the end of the page. #stage is stopped from flex-growing first, or the
+       maps would swallow that slack and the gap would open between the stat
+       boxes and the maps instead of below them. */
+    body{padding:14px 16px 18px;min-height:100vh}
+    #stage{flex:0 0 auto}
     h1,.sub,#foot,#hint{text-align:center}
 
     /* One solid line across the top. The size is derived from the viewport
@@ -284,7 +291,10 @@
     .count{font-size:9px;height:12px}
 
     /* Controls: 3 across, then the remaining 2 centred beneath. */
-    #bar{gap:6px;margin-top:8px}
+    #bar{gap:6px;margin-top:auto}   /* auto, not 8px: this is what pulls the
+       whole footer group down against the bottom buffer. Declared here rather
+       than earlier in the block because an equal-specificity rule later in the
+       source would otherwise win and silently restore the fixed margin. */
     /* stretch, not centre: a chip whose label wraps to two lines would
        otherwise sit at a different height from its neighbours and the row
        would read as ragged rather than tight. */
