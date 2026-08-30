@@ -29,11 +29,19 @@ browser. The qualifying criteria were measured as a classifier and iterated from
 
 ## 1. Skill-by-skill evidence
 
-> **Note for the drafter:** the original skills list was supplied in a table whose
-> rows 1, 3 and 5 lost their labels in transit. Those three are reconstructed from
-> context and marked **[inferred]** — confirm the exact wording before publishing.
+The eight skills, as stated by the candidate:
 
-### 1 · Data ingestion and acquisition **[inferred label]** — DEMONSTRATED
+1. **ETL data pipelines on millions of records** — *"data ingestion and enrichment
+   pipelines that process large volumes of records"*
+2. **Record linkage, fuzzy matching, entity resolution** — named verbatim in the posting
+3. **Evaluation methodology / data QA** — *"how do you know the data is right"*
+4. **SQL / relational analytics** — *"solid SQL/relational databases"*
+5. **Search analytics surface, end-to-end ownership** — *"search, classification and analytics"*
+6. **Graph construction over resolved entities** — *"the product shape itself, a graph not a report"*
+7. **Classification** — *"search, classification and analytics"*
+8. **Cross-source entity resolution across 310+ sources**
+
+### 1 · ETL pipelines on millions of records — DEMONSTRATED
 
 | | |
 |---|---:|
@@ -57,8 +65,25 @@ a large row count:
   regardless of volume.
 - **Philadelphia** — 8 machinery records.
 
-**Résumé angle:** demonstrates evaluating a data source on evidence and discarding it
-with a documented reason, rather than using whatever is easiest to obtain.
+**The enrichment half of the pipeline**, which the posting names explicitly:
+
+- **Name normalisation** — every party name passes through a pure function that
+  uppercases, resolves `&`/`AND`, deletes intra-token punctuation so `L.L.C.` collapses
+  to `LLC`, and peels legal suffixes into a *separate comparison feature* rather than
+  discarding them. Applied to 3.4M rows; never raises on any input, including the
+  **44.84% of Colorado debtor rows that carry a blank organisation name** because the
+  state publishes no individual-name column.
+- **Geospatial enrichment** — every qualifying row is joined to an external reference
+  dataset (US Census ZCTA Gazetteer) to attach a coordinate, with a city-centroid
+  fallback for PO-box-only ZIPs that the gazetteer does not place. **95.4% coverage**;
+  unresolved rows keep a NULL rather than a guessed coordinate.
+- **Derived analytical tables** — scope, party-record corpus, resolved clusters and
+  published extracts, each rebuilt deterministically from the snapshot.
+
+**Résumé angle:** an end-to-end ETL pipeline — extract from five public APIs, transform
+through normalisation and criteria, enrich against an external reference dataset, load
+into analytical tables — plus the judgement to evaluate a source on evidence and
+discard it with a documented reason rather than use whatever is easiest to obtain.
 
 ---
 
@@ -95,10 +120,13 @@ model that reports good numbers for the wrong reason.
 
 ---
 
-### 3 · Evaluation methodology and labelling **[inferred label]** — DEMONSTRATED
+### 3 · Evaluation methodology / data QA — DEMONSTRATED
+*("how do you know the data is right")*
 
-This is the skill that most separates the project from "ran a linkage library over a
-weekend."
+**This is the strongest section, because the question the posting asks is the question
+the project spends most of its effort answering.** The short answer: the data is right
+because it was measured three times, the measuring instrument was itself validated,
+and the blind spots in the measurement were found and closed.
 
 - **A signed decision rule written before labelling**, with rules R0–R10 in strict
   priority order, plus explicit address-expansion, name-normalisation and
@@ -145,12 +173,20 @@ querying a clean warehouse.
 
 ---
 
-### 5 · Search / retrieval surface **[inferred label]** — DEMONSTRATED
+### 5 · Search analytics surface, end-to-end ownership — DEMONSTRATED
+*("search, classification and analytics")*
 
-The published page is the retrieval surface: select a jurisdiction, select a location,
-read the filings at it, and pivot from any lender to every borrower it financed. The
-filter **executes live in the browser on each interaction** rather than replaying a
-precomputed result.
+**The end-to-end ownership is the point of this one, and it is literal**: a single
+person took this from raw public APIs to a published, interactive product — ingest,
+normalisation, criteria design, entity resolution, evaluation, geospatial enrichment,
+front-end build and deployment. No handoffs, no separate data-engineering and
+analytics roles.
+
+The published page is the search and analytics surface: select a jurisdiction, select
+a location, read the filings at it, pivot from any lender to every borrower it
+financed, filter by which criterion admitted a row, and read the named SQL views with
+their queries printed beside their results. The criteria **execute live in the browser
+on each interaction** rather than replaying a precomputed result.
 
 ---
 
@@ -214,11 +250,20 @@ the uncertainty honestly, and re-architects when measurement says the design is 
 
 ---
 
-### 8 · Cross-source linkage — DEMONSTRATED, INCLUDING THE RESTRAINT
+### 8 · Cross-source entity resolution — PARTIALLY DEMONSTRATED (state this honestly)
 
-The pipeline generalises across two independently-structured sources: Connecticut was
-ingested, filtered and resolved through the same criteria as Colorado despite
-publishing an incompatible schema and no party key.
+*The posting asks for this across 310+ sources. This project evaluated five and
+retained two. Do not let a résumé line imply otherwise — the honest claim is that the
+**method** generalises across heterogeneous sources, evidenced at small n, and the
+hard part of that problem was actually solved.*
+
+What *is* demonstrated is the difficulty that makes 310 sources hard in the first
+place: **schema heterogeneity**. Connecticut was ingested, filtered and resolved
+through the same criteria as Colorado despite publishing a structurally incompatible
+schema and **no party identifier at all** — a deterministic surrogate key is
+synthesised from row content so re-pulls stay reproducible. Five jurisdictions were
+evaluated against one criteria layer; three were rejected on their own structure
+rather than on effort. That is the same shape of work as 310 sources, at n=5.
 
 **The stronger result is a negative one.** Fifteen borrower names appear in *both*
 registers — `ACEVES CONCRETE LLC` files in Aurora, Colorado *and* Meriden,
@@ -259,7 +304,9 @@ in-state for plotting, and the deliberate refusal to link across registers.
 
 ## 3. Suggested résumé lines
 
-Pick per the target role; each is supported above.
+Pick per the target role; each is supported above. **Seven of the eight skills are
+fully demonstrated; skill 8 is partially demonstrated and the line below is worded to
+stay truthful about that.**
 
 - Ingested and evaluated **3.4M public lien filings across five US jurisdictions**,
   cutting three on documented structural grounds including a statutory finding
@@ -282,6 +329,8 @@ Pick per the target role; each is supported above.
   measurement showed the exclusions were 99.9% redundant and were silently deleting
   406 valid records.
 - Unified **two incompatible state register schemas**, one of which publishes no party
-  identifier, behind a single deterministic pipeline.
+  identifier, behind a single deterministic pipeline — the schema-heterogeneity problem
+  that makes multi-source entity resolution hard, solved at n=5 evaluated / 2 retained.
+  *(Do not phrase this as "310+ sources" — see skill 8.)*
 - Shipped an **interactive published demo** that re-executes the qualifying criteria
   live in the browser against a 3.4M-row snapshot.
