@@ -25,8 +25,12 @@
   body{margin:0;background:var(--bg);color:var(--ink);
     font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
     display:flex;flex-direction:column;align-items:center;padding:12px 16px 16px}
-  h1{font-size:15px;font-weight:600;margin:0}
-  .sub{font-size:11.5px;color:var(--mut);margin:2px 0 0}
+  /* The title was set at 15px/600 -- smaller than the stat figures beneath it,
+     which inverted the hierarchy: the page's name was quieter than its numbers.
+     21px/750 with tight tracking puts it back on top. */
+  h1{font-size:21px;font-weight:750;letter-spacing:-.02em;margin:0;line-height:1.2}
+  .sub{font-size:13px;color:#5a5a5a;margin:4px 0 0;letter-spacing:.005em}
+  .sub b{color:var(--ink);font-weight:650}
   /* Raised tiles, lit from the north-west like the maps: a light top-left rim,
      a shade at the bottom, and a shadow offset down-right where a NW light puts
      it. The surface gradient is deliberately shallow (#fff -> #f2f2f2) so the
@@ -158,7 +162,13 @@
   #pane .sql{font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#555;
     padding:7px 12px;background:#fcfcfc;border-bottom:1px solid #eee;white-space:pre-wrap}
   #pane p{margin:0;padding:8px 12px;font-size:11.5px;color:#555;border-bottom:1px solid #eee}
-  #foot{margin-top:10px;font-size:11px;color:#6e6e6e;text-align:center;max-width:900px}
+  /* The footer carries the precision claim -- the single most load-bearing
+     sentence for a technical reader -- and was set at 11px in grey, smaller than
+     the table it describes. 12.5px at #4a4a4a reads as a statement rather than
+     as fine print, and the claim itself is emphasised. */
+  #foot{margin-top:13px;font-size:12.5px;line-height:1.55;color:#4a4a4a;
+    text-align:center;max-width:940px}
+  #foot b{color:var(--ink);font-weight:650}
 </style>
 </head>
 <body>
