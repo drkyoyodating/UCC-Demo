@@ -257,6 +257,13 @@
      MOBILE PORTRAIT (<= 640px). Never evaluated above 640px, so the desktop
      rendering cannot move. Tight, not cramped.
      ========================================================================== */
+  /* The scroll lock is scoped to viewports tall enough to hold the layout.
+     Below ~600px of visible height the content genuinely does not fit, and
+     overflow:hidden there would strand it off-screen with no way to reach it,
+     so those devices keep their scrollbar. */
+  @media (max-width:640px) and (min-height:600px){
+    body{overflow:hidden}
+  }
   @media (max-width:640px){
 
     /* The footer group -- the control rows, the hint, the pane chips and the
@@ -272,7 +279,17 @@
        height with the address bar showing, which is exactly what the user sees
        when the page opens. The plain vh line stays first as a fallback for
        engines that predate svh. */
-    body{padding:14px 16px 18px;min-height:100vh;min-height:100svh}
+    /* Bottom gap is 15% of the VISIBLE viewport, not a fixed pixel value, so the
+       lowest element sits clear of the floor on every screen instead of landing
+       on -- or just past -- it. #bar's auto margin absorbs the change, so the
+       group rises as one. */
+    body{padding:14px 16px 15svh;min-height:100vh;min-height:100svh}
+    /* Locked to the visible screen: the floor of the viewport IS the base, and
+       there is no page scrolling in portrait. Anything that does not fit would
+       be unreachable rather than merely below the fold, so the pane below is
+       capped in viewport units instead of pixels to keep it inside the lock. */
+    html{height:100%}
+    body{height:100svh;max-height:100svh}
     #stage{flex:0 0 auto}
     h1,.sub,#foot,#hint{text-align:center}
 
@@ -336,7 +353,7 @@
     #box td.kd{font-size:8.5px}
 
     /* SQL / cross-register panes, same reduction. */
-    #pane{max-height:240px}
+    #pane{max-height:26svh}   /* must fit inside the locked screen */
     #pane h3{font-size:9.5px;padding:7px 10px}
     #pane table{font-size:9.5px}
     #pane th,#pane td{padding:4px 6px}
