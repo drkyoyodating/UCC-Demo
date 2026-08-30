@@ -57,11 +57,11 @@ cinemas), `YALE MATERIALS HANDLING` not `YALE` (university, locks), `WABASH NATI
 **Descriptive phrases that also qualify** (founder ruling 2026-08-30): `CONSTRUCTION EQUIPMENT`,
 `HEAVY EQUIPMENT`, `HEAVY CONSTRUCTION EQUIPMENT`.
 
+**`FORKLIFT` IS a borrower qualifier** (founder ruling 2026-08-30) — Hyster-Yale is a listed maker and its forklifts work job sites and building yards.
+
 **Products named by those makers that are NOT borrower qualifiers**, and why — each would
 reverse an earlier founder ruling, so the maker qualifies as a *lender* while the product word
 does not qualify a *borrower*:
-- `FORKLIFT` — Hyster-Yale is a listed maker, but a firm *named* Forklift is a warehouse
-  business. Removed under the "equipment used on job sites" rule.
 - `MOWING` — Alamo makes highway mowers, but the word pulls lawn-care firms.
 - `TRAILER` / `FLATBED` — Wabash makes them, but the founder ruled out freight
   ("we aren't looking for freight trucks"), which is why `HEAVY HAUL` was removed.
