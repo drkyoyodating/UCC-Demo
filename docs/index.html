@@ -28,7 +28,8 @@
   /* The title was set at 15px/600 -- smaller than the stat figures beneath it,
      which inverted the hierarchy: the page's name was quieter than its numbers.
      21px/750 with tight tracking puts it back on top. */
-  h1{font-size:21px;font-weight:750;letter-spacing:-.02em;margin:0;line-height:1.2}
+  h1{font-size:21px;font-weight:750;letter-spacing:-.02em;margin:0;line-height:1.2;
+    text-shadow:-.5px -.5px 0 rgba(255,255,255,.9), 1px 1.5px 1.5px rgba(15,15,20,.20)}
   .sub{font-size:13px;color:#5a5a5a;margin:4px 0 0;letter-spacing:.005em}
   .sub b{color:var(--ink);font-weight:650}
   /* Raised tiles, lit from the north-west like the maps: a light top-left rim,
@@ -44,9 +45,11 @@
                0 -1px 0 rgba(15,15,20,.045) inset,
                1px 2px 4px rgba(15,15,20,.10);
   }
-  .stat b{display:block;font-size:18px;font-weight:650;font-variant-numeric:tabular-nums;
-    letter-spacing:-.01em;line-height:1.15}
-  .stat span{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+  .stat b{display:block;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;
+    letter-spacing:-.015em;line-height:1.15;color:#141414;
+    text-shadow:-.5px -.5px 0 rgba(255,255,255,.95), 1px 1px 1.5px rgba(15,15,20,.22)}
+  .stat span{font-size:10px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;
+    color:#5f5f5f;text-shadow:0 1px 0 rgba(255,255,255,.9)}
   #stage{display:flex;gap:6vw;align-items:center;justify-content:space-between;
     width:100%;max-width:1860px;flex:1;min-height:0;padding:0 1vw}
   .panel{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
@@ -56,7 +59,9 @@
     color:#3a3a3a}
   .panel.on .label{color:var(--ink)}
   #co.on .label{color:#502f78} #ct.on .label{color:#902b20}
-  .count{font-size:11px;color:#6e6e6e;height:14px}
+  .count{font-size:12px;font-weight:600;color:#454545;height:15px;
+    font-variant-numeric:tabular-nums;letter-spacing:.005em;
+    text-shadow:0 1px 0 rgba(255,255,255,.85)}
   /* No white rim: it measured 1.10:1 on the ground, separating nothing outward
      while eating into the fill inward. Each state instead carries a boundary in
      a darkened value of its OWN hue, because both muted fills fall under the 3:1
@@ -118,7 +123,8 @@
   .chip.on{border-color:rgba(15,15,20,.62);color:#111;font-weight:700;
     background:linear-gradient(158deg,#f0f0f0,#e4e4e4);
     box-shadow:0 1px 2px rgba(15,15,20,.16) inset}
-  #hint{font-size:11.5px;color:var(--mut);height:15px}
+  #hint{font-size:12.5px;font-weight:550;color:#4f4f4f;height:16px;
+    text-shadow:0 1px 0 rgba(255,255,255,.85)}
   .count,#boxsub,#hint,#foot{font-variant-numeric:tabular-nums}
   /* Glass: a translucent plate with a blurred backdrop, a bright top rim and a
      deep shadow. It floats over the map, so it earns real elevation -- this is
@@ -138,30 +144,53 @@
   #boxhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
     padding:9px 13px;border-bottom:1px solid rgba(15,15,20,.14);
     background:linear-gradient(158deg,rgba(255,255,255,.75),rgba(242,242,242,.6))}
-  #boxtitle{font-size:12px;font-weight:600}
-  #boxsub{font-size:11px;color:var(--mut)}
+  #boxtitle{font-size:13.5px;font-weight:700;letter-spacing:-.005em;color:#141414;
+    text-shadow:0 1px 0 rgba(255,255,255,.9)}
+  #boxsub{font-size:11.5px;font-weight:600;color:#565656;
+    font-variant-numeric:tabular-nums}
   #close{border:0;background:none;font-size:17px;padding:0 2px;cursor:pointer;color:var(--mut)}
   #close:hover{background:none;color:#111}
   #scroll{overflow:auto}
   table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
-  th,td{padding:5px 8px;border-bottom:1px solid #ececec;text-align:left;white-space:nowrap}
-  th{position:sticky;top:0;background:#e8e8e8;font-weight:600;font-size:11px;
-     border-bottom:0;box-shadow:inset 0 -1px 0 var(--line)}
-  td.num{text-align:right;font-variant-numeric:tabular-nums}
-  tbody tr:nth-child(even){background:#f2f2f2}
-  .lender{color:#0b57a4;cursor:pointer;text-decoration:underline dotted}
-  .kd{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+  /* Matched to the tiles and panels: translucent hairlines rather than a solid
+     grey rule, so a row edge picks up what is behind it and reads as a seam in an
+     object instead of a line drawn on a diagram. Padding opened 5/8 -> 6/10,
+     enough to breathe without pushing eight columns into a horizontal scroll. */
+  th,td{padding:6px 10px;border-bottom:1px solid rgba(15,15,20,.07);
+    text-align:left;white-space:nowrap}
+  /* The borrower name is the row's identity; every other cell is an attribute
+     of it, so only that column carries weight. */
+  tbody td:first-child{font-weight:600;color:#141414}
+  th{position:sticky;top:0;font-weight:700;font-size:11px;color:#2a2a2a;
+     letter-spacing:.04em;text-transform:uppercase;
+     background:linear-gradient(158deg,#efefef,#e2e2e2);
+     text-shadow:0 1px 0 rgba(255,255,255,.9);
+     border-bottom:0;box-shadow:inset 0 -1px 0 rgba(15,15,20,.20)}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;color:#3a3a3a}
+  tbody tr:nth-child(even){background:rgba(15,15,20,.030)}
+  tbody tr:hover{background:rgba(107,63,160,.10)}
+  tbody tr:hover td:first-child{color:#000}
+  .lender{color:#0b4f96;font-weight:600;cursor:pointer;
+    text-decoration:underline dotted rgba(11,79,150,.55);text-underline-offset:2px}
+  .lender:hover{color:#062f5c;text-decoration-color:#062f5c}
+  .kd{font-size:10.5px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:#5f5f5f}
   #tabs{display:flex;gap:6px;margin-top:10px}
   #pane{display:none;width:min(1100px,96vw);margin-top:8px;
     border:1px solid rgba(15,15,20,.15);border-radius:6px;background:#fff;
     box-shadow:0 1px 0 rgba(255,255,255,.9) inset, 1px 2px 6px rgba(15,15,20,.09);
     max-height:300px;overflow:auto}
   #pane.show{display:block}
-  #pane h3{margin:0;padding:8px 12px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
-    color:var(--mut);border-bottom:1px solid var(--line);background:#fafafa;position:sticky;top:0}
-  #pane .sql{font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#555;
-    padding:7px 12px;background:#fcfcfc;border-bottom:1px solid #eee;white-space:pre-wrap}
-  #pane p{margin:0;padding:8px 12px;font-size:11.5px;color:#555;border-bottom:1px solid #eee}
+  #pane h3{margin:0;padding:9px 13px;font-size:11.5px;font-weight:700;letter-spacing:.09em;
+    text-transform:uppercase;color:#2f2f2f;position:sticky;top:0;
+    background:linear-gradient(158deg,#f6f6f6,#e9e9e9);
+    text-shadow:0 1px 0 rgba(255,255,255,.9);
+    border-bottom:1px solid rgba(15,15,20,.16)}
+  #pane .sql{font:11px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:#3f4b57;
+    padding:9px 13px;background:#f7f8fa;white-space:pre-wrap;
+    border-bottom:1px solid rgba(15,15,20,.10);
+    box-shadow:inset 0 1px 2px rgba(15,15,20,.05)}
+  #pane p{margin:0;padding:10px 13px;font-size:12px;line-height:1.55;color:#454545;
+    border-bottom:1px solid rgba(15,15,20,.10)}
   /* The footer carries the precision claim -- the single most load-bearing
      sentence for a technical reader -- and was set at 11px in grey, smaller than
      the table it describes. 12.5px at #4a4a4a reads as a statement rather than
