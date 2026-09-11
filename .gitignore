@@ -25,3 +25,13 @@ artifact-data-verification.md
 
 # P6: the answer key stays private until the labels are in. Its sha256 is committed at
 # docs/labels_key.sha256 BEFORE labelling, which proves the strata were fixed in advance.
+
+# --- ML Lab (v1): working data, experiment tracking and the second venv stay local ---
+.venv-ml/
+ml/data/
+ml/artifacts/
+ml/mlflow/
+ml/reports/
+
+# --- macOS ---
+.DS_Store
