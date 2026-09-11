@@ -22,6 +22,9 @@ import duckdb
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "data" / "stats.json"
 
+# Every LIMITed view carries a name tiebreaker: without one, ties at the cutoff
+# (e.g. three borrowers at 208 filings) come back in a different order on each
+# run and the exported JSON is not reproducible.
 Q = {
  "headline": """
     SELECT count(*) AS filings,
@@ -39,13 +42,16 @@ Q = {
     FROM scope_all GROUP BY 1 ORDER BY 2 DESC""",
  "top_lenders": """
     SELECT lender, count(*) AS filings, count(DISTINCT borrower) AS borrowers
-    FROM scope_all WHERE lender <> '' GROUP BY 1 ORDER BY filings DESC LIMIT 12""",
+    FROM scope_all WHERE lender <> '' GROUP BY 1 ORDER BY filings DESC, lender LIMIT 12""",
  "top_borrowers": """
     SELECT borrower, region, count(*) AS filings,
            min(loan_year) AS first_year, max(loan_year) AS last_year
-    FROM scope_all GROUP BY 1,2 ORDER BY filings DESC LIMIT 12""",
- "by_decade": """
-    SELECT (CAST(loan_year AS INT)/10)*10 AS decade, count(*) AS filings
+    FROM scope_all GROUP BY 1,2 ORDER BY filings DESC, borrower, region LIMIT 12""",
+ # loan_year is VARCHAR; keep it as text so the page prints 1996, not 1,996.
+ # (The previous decade query used `/`, which is float division in DuckDB, so it
+ # emitted one float row per year anyway.)
+ "by_year": """
+    SELECT loan_year AS year, count(*) AS filings
     FROM scope_all WHERE loan_year ~ '^[0-9]{4}$' GROUP BY 1 ORDER BY 1""",
  # CROSS-SOURCE LINKAGE. The same normalised name filing in both registers.
  # These are deliberately NOT merged into one entity: a shared name across two
@@ -62,7 +68,7 @@ Q = {
     JOIN (SELECT borrower, count(*) n, min(borrower_city) city
           FROM scope_all WHERE region='CT' GROUP BY 1) ct
       ON upper(trim(co.borrower)) = upper(trim(ct.borrower))
-    ORDER BY (co.n + ct.n) DESC LIMIT 15""",
+    ORDER BY (co.n + ct.n) DESC, name LIMIT 15""",
 }
 
 

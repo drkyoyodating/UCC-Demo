@@ -714,7 +714,7 @@ function showPane(which){
   p.dataset.cur=which; p.classList.add('show');
   document.querySelectorAll('#tabs .chip').forEach(function(c){ c.classList.toggle('on',c.dataset.p===which); });
   if(which==='sql'){
-    p.innerHTML = ['by_criterion','top_lenders','top_borrowers','by_decade'].map(function(k){
+    p.innerHTML = ['by_criterion','top_lenders','top_borrowers','by_year'].map(function(k){
       return '<h3>'+k.replace(/_/g,' ')+'</h3><div class="sql">'+STATS[k].sql+'</div>'+tableHTML(STATS[k]);
     }).join('');
   } else {
