@@ -186,3 +186,39 @@ def test_labels_summary_refuses_a_disclosure_that_contradicts_its_own_rounds():
 def test_labels_summary_still_requires_the_literal_when_there_is_no_per_round_map():
     with pytest.raises(ValueError, match="disclosure must be"):
         labels_summary(_one_row_table(), "train", _manifest(disclosure="something else"))
+
+
+def test_labels_summary_names_the_policy_of_each_round_when_they_differ():
+    """'policy_version' had exactly the defect 'disclosure' had. The scalar is the config default and
+    names the PILOT's policy; on the real file main_v1 is 2880 of 3120 rows under label_policy_v2, so
+    copying the scalar states the smaller round's policy as if it covered the whole file."""
+    by_round = {"pilot_v1": "label_policy_v1", "main_v1": "label_policy_v2"}
+    block = labels_summary(_one_row_table(), "train",
+                           _manifest(policy_version="label_policy_v1", policy_version_by_round=by_round))
+    assert block["policy_version"] == "mixed by round -- main_v1: label_policy_v2; pilot_v1: label_policy_v1"
+    assert block["policy_version_by_round"] == by_round     # carried into the metrics document
+    assert block["policy_version"] != "label_policy_v1"     # the majority round is no longer misnamed
+
+
+def test_labels_summary_keeps_the_scalar_when_every_round_shares_one_policy():
+    """A single-valued map says nothing the scalar does not, so the scalar still stands."""
+    by_round = {"pilot_v1": "label_policy_v1", "main_v1": "label_policy_v1"}
+    block = labels_summary(_one_row_table(), "train", _manifest(policy_version_by_round=by_round))
+    assert block["policy_version"] == "label_policy_v1"
+    assert block["policy_version_by_round"] == by_round
+
+
+def test_labels_summary_uses_the_scalar_when_there_is_no_per_round_policy_map():
+    block = labels_summary(_one_row_table(), "train", _manifest())
+    assert block["policy_version"] == "label_policy_v1"
+    assert "policy_version_by_round" not in block
+
+
+def test_labels_summary_prefers_the_map_over_a_stale_scalar_without_raising():
+    """Unlike the disclosure, a policy scalar that disagrees with the map is NOT an error: cli.py
+    writes the config default there beside the map, so raising would refuse the pipeline's own
+    output. The map is the truth and wins."""
+    block = labels_summary(_one_row_table(), "train",
+                           _manifest(policy_version="label_policy_v1",
+                                     policy_version_by_round={"main_v1": "label_policy_v2"}))
+    assert block["policy_version"] == "label_policy_v2"

@@ -256,8 +256,26 @@ def labels_summary(table: pd.DataFrame, split: str, labels_manifest: Mapping) ->
                              f"disclosure_by_round {by_round!r}; expected {expected!r}")
     elif stated != LABEL_DISCLOSURE:
         raise ValueError(f"labels_manifest.json disclosure must be {LABEL_DISCLOSURE!r}, got {stated!r}")
+    # 'policy_version' carries the same defect the disclosure did, and is repaired the same way. The
+    # scalar is the CONFIG DEFAULT -- cli.py passes cfg.version.label_policy_version positionally and
+    # never overrides it -- so today it reads label_policy_v1, the PILOT's policy, 240 of 3120 rows,
+    # while main_v1's 2880 rows were labelled under label_policy_v2. Copying it into the block states
+    # the smaller round's policy as if it covered the whole file. The per-round map is the truth, so
+    # the pooled value is rebuilt from it exactly as pooled_disclosure rebuilds the sentence: one
+    # distinct policy collapses to that policy, several are named per round.
+    # This does NOT raise when the scalar disagrees with the map, where the disclosure above does, and
+    # the asymmetry is in how each field is WRITTEN. cli.py overrides the disclosure scalar with
+    # pooled_disclosure(disclosure_by_round), so a mismatch there can only be a tampered or stale file.
+    # The policy scalar is deliberately left as the config default beside the map, so raising on that
+    # would refuse the pipeline's own current output and stop every metrics document.
+    policy_by_round = labels_manifest.get("policy_version_by_round")
+    policy_version = labels_manifest["policy_version"]
+    if policy_by_round:
+        distinct = set(policy_by_round.values())
+        policy_version = (next(iter(distinct)) if len(distinct) == 1 else "mixed by round -- " +
+                          "; ".join(f"{r}: {v}" for r, v in sorted(policy_by_round.items())))
     sub = table[table.split == split]
-    block = {**{k: labels_manifest[k] for k in K3_LABEL_STATISTICS}, "policy_version": labels_manifest["policy_version"],
+    block = {**{k: labels_manifest[k] for k in K3_LABEL_STATISTICS}, "policy_version": policy_version,
              "split": split, "n_labelled": int(len(sub)), "n_resolved": int(sub.y.notna().sum()),
              "n_unresolved": int(sub.y.isna().sum()), "n_positive": int((sub.y == 1).sum()),
              "n_negative": int((sub.y == 0).sum())}
@@ -265,6 +283,10 @@ def labels_summary(table: pd.DataFrame, split: str, labels_manifest: Mapping) ->
         # Carried into every metrics document, so a reader sees each round's arrangement rather than
         # one phrase that covers only some of the rows.
         block["disclosure_by_round"] = dict(by_round)
+    if policy_by_round:
+        # Same reason as the disclosure map: a reader sees the policy each round was labelled under,
+        # rather than one version that is true of only some of the rows.
+        block["policy_version_by_round"] = dict(policy_by_round)
     return block
 
 
