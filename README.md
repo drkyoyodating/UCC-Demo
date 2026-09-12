@@ -136,6 +136,8 @@ output. Pins in `requirements.lock.txt` are load-bearing.
 
 **[`docs/ML_TECHNICAL_REPORT.md`](docs/ML_TECHNICAL_REPORT.md)** reports the ML screener end to end: the sampling design and design weights, the two label rounds and their different arrangements, the pre-registered evaluation protocol, and the single held-out test run. The result is negative and is reported as such — the model does not beat the frozen rules, and the rules remain authoritative.
 
+**[`docs/ML_MODEL_CARD.md`](docs/ML_MODEL_CARD.md)** is the model card for release `80b952a3e9a8`, copied byte-for-byte out of the release bundle — its sha256 matches the `SHA256SUMS` the build wrote, so it can be checked against the artefact it describes.
+
 ## Licence
 
 MIT. Source data is public record.
