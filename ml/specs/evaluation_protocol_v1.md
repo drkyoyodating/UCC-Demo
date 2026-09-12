@@ -1,6 +1,9 @@
 # Evaluation protocol v1 — pre-registered before any model is trained
 
-Status: FROZEN on commit. Changing anything below after `freeze-candidate` has run
+Status: FROZEN on commit. Amended once before any candidate was frozen, to name the
+`blind_unresolved` status added after this document was written (section 3); the amendment
+states how those rows were always going to be treated under section 2 and changes no rate,
+weight, threshold or metric. No model had been trained when it was made. Changing anything below after `freeze-candidate` has run
 requires a new protocol version and a fresh, untouched test set. Labels are
 model-labelled, founder-adjudicated, and every report says so.
 
@@ -31,8 +34,11 @@ rules-accepted ones. It never replaces the frozen rules.
 
 ## 3. Label resolution
 Only rows whose `adjudication_status` is `model_agreed`, `founder_confirmed` or
-`founder_adjudicated` count (contract K3). `blind_repeat` rows (`is_repeat = True`) are
-removed before anything is fitted or measured, and any other status stops the run.
+`founder_adjudicated` count as RESOLVED (contract K3). `blind_repeat` rows (`is_repeat = True`) are
+removed before anything is fitted or measured. A `blind_unresolved` row -- both blind passes answered
+and disagreed, and no person adjudicated it -- is an INSUFFICIENT_EVIDENCE case: excluded from
+fitting and from every rate, and KEPT in `n_h` exactly like any other unresolved case. Any status
+outside the five K3 statuses stops the run.
 RELEVANT → 1, NOT_RELEVANT → 0. INSUFFICIENT_EVIDENCE is excluded from fitting and from
 every rate but stays in `n_h`; its design-weighted share is reported by region, stratum and
 in total.
