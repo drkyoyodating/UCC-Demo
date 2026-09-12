@@ -1,0 +1,9 @@
+f01bd118fbcd35ce5d87dc1bc3444923d20b0ad9d181f1f3be8c2be8e1fde6c0  pilot_cases.parquet
+6e40c224c832e040d2eaa733ad1b39a8cc5f4d17fe5b480d4a550bea8cd3b51f  pilot_manifest.json
+b38a0880f8efe9f9cffe3d6d6ca9e9f958b7a1e49c2d11eee58549130a6b341a  queue_key_pilot_v1.csv
+408b2854e23a6c65293c93adf9076f49a028033b5b8c29ae63423a84bda6ca88  queue_pilot_v1_part_001.csv
+# Committed BEFORE any pilot_v1 label exists (contract K13). The queue chunks are exactly what
+# the blind labellers see: case_id, borrower name, lender names, city, state -- nothing else. The key
+# holds the strata, N_h, inclusion probabilities and repeat aliases and stays private. Committing every
+# hash first proves the sample, the design weights and the repeat structure were fixed in advance.
+# Labels for this round will be model-labelled, founder-adjudicated.
