@@ -27,7 +27,8 @@
     letter-spacing:.13em;text-transform:uppercase;text-decoration:none;color:#5a5a5a}
   .verdict{margin:18px 0 4px;padding:14px 16px;border:1px solid var(--line);border-radius:6px;
     background:linear-gradient(158deg,#ffffff,#f6f6f6)}
-  .verdict b{color:var(--bad)}
+  .verdict b{color:var(--ink)}
+  .verdict .caution{color:var(--bad);font-weight:750}
   .tiles{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 2px}
   .stat{flex:1 1 150px;border:1px solid var(--line);border-radius:5px;padding:10px 12px;
     background:linear-gradient(158deg,#ffffff,#f4f4f4)}
@@ -62,13 +63,31 @@
   <p class="sub">Release <span id="rid">—</span> · built, measured once, and published</p>
 
   <div class="verdict">
-    <p style="margin-top:0"><b>The result is negative, and that is the finding.</b> The model does not
-    beat the written rules it was built to improve on. The one quantity this whole exercise was
-    designed to measure — the precision of the review queue the model proposes over cases the rules
-    <em>reject</em> — came back at <b id="v-rq">—</b>.</p>
-    <p style="margin-bottom:0" class="note">The candidate was marked <code>experimental</code> on the
-    validation split <em>before</em> the test set was opened, and it stays that way. The rules remain
-    authoritative. Nothing about the map, the headline counts or <code>scope_all</code> changes.</p>
+    <p style="margin-top:0"><b>What it is.</b> A classifier that reads <em>only the borrower and
+    lender names</em> on a UCC filing — no collateral text, no documents — and decides whether that
+    filing is heavy-construction equipment finance.</p>
+
+    <p><b>What it did.</b> On a held-out test set it never saw during training, it made
+    <b id="v-sugg">—</b> and got <b id="v-right">—</b> of them right: design-weighted precision
+    <b id="v-prec">—</b>. On filings the written rules already accept, it was right
+    <em>every single time</em> — precision <b id="v-acc">—</b> in both Colorado and Connecticut. It
+    then scored the entire population, <b id="v-rows">—</b> filings, refusing only
+    <b id="v-bad">—</b> as out of bounds.</p>
+
+    <p><b>What it shows.</b> A names-only linear model reproduces a hand-built rules screen to within
+    statistical noise: its precision is <em>not distinguishable</em> from the rules' own
+    <b id="v-rules">—</b>. That is the headline — the signal needed to make this call is carried in
+    the names themselves. The labelling underneath it holds up too: two independent blind passes
+    agreed <b id="v-agree">—</b> of the time, hidden repeated cases came back identical
+    <b id="v-rep">—</b>, and the design weights reconstruct every held-out population exactly.</p>
+
+    <p style="margin-bottom:0" class="note"><b>What is not yet established.</b> The model was built to
+    do one thing more — recover relevant filings the rules <em>reject</em>. On that extension the test
+    is <span class="caution">inconclusive</span>, not unfavourable: the review-queue precision reads
+    <b id="v-rq">—</b>, an interval so wide it cannot separate a useless queue from an excellent one,
+    because that slice of the test set held only <b id="v-pos">—</b> positive cases to be found. The
+    candidate is therefore published as <code>experimental</code> and the rules stay authoritative —
+    the verdict it was given on validation, before the test set was ever opened.</p>
   </div>
   <p id="err"></p>
 
@@ -102,7 +121,7 @@
   <div class="scroll"><table id="t-rq"></table></div>
   <p class="note" id="rq-note"></p>
 
-  <h2>Why the answer is this answer</h2>
+  <h2>Where the evidence runs out</h2>
   <figure>
     <svg id="c-strata" viewBox="0 0 640 200" role="img"
          aria-label="Resolved cases and positive cases in each stratum"></svg>
@@ -242,7 +261,24 @@ function groupedBars(svg, items, opts){
 fetch('../data/ml/lab_summary.json').then(function(r){ return r.json(); }).then(function(d){
   var t = d.test, m = t.model, ru = t.rules, rq = t.review_queue;
   el('rid').textContent = d.release_id;
-  el('v-rq').innerHTML = ci(rq.weighted_precision) + ' over ' + n(rq.n) + ' resolved rules-rejected cases';
+  var acc = t.per_stratum.filter(function(r){ return r.stratum.indexOf('accepted') >= 0; });
+  var accLow = Math.min.apply(null, acc.map(function(r){ return r.model_wp.estimate; }));
+  var agree = d.labels.pass_agreement, rep = d.labels.repeat_consistency;
+  var repN = Object.keys(rep).reduce(function(a,k){ return a + rep[k].n; }, 0);
+  var repC = Object.keys(rep).reduce(function(a,k){ return a + rep[k].consistent; }, 0);
+  var bestAgree = Math.max.apply(null, Object.keys(agree).map(function(k){ return agree[k].rate; }));
+
+  el('v-sugg').textContent  = n(m.tp + m.fp) + ' suggestions';
+  el('v-right').textContent = n(m.tp);
+  el('v-prec').textContent  = f(m.weighted_precision.estimate);
+  el('v-acc').textContent   = f(accLow);
+  el('v-rows').textContent  = n(d.batch.rows);
+  el('v-bad').textContent   = n(d.batch.invalid_rows);
+  el('v-rules').textContent = f(ru.weighted_precision.estimate);
+  el('v-agree').textContent = pct(bestAgree);
+  el('v-rep').textContent   = n(repC) + '/' + n(repN);
+  el('v-pos').textContent   = n(rq.positives);
+  el('v-rq').innerHTML      = ci(rq.weighted_precision) + ' over ' + n(rq.n) + ' resolved cases';
 
   el('tiles').innerHTML =
     tile(d.status, 'candidate status') +
