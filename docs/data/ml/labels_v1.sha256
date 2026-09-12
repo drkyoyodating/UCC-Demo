@@ -1,8 +1,12 @@
 ca7d4aba82094b9f816c7c39252d1e80570a62fae855f937715b1f9341556574  labels.csv
-853d5529e40a36127ab6118069fbdecdad36387883bfb5641af034eee660a0be  labels_manifest.json
+324c350222051fdf021b78d7ccfe69e81361411498327c6b31b1b35f05478568  labels_manifest.json
 # labels.csv and labels_manifest.json for rounds pilot_v1, main_v1; labels are mixed by round -- main_v1: model-labelled, two independent blind passes, disagreements retained as unresolved; pilot_v1: model-labelled, founder-adjudicated.
 # disclosure_by_round pilot_v1: model-labelled, founder-adjudicated; main_v1: model-labelled, two independent blind passes, disagreements retained as unresolved
 # counts_by_status model_agreed=2512, founder_confirmed=0, founder_adjudicated=5, blind_unresolved=83, blind_repeat=520
 # pass_agreement pilot_v1=195/200, main_v1=2317/2400
-# founder_audit pilot_v1=0/0, main_v1=0/0
+# founder_audit pilot_v1=0/0 of 40 selected, main_v1=0/0 of 120 selected
+# labels.csv's digest is reproducible: re-run the pipeline and it matches. labels_manifest.json's is
+# NOT, and cannot be -- the manifest embeds created_at (wall clock) and git_head, so its hash moves on
+# every regeneration even when the labels are byte-identical. It is published to pin THIS file, not to
+# be re-derived. Verify labels.csv; compare the manifest by its recorded contents, not by its hash.
 # repeat_consistency pass_a=260/260, pass_b=260/260

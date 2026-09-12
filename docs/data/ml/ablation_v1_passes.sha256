@@ -5,4 +5,6 @@ c89460150c64acc9b9611c0cf18774c1c1758c9c7a3196286cc7007372d1d3c0  labeller_outpu
 # The ablation_v1 blind labeller outputs, frozen before the founder review (contract K14): two
 # independent tool-less Claude passes, one agent per queue chunk per pass; the orchestrator wrote each
 # raw CSV from the agent's structured output. The last two lines are the imported pass files.
-# Labels built from these passes are model-labelled, founder-adjudicated.
+# No labels are built from these passes. ablation_v1 is an instrument experiment over the pilot's own
+# 200 cases; labelling.rounds_in_labels excludes it, so it never enters labels.csv and is never
+# adjudicated. Its value is the comparison with pilot_v1 under the earlier brief, nothing else.

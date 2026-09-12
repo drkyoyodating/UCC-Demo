@@ -149,6 +149,38 @@ def cmd_make_pilot(ns: argparse.Namespace) -> int:
     return 0
 
 
+def _splits_digest_manifest(parquet_sha: str, split_digest: str) -> str:
+    """The published splits_v1.sha256: one checkable entry, then '# ' comments.
+
+    A published manifest must not name a path that does not exist. This file is consumed with
+    `shasum -a 256 -c`, so every non-comment line is a claim that the named file sits beside it. The
+    split digest is a CONTENT digest over the assignment -- sha256 of the sorted
+    'case_id,group_id,split' lines -- not the sha256 of any file, and no splits.digest file has ever
+    existed in this repository. Emitting it in the checkable-entry position (with the explanation
+    stuffed into the filename column) made `shasum -a 256 -c` fail on the published artefact: it
+    reported splits.digest as missing, which reads to a reader as a failed integrity check of the
+    splits themselves. It is therefore a comment carrying the command that reproduces it.
+
+    Entries-then-comments matches labeling.write_digest_file, which writes every other published
+    .sha256 in docs/data/ml. Kept here as a function, not an inline f-string, so the published file
+    can be rewritten from the frozen artefacts without re-running the draw (the splits are frozen:
+    cmd_freeze_splits redraws them and rewrites splits.parquet).
+    """
+    return (
+        f"{parquet_sha}  splits.parquet\n"
+        "# splits.parquet is the only verifiable entry in this file.\n"
+        f"# split digest: {split_digest}\n"
+        "#   sha256 over the sorted 'case_id,group_id,split' lines -- a content digest of the split\n"
+        '#   ASSIGNMENT, not of a file; it is also split_manifest.json "digest". It is a comment\n'
+        "#   because this manifest is checked with 'shasum -a 256 -c', which must not be handed a\n"
+        "#   path that does not exist. Reproduce it with:\n"
+        "#   python -c \"from ucc_ml.splitting import read_splits, split_digest; "
+        "print(split_digest(read_splits('ml/data/splits/v1/splits.parquet')))\"\n"
+        "# Committed when the splits were frozen, before any label exists. Groups are region-scoped borrower\n"
+        "# names; every group containing a pilot case is in train (contract K12).\n"
+    )
+
+
 def cmd_freeze_splits(ns: argparse.Namespace) -> int:
     from ucc_ml import dataset, splitting
     from ucc_ml.config import artefact_paths, load_config
@@ -167,12 +199,7 @@ def cmd_freeze_splits(ns: argparse.Namespace) -> int:
     write_json(paths.split_manifest, manifest)
     digest_path = paths.public_data_dir / "splits_v1.sha256"
     digest_path.parent.mkdir(parents=True, exist_ok=True)
-    digest_path.write_text(
-        f"{parquet_sha}  splits.parquet\n"
-        f"{manifest['digest']}  splits.digest (sha256 over sorted 'case_id,group_id,split' lines)\n"
-        "# Committed when the splits were frozen, before any label exists. Groups are region-scoped borrower\n"
-        "# names; every group containing a pilot case is in train (contract K12).\n"
-    )
+    digest_path.write_text(_splits_digest_manifest(parquet_sha, manifest["digest"]), encoding="utf-8")
     g, c, a = manifest["groups"], manifest["cases"], manifest["audit"]
     print(f"groups={g['total']} by_split={g['by_split']} pilot_groups={g['pilot']}")
     print(f"cases={c['total']} by_split={c['by_split']} pilot_by_split={c['pilot_by_split']}")

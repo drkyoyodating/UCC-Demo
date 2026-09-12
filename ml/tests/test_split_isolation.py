@@ -1,6 +1,7 @@
 """Zero group overlap, zero case overlap, every pilot group in train (K12), ratios honoured, digest stable."""
 import hashlib
 import json
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -86,10 +87,42 @@ def test_cli_freeze_splits(tmp_path, capsys):
     assert len(splits) == 200
     assert set(splits[splits.case_id.isin(pilot.case_id)].split) == {"train"}
     m = json.loads((tmp_path / "ml/data/splits/v1/split_manifest.json").read_text())
+    # The published manifest is consumed with 'shasum -a 256 -c', so every non-comment line is a claim
+    # that the named file sits beside it. The split digest is a content digest over the assignment, not
+    # a file: it used to occupy an entry naming 'splits.digest', which has never existed, so the check
+    # failed on the published artefact. It now rides in a comment and splits.parquet is the only entry.
     digest_file = (tmp_path / "docs/data/ml/splits_v1.sha256").read_text().splitlines()
-    assert digest_file[0].split()[0] == hashlib.sha256((tmp_path / "ml/data/splits/v1/splits.parquet").read_bytes()).hexdigest()
-    assert digest_file[1].split()[0] == m["digest"]
-    assert digest_file[2].startswith("#")
+    entries = [line for line in digest_file if not line.startswith("#")]
+    parquet = tmp_path / "ml/data/splits/v1/splits.parquet"
+    assert entries == [f"{hashlib.sha256(parquet.read_bytes()).hexdigest()}  splits.parquet"]
+    assert all((parquet.parent / line.split("  ", 1)[1]).exists() for line in entries)
+    assert m["digest"] not in "\n".join(entries)                     # never in a checkable position
+    assert any(line.startswith("#") and m["digest"] in line for line in digest_file)
+    assert digest_file[-1].startswith("#")
+
+
+def test_published_splits_manifest_has_no_unverifiable_entry():
+    """The committed docs/data/ml/splits_v1.sha256 must itself pass `shasum -a 256 -c` from the splits
+    directory: an entry naming a file that does not exist is indistinguishable, to a reader, from a
+    tampered artefact."""
+    from ucc_ml.cli import _splits_digest_manifest
+
+    repo = Path(__file__).resolve().parents[2]
+    published = repo / "docs/data/ml/splits_v1.sha256"
+    parquet = repo / "ml/data/splits/v1/splits.parquet"
+    manifest = repo / "ml/data/splits/v1/split_manifest.json"
+    if not (published.exists() and parquet.exists() and manifest.exists()):
+        pytest.skip("frozen split artefacts are not present in this checkout")
+    m = json.loads(manifest.read_text())
+    text = published.read_text()
+    entries = [line for line in text.splitlines() if not line.startswith("#")]
+    assert len(entries) == 1
+    sha, name = entries[0].split("  ", 1)
+    assert name == "splits.parquet" and (parquet.parent / name).exists()
+    assert sha == m["splits_parquet_sha256"] == hashlib.sha256(parquet.read_bytes()).hexdigest()
+    assert any(line.startswith("#") and m["digest"] in line for line in text.splitlines())
+    # byte-for-byte what the writer emits, so the published file cannot drift from the code
+    assert text == _splits_digest_manifest(sha, m["digest"])
 
 
 def test_freeze_splits_refuses_unknown_pilot_ids():

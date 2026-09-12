@@ -1,4 +1,10 @@
 f68ad5269de3b56d9e2c9008d781ef3295300d03a3ada368698e0083e7c288fa  splits.parquet
-27e7d9ee14ef67aacdf3cfa570873ac6752fb29dfa28db4fe9f4a122b0e275ae  splits.digest (sha256 over sorted 'case_id,group_id,split' lines)
+# splits.parquet is the only verifiable entry in this file.
+# split digest: 27e7d9ee14ef67aacdf3cfa570873ac6752fb29dfa28db4fe9f4a122b0e275ae
+#   sha256 over the sorted 'case_id,group_id,split' lines -- a content digest of the split
+#   ASSIGNMENT, not of a file; it is also split_manifest.json "digest". It is a comment
+#   because this manifest is checked with 'shasum -a 256 -c', which must not be handed a
+#   path that does not exist. Reproduce it with:
+#   python -c "from ucc_ml.splitting import read_splits, split_digest; print(split_digest(read_splits('ml/data/splits/v1/splits.parquet')))"
 # Committed when the splits were frozen, before any label exists. Groups are region-scoped borrower
 # names; every group containing a pilot case is in train (contract K12).

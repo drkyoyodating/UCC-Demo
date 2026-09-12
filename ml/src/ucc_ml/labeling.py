@@ -1041,7 +1041,15 @@ def write_labels_digest(public_data_dir: Path, labels_csv: Path, manifest_path: 
         *(["disclosure_by_round " + "; ".join(f"{r}: {d}" for r, d in by_round.items())] if by_round else []),
         "counts_by_status " + ", ".join(f"{s}={status[s]}" for s in ADJUDICATION_STATUSES),
         "pass_agreement " + ", ".join(f"{r}={v['agreed']}/{v['n']}" for r, v in manifest["pass_agreement"].items()),
-        "founder_audit " + ", ".join(f"{r}={v['n_confirmed']}/{v['n_audited']}" for r, v in manifest["founder_audit"].items()),
+        # n_confirmed/n_audited alone collapses to 0/0 and reads as "no audit was scheduled". 160 rows WERE
+        # selected for re-reading and none were, so the denominator has to carry n_selected or the line
+        # overstates the human check standing next to a per-round disclosure that names adjudication.
+        "founder_audit " + ", ".join(f"{r}={v['n_confirmed']}/{v['n_audited']} of {v['n_selected']} selected"
+                                     for r, v in manifest["founder_audit"].items()),
+        "labels.csv's digest is reproducible: re-run the pipeline and it matches. labels_manifest.json's is",
+        "NOT, and cannot be -- the manifest embeds created_at (wall clock) and git_head, so its hash moves on",
+        "every regeneration even when the labels are byte-identical. It is published to pin THIS file, not to",
+        "be re-derived. Verify labels.csv; compare the manifest by its recorded contents, not by its hash.",
         "repeat_consistency " + ", ".join(f"{p}={v['consistent']}/{v['n']}" for p, v in manifest["repeat_consistency"].items()),
     ]
     write_digest_file(path, [labels_csv, manifest_path], comments)
