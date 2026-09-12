@@ -1,9 +1,11 @@
 # Evaluation protocol v1 — pre-registered before any model is trained
 
-Status: FROZEN on commit. Amended once before any candidate was frozen, to name the
-`blind_unresolved` status added after this document was written (section 3); the amendment
-states how those rows were always going to be treated under section 2 and changes no rate,
-weight, threshold or metric. No model had been trained when it was made. Changing anything below after `freeze-candidate` has run
+Status: FROZEN on commit. Amended twice before any candidate was frozen, to name the
+`blind_unresolved` status added after this document was written (section 3), and to replace the
+section 2 weighting claim that a stratum carries one sampling rate, which the screened round made
+false for every held-out row. Both amendments were made with no model trained and no candidate
+frozen. The second one CHANGES THE APPLIED WEIGHT: rows now carry their own cell's rate rather
+than a stratum average, which is the unbiased weight for the design that was actually drawn. Changing anything below after `freeze-candidate` has run
 requires a new protocol version and a fresh, untouched test set. Labels are
 model-labelled, founder-adjudicated, and every report says so.
 
@@ -22,15 +24,23 @@ rules-accepted ones. It never replaces the frozen rules.
 - Evaluation population for a split S ∈ {validation, test}: every candidate whose
   group is assigned to S. For stratum h in S: `N_h` = candidates in S with stratum h;
   `n_h` = ALL non-repeat labelled cases drawn in S with stratum h, INSUFFICIENT_EVIDENCE
-  included; `w_h = N_h / n_h`, which equals 1/inclusion_probability because validation and
-  test contain no pilot case (K12) and main_v1 draws within (split, stratum) (K13).
+  included. The weight applied to a row is `1 / inclusion_probability`, the rate of the CELL it
+  was drawn from. `w_h = N_h / n_h` is reported as the stratum's average weight and is NOT
+  applied to any row: it would be the correct weight only if every case in the stratum had one
+  chance of selection, and the screened round draws within (split, stratum, cell), so one
+  stratum carries up to four rates.
   Rates use the resolved cases with these weights, so they estimate performance on the
   RESOLVABLE population of S (cases a screener could label RELEVANT or NOT_RELEVANT).
   The design-weighted INSUFFICIENT_EVIDENCE share of S and of the model's predicted
   positives is reported next to every rate.
-- The run stops if `N_h / n_h` disagrees with 1/inclusion_probability for any validation or
-  test row, or if a stratum with candidates in S has no labelled case.
-- Training weight per labelled TRAIN case: `1 / inclusion_probability`, normalised to mean 1 over fitted rows. Each row carries the rate of the cell it was actually drawn from, so a pilot row and a main row in the same stratum keep their own rates. `N_train_h / n_h` is wrong here and only looked right while every stratum had a single cell at a single rate. The validation and test guard that `w_h = N_h / n_h` equals `1/inclusion_probability` is applied to those two splits ONLY: it is false in TRAIN by construction, and silently so.
+- The run stops if the design weights of a validation or test stratum do not RECONSTRUCT its
+  population -- `sum(1 / inclusion_probability)` over the stratum's drawn cases must equal `N_h`
+  -- or if a stratum with candidates in S has no labelled case. Within a cell the rate is
+  `n_cell / pool_cell`, so the inverse probabilities sum to `pool_cell` exactly and across a
+  stratum's cells to `N_h`, because K12 puts every pilot case in TRAIN and leaves `pool_h == N_h`
+  in the held-out splits. This replaces the row-equality check, which assumed one rate per
+  stratum and was false for every held-out row once the screen existed.
+- Training weight per labelled TRAIN case: `1 / inclusion_probability`, normalised to mean 1 over fitted rows. Each row carries the rate of the cell it was actually drawn from, so a pilot row and a main row in the same stratum keep their own rates. `N_train_h / n_h` is wrong here and only looked right while every stratum had a single cell at a single rate. The validation and test reconstruction guard is applied to those two splits ONLY: in TRAIN the pilot is excluded from the main round's frame, so the weights sum to about 1.5x the population by construction, and silently so.
 
 ## 3. Label resolution
 Only rows whose `adjudication_status` is `model_agreed`, `founder_confirmed` or

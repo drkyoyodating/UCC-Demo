@@ -52,8 +52,14 @@ def test_protocol_pre_registers_the_design_the_code_implements():
         "Status: FROZEN on commit",
         "model-labelled, founder-adjudicated",
         "`CO:accepted`, `CO:rejected`, `CT:accepted`, `CT:rejected`",
-        "`n_h` = ALL non-repeat labelled cases drawn in S with stratum h, INSUFFICIENT_EVIDENCE included; `w_h = N_h / n_h`",
-        "equals 1/inclusion_probability",
+        # The sample-count definition is unchanged and still load-bearing; the weighting claim that used
+        # to be bundled into the same sentence was retired by the section 2 amendment, and is forbidden
+        # below so it cannot return.
+        "`n_h` = ALL non-repeat labelled cases drawn in S with stratum h, INSUFFICIENT_EVIDENCE included",
+        "The weight applied to a row is `1 / inclusion_probability`, the rate of the CELL it was drawn from",
+        "is NOT applied to any row",
+        "The run stops if the design weights of a validation or test stratum do not RECONSTRUCT its population",
+        "`sum(1 / inclusion_probability)` over the stratum's drawn cases must equal `N_h`",
         "RESOLVABLE population of S",
         "`1 / inclusion_probability`",
         "normalised to mean 1 over fitted rows",
@@ -71,6 +77,10 @@ def test_protocol_pre_registers_the_design_the_code_implements():
         "not multiplicity-adjusted",
     ):
         assert phrase in text, phrase
+    # A pinning test that only tracks the current text is weaker than one that also refuses the design
+    # it replaced: the stratum-level weight and its false equality must not come back unnoticed.
     for retired in ("Stratified group bootstrap", "conditional on label resolution", "1 / inclusion_probability`.",
-                    "(≥ 200 OOF positives)", "CO|accepted"):
+                    "(≥ 200 OOF positives)", "CO|accepted",
+                    "which equals 1/inclusion_probability because validation and test contain no pilot case",
+                    "The run stops if `N_h / n_h` disagrees with 1/inclusion_probability"):
         assert retired not in text, retired
