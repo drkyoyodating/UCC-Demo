@@ -595,3 +595,28 @@ def build_candidates(snapshot_dir: Path, out_dir: Path, dataset_version: str, ye
     }
     write_json(out_dir / "candidates_manifest.json", manifest)
     return manifest
+# ----------------------------------------------------------------------------- generic small-frame I/O
+
+def write_frame(df: pd.DataFrame, path: Path) -> str:
+    """Parquet for small derived frames (pilot, splits). Object columns holding Python lists become
+    list<string>; None stays null; datetime.date becomes date32. Returns the file's sha256."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    table = pa.Table.from_pandas(df, preserve_index=False)
+    pq.write_table(table, path, compression="zstd")
+    return sha256_file(path)
+
+
+def read_frame(path: Path) -> pd.DataFrame:
+    table = pq.read_table(path)
+    data = {}
+    for field in table.schema:
+        col = table.column(field.name).to_pylist()
+        if pa.types.is_list(field.type):
+            col = [list(v) if v is not None else [] for v in col]
+            data[field.name] = pd.Series(col, dtype=object)
+        elif pa.types.is_string(field.type) or pa.types.is_large_string(field.type) or pa.types.is_date(field.type):
+            data[field.name] = pd.Series(col, dtype=object)
+        else:
+            data[field.name] = col
+    return pd.DataFrame(data, columns=list(table.schema.names))

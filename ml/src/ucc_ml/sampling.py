@@ -64,3 +64,12 @@ def draw_stratified(cases: pd.DataFrame, n_per_stratum: Mapping[str, int], seed:
     if not parts:
         return pd.DataFrame(columns=list(SAMPLE_COLUMNS))
     return pd.concat(parts, ignore_index=True)[list(SAMPLE_COLUMNS)]
+def make_pilot(cases: pd.DataFrame, per_stratum: int, seed: int, purpose: str = "pilot_v1") -> pd.DataFrame:
+    """The development pilot: per_stratum cases from each of the four strata, full case columns attached."""
+    sample = draw_stratified(cases, {s: per_stratum for s in STRATA}, seed=seed, purpose=purpose)
+    merged = sample.merge(cases, on="case_id", how="left", validate="one_to_one")
+    case_cols = [c for c in cases.columns if c != "case_id"]
+    ordered = ["case_id"] + case_cols + [c for c in SAMPLE_COLUMNS if c != "case_id"]
+    merged["_order"] = [STRATA.index(s) for s in merged.sampling_stratum]
+    merged = merged.sort_values(["_order", "draw_rank"], kind="mergesort").drop(columns="_order")
+    return merged[ordered].reset_index(drop=True)

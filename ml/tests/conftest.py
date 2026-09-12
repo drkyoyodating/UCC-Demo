@@ -138,3 +138,57 @@ def snapshot_factory(tmp_path):
     def _make(tables: dict[str, list[dict]], name: str = "snap") -> Path:
         return write_snapshot(tmp_path / name, tables)
     return _make
+# --- synthetic Case rows (valid under contracts.Case, scored by the real vendored baseline) ----
+
+def make_case_row(region: str, file_id: str, name: str, lenders=(), address: str = "1 MAIN ST",
+                  city: str | None = None, state: str | None = None, zipcode: str | None = None,
+                  dataset_version: str = "v1") -> dict:
+    from datetime import date
+
+    from ucc_ml import legacy
+    from ucc_ml.contracts import make_borrower_key, make_case_id, make_group_id
+    from ucc_ml.dataset import canonical_lender_set
+
+    city = city or ("DENVER" if region == "CO" else "HARTFORD")
+    state = state or region
+    zipcode = zipcode or ("80202" if region == "CO" else "06103")
+    lenders = canonical_lender_set(lenders)
+    name_clean, suffix = legacy.normalize_name(name)
+    bk = make_borrower_key(name, address, city, state, zipcode)
+    return {
+        "case_id": make_case_id(region, file_id, bk), "dataset_version": dataset_version, "region": region,
+        "file_id": file_id, "lineage_id": None, "borrower_key": bk, "borrower_name_raw": name,
+        "borrower_name_clean": name_clean, "borrower_suffix": suffix,
+        "lender_names_raw": lenders,
+        "lender_names_clean": sorted({c for c in (legacy.normalize_name(l)[0] for l in lenders) if c}),
+        "earliest_observed_date": date(2001, 2, 3), "latest_observed_date": date(2001, 2, 3),
+        "borrower_city": city, "borrower_state": state, "borrower_zip": zipcode,
+        "source_row_count": 1, "source_filing_type": "ucc" if region == "CO" else "ORIG FIN STMT",
+        "source_status": "false" if region == "CO" else "Active",
+        "baseline_qualifies": legacy.baseline_qualifies(name, lenders),
+        "baseline_route": legacy.baseline_route(name, lenders),
+        "group_id": make_group_id(region, name_clean, name),
+    }
+
+
+def write_candidates_fixture(path: Path, rows: list[dict]) -> pd.DataFrame:
+    from ucc_ml.contracts import CASE_COLUMNS
+    from ucc_ml.dataset import validate_cases, write_candidates
+
+    df = pd.DataFrame(rows, columns=list(CASE_COLUMNS)).sort_values("case_id").reset_index(drop=True)
+    for c in ("lineage_id", "borrower_name_clean", "borrower_suffix", "source_filing_type", "source_status",
+              "borrower_city", "borrower_state", "borrower_zip"):
+        df[c] = pd.Series([v if isinstance(v, str) else None for v in df[c]], index=df.index, dtype=object)
+    validate_cases(df)
+    write_candidates(df, path)
+    return df
+
+
+def balanced_case_rows(per_stratum: int) -> list[dict]:
+    """per_stratum accepted + per_stratum rejected cases in each region; every case its own group."""
+    rows = []
+    for region in ("CO", "CT"):
+        for i in range(per_stratum):
+            rows.append(make_case_row(region, f"{region}A{i:04d}", f"ACME EXCAVATION {i} LLC", ["FIRST BANK"]))
+            rows.append(make_case_row(region, f"{region}R{i:04d}", f"SMITH LAW OFFICE {i} PC", ["FIRST BANK"]))
+    return rows

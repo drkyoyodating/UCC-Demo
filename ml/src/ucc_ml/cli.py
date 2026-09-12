@@ -39,6 +39,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("build-candidates", help="snapshot Parquet -> candidates.parquet + reconciliation")
     _add_config_arg(sp)
     sp.set_defaults(func=cmd_build_candidates)
+    sp = sub.add_parser("make-pilot", help="draw the 200-case development pilot (per_stratum x 4 strata)")
+    _add_config_arg(sp)
+    sp.set_defaults(func=cmd_make_pilot)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -63,6 +66,35 @@ def cmd_build_candidates(ns: argparse.Namespace) -> int:
     print(f"parity: {'OK' if manifest['parity_ok'] else 'FAILED -- read reconciliation.json'}")
     print(f"wrote {paths.candidates_parquet} sha256={c['sha256']}")
     return 0 if manifest["parity_ok"] else 1
+
+
+def cmd_make_pilot(ns: argparse.Namespace) -> int:
+    import hashlib
+
+    from ucc_ml import dataset, sampling
+    from ucc_ml.config import artefact_paths, load_config
+    from ucc_ml.provenance import git_head, sha256_file, utc_now_iso, write_json
+
+    cfg = load_config(ns.config)
+    paths = artefact_paths(cfg)
+    cases = dataset.read_candidates(paths.candidates_parquet)
+    pilot = sampling.make_pilot(cases, per_stratum=cfg.sampling.pilot_per_stratum, seed=cfg.seed, purpose="pilot_v1")
+    sha = dataset.write_frame(pilot, paths.pilot_cases)
+    strata = {s: {"N_h": int(g.N_h.iloc[0]), "pool_h": int(g.pool_h.iloc[0]), "n_h": int(g.n_h.iloc[0]),
+                  "inclusion_probability": float(g.inclusion_probability.iloc[0])}
+              for s, g in pilot.groupby("sampling_stratum", sort=False)}
+    manifest = {
+        "purpose": "pilot_v1", "dataset_version": cfg.version.dataset_version, "seed": cfg.seed,
+        "per_stratum": cfg.sampling.pilot_per_stratum, "strata": strata, "rows": int(len(pilot)),
+        "by_region": {k: int(v) for k, v in sorted(pilot.region.value_counts().items())},
+        "case_id_digest": hashlib.sha256(("\n".join(sorted(pilot.case_id)) + "\n").encode("utf-8")).hexdigest(),
+        "pilot_cases_sha256": sha, "candidates_sha256": sha256_file(paths.candidates_parquet),
+        "created_at": utc_now_iso(), "git_head": git_head(cfg.repo_root), "config_sha256": cfg.config_sha256,
+    }
+    write_json(paths.pilot_manifest, manifest)
+    print(f"pilot rows={len(pilot)} by_region={manifest['by_region']} strata={ {k: v['n_h'] for k, v in strata.items()} }")
+    print(f"wrote {paths.pilot_cases} sha256={sha}")
+    return 0
 
 
 # --- cmd_<name> functions are added above this line by later tasks; each imports its implementation lazily ---
