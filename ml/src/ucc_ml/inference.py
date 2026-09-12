@@ -1,0 +1,373 @@
+"""Release bundle (build / verify / load) and the shared prediction path (contract K8).
+
+Part 1 (Task 12): the immutable release directory
+  ml/artifacts/releases/<release_id>/{pipeline.joblib, model-manifest.json, threshold.json, dataset-manifest.json,
+  split-manifest.json, metrics.json, model-card.md, requirements-ml.lock.txt, SHA256SUMS}
+release_id = first 12 hex of sha256 over the concatenated bytes of the four manifests, in RELEASE_ID_MANIFESTS order.
+Manifests carry no timestamps, so the same frozen candidate always yields the same id. joblib.load happens only after
+SHA256SUMS verifies with every RELEASE_FILES name required (Codex §8, contract K8). Nothing at module level imports
+duckdb, mlflow or Plan A's dataset / splitting / labeling modules: the API imports this module.
+"""
+from __future__ import annotations
+
+import hashlib
+import shutil
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
+
+from ucc_ml.contracts import LABELLING_ROUNDS, SPLITS
+from ucc_ml.evaluation import FINAL_METRICS_NAME
+from ucc_ml.features import feature_names as _feature_names
+from ucc_ml.provenance import (
+    BundleIntegrityError,
+    read_json,
+    sha256_file,
+    utc_now_iso,
+    verify_sha256sums,
+    write_json,
+    write_sha256sums,
+)
+from ucc_ml.training import FROZEN_FILES, GUARD_FILE_NAME, PROTOCOL_PATH, VALIDATION_LOOKS_NAME, CalibratedModel
+
+RELEASE_FILES = ("pipeline.joblib", "model-manifest.json", "threshold.json", "dataset-manifest.json",
+                 "split-manifest.json", "metrics.json", "model-card.md", "requirements-ml.lock.txt")
+RELEASE_ID_MANIFESTS = ("model-manifest.json", "threshold.json", "dataset-manifest.json", "split-manifest.json")
+
+
+def compute_release_id(directory: Path) -> str:
+    h = hashlib.sha256()
+    for name in RELEASE_ID_MANIFESTS:
+        h.update((Path(directory) / name).read_bytes())
+    return h.hexdigest()[:12]
+
+
+def _fmt(x, digits: int = 3) -> str:
+    if x is None:
+        return "n/a"
+    try:
+        return f"{float(x):.{digits}f}"
+    except (TypeError, ValueError):
+        return str(x)
+
+
+def _interval(c: dict) -> str:
+    return f"{_fmt(c['estimate'])} [{_fmt(c['lower'])}, {_fmt(c['upper'])}]"
+
+
+def _ci(block: dict, key: str) -> str:
+    return _interval(block["ci"][key])
+
+
+def _ordered_rounds(by_round) -> list:
+    """Labelling rounds in LABELLING_ROUNDS order, so the card reads chronologically; unknown names last."""
+    known = [r for r in LABELLING_ROUNDS if r in by_round]
+    return known + sorted(r for r in by_round if r not in known)
+
+
+def _pool_counts(by_round, keys: tuple) -> dict:
+    return {k: sum(int((row or {}).get(k) or 0) for row in by_round.values()) for k in keys}
+
+
+def _adjudication_clause(disagreements, audit) -> str:
+    """What the founder actually did with this round's pass disagreements and its audit sample.
+
+    RENDERED, never asserted. The card used to publish the flat sentence "the founder decided every
+    disagreement and audited a sample of agreed rows". On the real labels main_v1 is
+    {"n": 83, "decided": 0, "undecided": 83} with 0 of 120 selected rows audited, so that sentence was
+    false of 2,880 of the 3,120 label rows -- and it sat one clause after a disclosure saying the
+    opposite. Every clause below comes out of founder_disagreements / founder_audit, so the card cannot
+    drift away from the file it describes."""
+    parts = []
+    if disagreements:
+        n, decided = int(disagreements.get("n") or 0), int(disagreements.get("decided") or 0)
+        undecided = int(disagreements.get("undecided") or 0)
+        if n == 0:
+            parts.append("the two blind passes agreed on every case")
+        elif undecided == 0:
+            parts.append(f"the founder decided all {decided} of the {n} pass disagreements")
+        elif decided == 0:
+            parts.append(f"all {n} pass disagreements were retained as unresolved (INSUFFICIENT_EVIDENCE, "
+                         "counted in n_h) and none was adjudicated")
+        else:
+            parts.append(f"the founder decided {decided} of the {n} pass disagreements and {undecided} "
+                         "were retained as unresolved")
+    if audit:
+        n_selected, n_audited = int(audit.get("n_selected") or 0), int(audit.get("n_audited") or 0)
+        parts.append(f"{n_audited} of the {n_selected} rows selected for the founder audit were audited"
+                     if n_selected else "no rows were selected for a founder audit")
+    return "; ".join(parts) if parts else "no adjudication statistics were recorded"
+
+
+def _label_provenance_lines(labels: dict, dataset_manifest: dict) -> list[str]:
+    """The "Labels:" bullet -- one bullet per ROUND when the rounds were labelled under different
+    arrangements, because no single sentence is true of the whole file in that case.
+
+    `labels` is the metrics document's block (training.labels_summary), which already rebuilds the pooled
+    policy from policy_version_by_round; `dataset_manifest` carries the per-round maps and the founder
+    counts. When the manifest states no disclosure map, one arrangement really does cover the file and the
+    single-sentence form is the honest rendering -- but its adjudication clause is still rendered from the
+    pooled counts rather than asserted."""
+    by_round = labels.get("disclosure_by_round") or dataset_manifest.get("disclosure_by_round")
+    policy_by_round = labels.get("policy_version_by_round") or dataset_manifest.get("policy_version_by_round") or {}
+    disagreements = dataset_manifest.get("founder_disagreements") or {}
+    audits = labels.get("founder_audit") or dataset_manifest.get("founder_audit") or {}
+    counts = labels.get("counts_by_round") or {}
+    head = (f"- Labels: policy `{labels.get('policy_version') or dataset_manifest['policy_version']}`; "
+            f"**{dataset_manifest['label_disclosure']}** — two independent blind Claude passes labelled every "
+            "case under the written policy; nothing was labelled by looking anything up.")
+    if not by_round:
+        pooled_d = _pool_counts(disagreements, ("n", "decided", "undecided")) if disagreements else None
+        pooled_a = _pool_counts(audits, ("n_selected", "n_audited")) if audits else None
+        return [f"{head} Across the rounds, {_adjudication_clause(pooled_d, pooled_a)}."]
+    out = [f"{head} The rounds were NOT labelled under one arrangement, so each is stated separately:"]
+    for r in _ordered_rounds(by_round):
+        rows = counts.get(r)
+        out.append(f"  - `{r}` ({rows:,} rows, policy `{policy_by_round.get(r, 'unrecorded')}`): " if isinstance(rows, int)
+                   else f"  - `{r}` (policy `{policy_by_round.get(r, 'unrecorded')}`): ")
+        out[-1] += f"{by_round[r]}; {_adjudication_clause(disagreements.get(r), audits.get(r))}."
+    return out
+
+
+def render_model_card(release_id: str, model_manifest: dict, threshold_doc: dict, dataset_manifest: dict,
+                      split_manifest: dict, test_metrics: dict, validation_looks: int | None) -> str:
+    ev = test_metrics["evaluation"]; m, r = ev["model"], ev["rules"]; d = ev["delta_model_minus_rules"]
+    rq, labels, verdict = ev["review_queue"], test_metrics["labels"], test_metrics["verdict"]
+    val, cal = threshold_doc["validation"], threshold_doc["calibration"]
+    sd_oof, sd_refit = model_manifest["oof_raw_score_sd"], model_manifest["refit_train_raw_score_sd"]
+    lines = [
+        f"# Model card — UCC heavy-construction relevance screener, release `{release_id}`", "",
+        "## What it is",
+        "A scikit-learn TF-IDF + logistic-regression screener over UCC borrower and lender NAMES "
+        "(word 1–2-grams on the normalised name, character 3–5-grams on the raw name, separate borrower "
+        "and lender blocks). It is a **review queue over rules-rejected cases plus a second opinion on "
+        "rules-accepted ones**. It never replaces the frozen rules, never changes `scope_all`, the headline "
+        "counts or the existing map. A score indicates evidence of relevance under the written screening "
+        "policy; it does not establish collateral, equipment ownership, loan amount, active debt or creditworthiness.", "",
+        "## Data and labels",
+        f"- Candidates: {dataset_manifest['candidates_rows']:,} filing-borrower cases (dataset `{dataset_manifest['dataset_version']}`, "
+        f"sha256 `{dataset_manifest['candidates_sha256'][:12]}…`), by region {dataset_manifest['candidates_rows_by_region']}.",
+        *_label_provenance_lines(labels, dataset_manifest),
+        f"- Label statistics: by status {labels['counts_by_status']}; by round {labels['counts_by_round']}; pass agreement "
+        f"{labels['pass_agreement']}; founder audit {labels['founder_audit']}; blind-repeat consistency {labels['repeat_consistency']}.",
+        f"- Labelled cases by split {dataset_manifest['labelled_rows_by_split']}, of which resolved (RELEVANT / NOT_RELEVANT) "
+        f"{dataset_manifest['resolved_rows_by_split']}.",
+        f"- Groups are {split_manifest['group_scope']} borrower groups; splits {split_manifest['rows_by_split']} rows / "
+        f"{split_manifest['groups_by_split']} groups.", "",
+        "## Training",
+        f"- Variant `{model_manifest['variant']}`, C = {model_manifest['C']} (grid {model_manifest['c_grid']}"
+        + (", **at a grid boundary: widening the grid is a founder decision**" if model_manifest["best_C_at_grid_boundary"] else "")
+        + f"), class_weight none, sample weight 1/inclusion_probability per row ({model_manifest['sample_weight_normalisation']}), "
+        f"seed {model_manifest['seed']}, StratifiedGroupKFold({model_manifest['cv_folds']}) inside TRAIN, selected by "
+        f"{model_manifest['selection_metric']}.",
+        f"- Calibration `{model_manifest['calibration_method']}` on group-separated out-of-fold TRAIN scores "
+        f"({_fmt(cal['oof_effective_positives'], 1)} Kish effective positives); validation weighted ECE {_fmt(cal['weighted_ece'])}, "
+        f"decision-region (score ≥ {cal['decision_region_min_score']}) weighted ECE {_fmt(cal['decision_region_weighted_ece'])} "
+        f"→ score_type `{threshold_doc['score_type']}`.",
+        f"- Out-of-fold raw-score SD {_fmt(sd_oof)} vs refit TRAIN raw-score SD {_fmt(sd_refit)} (ratio "
+        f"{_fmt(sd_refit / sd_oof if sd_oof else None)}): the calibrator learned the fold models' score scale, so a ratio "
+        "above 1 makes the refit's probabilities slightly overconfident.",
+        f"- {model_manifest['n_features']:,} features; feature policy `{model_manifest['feature_policy_version']}`; "
+        f"scikit-learn {model_manifest['sklearn_version']}, Python {model_manifest['python_version']}.", "",
+        "## Threshold (chosen on VALIDATION, before TEST)",
+        f"- Objective: max weighted recall s.t. weighted precision ≥ {threshold_doc['objective']['min_weighted_precision']} "
+        f"with ≥ {threshold_doc['objective']['min_predicted_positives']} predicted positives counted as the Kish effective "
+        "number, and a one-sided 95% lower bound of weighted precision at or above the same floor.",
+        f"- Threshold {_fmt(threshold_doc['threshold'], 4)} → status **{threshold_doc['status']}**"
+        + (f" (fallback: {threshold_doc['fallback']}; the rules remain authoritative)" if threshold_doc["status"] != "production" else "")
+        + ".",
+        f"- Validation: wP {_fmt(val['weighted_precision'])} (one-sided 95% lower bound "
+        f"{_fmt(val['precision_lower_bound_95_one_sided'])}), wR {_fmt(val['weighted_recall'])}, Kish effective predicted "
+        f"positives {_fmt(val['kish_effective_predicted_positives'], 1)}, "
+        f"{threshold_doc['validation']['predicted_positives']} predicted positives of n = {threshold_doc['validation']['n']} (selection-biased upward: the threshold was chosen on this sample; the TEST rows below are the unbiased estimate).",
+        f"- Validation was looked at {validation_looks if validation_looks is not None else 'an unrecorded number of'} "
+        "time(s) before this release.", "",
+        "## Test result (one run, held-out borrower groups, design-weighted, 95% Jeffreys cluster-bootstrap intervals)",
+        f"- Primary (pre-registered): review-queue weighted precision (model suggestions among rules-rejected cases) "
+        f"{_ci(rq['model'], 'weighted_precision')} over {rq['n']} resolved rules-rejected cases.",
+        f"- n = {ev['n']} resolved cases ({ev['positives']} positive); design-weighted unresolved share {_fmt(ev['unresolved_share']['estimate'])} [{_fmt(ev['unresolved_share']['lower'])}, {_fmt(ev['unresolved_share']['upper'])}]; unresolved share among model suggestions {_fmt(ev['unresolved_share_among_model_positive'])}.",
+        "", "| | weighted precision | weighted recall | weighted F1 | TP/FP/FN/TN |", "|---|---|---|---|---|",
+        f"| model | {_ci(m, 'weighted_precision')} | {_ci(m, 'weighted_recall')} | {_ci(m, 'weighted_f1')} | {m['tp']}/{m['fp']}/{m['fn']}/{m['tn']} |",
+        f"| frozen rules | {_ci(r, 'weighted_precision')} | {_ci(r, 'weighted_recall')} | {_ci(r, 'weighted_f1')} | {r['tp']}/{r['fp']}/{r['fn']}/{r['tn']} |",
+        "",
+        f"- Secondary: paired delta (model − rules) precision {_interval(d['delta_weighted_precision'])} "
+        f"({verdict['delta_precision']}), recall {_interval(d['delta_weighted_recall'])} ({verdict['delta_recall']}); "
+        "two comparisons, not multiplicity-adjusted.",
+        "- Per region:",
+    ]
+    for row in ev["per_region"]:
+        lines.append(f"  - {row['region']}: n={row['n']}, model wP {_ci(row['model'], 'weighted_precision')}, wR "
+                     f"{_ci(row['model'], 'weighted_recall')}; rules wP {_ci(row['rules'], 'weighted_precision')}, wR "
+                     f"{_ci(row['rules'], 'weighted_recall')}")
+    lines += [
+        "", "## Limitations",
+        "- Inputs are names only: no collateral text (CO's field is a 124-value category list, CT has none), no documents.",
+        "- Rates estimate performance on the RESOLVABLE population (cases a screener could label RELEVANT or NOT_RELEVANT), design-weighted by 1 / inclusion_probability — the sampling rate of the (split, stratum, screen cell) each case was actually drawn from, since the boundary screen puts several rates inside one stratum. N_h / n_h is reported per stratum as that stratum's AVERAGE weight and is applied to no row. The INSUFFICIENT_EVIDENCE share of the population and of the model's suggestions is reported above with its interval.",
+        "- The split is by borrower group within this snapshot; it is not a chronological forecast and not a transfer claim to other states.",
+        "- Linear feature contributions describe the model's calculation, not independent evidence about the business.",
+        "- Cross-register (CO↔CT) entity linking, entity resolution and active-loan status are out of scope (v1 screens historical observations).",
+        "", "## Reproducibility",
+        f"- Protocol `{PROTOCOL_PATH}`; source commit `{model_manifest['source_commit']}` (dirty: {model_manifest['source_dirty']}); "
+        f"config sha256 `{model_manifest['config_sha256'][:12]}…`; lock sha256 `{model_manifest['lock_sha256'][:12]}…`.",
+        f"- Digests: candidates `{model_manifest['candidates_sha256'][:12]}…`, splits `{model_manifest['splits_sha256'][:12]}…`, "
+        f"labels `{model_manifest['labels_sha256'][:12]}…`, pipeline `{model_manifest['pipeline_sha256'][:12]}…`.",
+        "- Verify: `shasum -a 256 -c SHA256SUMS` in this directory; `cat model-manifest.json threshold.json dataset-manifest.json "
+        "split-manifest.json | shasum -a 256 | cut -c1-12` reproduces the release id.", "",
+    ]
+    return "\n".join(lines)
+
+
+def run_build_release(config_path: Path) -> Path:
+    """CLI `build-release`. Requires a frozen candidate and its ONE final TEST result; returns the release directory."""
+    from ucc_ml.config import artefact_paths, load_config
+    from ucc_ml.training import build_model_table, read_plan_a_inputs, split_populations
+
+    cfg = load_config(config_path)
+    paths = artefact_paths(cfg)
+    fdir, fe_dir = paths.frozen_dir, paths.final_eval_dir
+    verify_sha256sums(fdir, required=FROZEN_FILES)
+    if not (fe_dir / GUARD_FILE_NAME).exists() or not (fe_dir / FINAL_METRICS_NAME).exists():
+        raise RuntimeError(f"no final test result in {fe_dir}: run evaluate-final before build-release")
+    guard = read_json(fe_dir / GUARD_FILE_NAME)
+    if guard["frozen_sha256sums_sha256"] != sha256_file(fdir / "SHA256SUMS"):
+        raise RuntimeError("the frozen candidate changed after the test was evaluated; the test result does not "
+                           "describe these weights. Refusing to build. A new candidate needs a fresh benchmark.")
+    if guard["metrics_sha256"] != sha256_file(fe_dir / FINAL_METRICS_NAME):
+        raise RuntimeError(f"{fe_dir / FINAL_METRICS_NAME} changed after evaluate-final wrote it; refusing to build")
+    test_metrics = read_json(fe_dir / FINAL_METRICS_NAME)
+    validation_doc = read_json(fdir / "validation-metrics.json")
+    model_manifest, threshold_doc = read_json(fdir / "model-manifest.json"), read_json(fdir / "threshold.json")
+
+    inputs = read_plan_a_inputs(paths)
+    table = build_model_table(inputs.candidates, inputs.splits, inputs.labels)
+    populations = split_populations(inputs.candidates, inputs.splits)
+    labelled = table.groupby("split").size()
+    resolved_rows = table[table.y.notna()].groupby("split").size()
+    lm = inputs.labels_manifest
+
+    # THE LABEL FILE IS PER ROUND, and this manifest is hashed into release_id -- so it has to be right
+    # BEFORE the first real bundle, not after. The scalar policy_version is the config default (cli.py
+    # passes cfg.version.label_policy_version and never overrides it): on the real labels it reads
+    # label_policy_v1 while policy_version_by_round puts main_v1 -- 2,880 of 3,120 rows -- under
+    # label_policy_v2. Publishing that scalar alone states the smaller round's policy as if it covered
+    # the file. So the map is published, and the scalar is rebuilt from it by the same rule
+    # training.labels_summary already applies: one distinct policy collapses to that policy, several are
+    # named per round. A manifest that states no map is itself the claim that every round used its
+    # scalar, so the map is written out from `rounds` rather than left silent.
+    policy_by_round = {str(k): str(v) for k, v in (lm.get("policy_version_by_round") or {}).items()}
+    if not policy_by_round:
+        policy_by_round = {str(r): str(lm["policy_version"]) for r in lm.get("rounds") or []}
+    if policy_by_round:
+        distinct = set(policy_by_round.values())
+        policy_version = (next(iter(distinct)) if len(distinct) == 1 else "mixed by round -- " +
+                          "; ".join(f"{r}: {v}" for r, v in sorted(policy_by_round.items())))
+    else:
+        policy_version = str(lm["policy_version"])
+    # The DISCLOSURE map is deliberately not invented when it is absent: one arrangement really does
+    # cover some label files, and the card's single-sentence form is the honest rendering for those.
+    # When the map IS stated, the pooled sentence is rebuilt from it and must agree exactly -- the same
+    # check training.labels_summary makes -- so a bundle can never publish a provenance sentence its own
+    # per-round map contradicts.
+    disclosure_by_round = {str(k): str(v) for k, v in (lm.get("disclosure_by_round") or {}).items()}
+    label_disclosure = str(lm["disclosure"])
+    if disclosure_by_round:
+        from ucc_ml.labeling import pooled_disclosure
+
+        expected = pooled_disclosure(disclosure_by_round)
+        if label_disclosure != expected:
+            raise RuntimeError(f"{paths.labels_manifest}: disclosure {label_disclosure!r} does not describe its own "
+                               f"disclosure_by_round; expected {expected!r}. Refusing to publish it.")
+    dataset_manifest = {
+        "dataset_version": str(inputs.candidates.dataset_version.iloc[0]) if len(inputs.candidates) else "unknown",
+        "candidates_sha256": sha256_file(paths.candidates_parquet), "candidates_rows": int(len(inputs.candidates)),
+        "candidates_rows_by_region": {str(k): int(v) for k, v in inputs.candidates.groupby("region").size().items()},
+        "labels_sha256": sha256_file(paths.labels_csv), "labels_rows_raw": int(len(inputs.labels)),
+        "labels_manifest_sha256": sha256_file(paths.labels_manifest),
+        "policy_version": policy_version, "policy_version_by_round": policy_by_round,
+        "labelled_rows_by_split": {s: int(labelled.get(s, 0)) for s in SPLITS},
+        "resolved_rows_by_split": {s: int(resolved_rows.get(s, 0)) for s in SPLITS},
+        "strata_populations": {s: populations[s] for s in ("validation", "test")},
+        "label_disclosure": label_disclosure,
+        # The model card renders what the founder actually did from these, instead of asserting it.
+        "founder_disagreements": {str(k): dict(v) for k, v in (lm.get("founder_disagreements") or {}).items()},
+        "founder_audit": {str(k): dict(v) for k, v in (lm.get("founder_audit") or {}).items()},
+        **({"disclosure_by_round": disclosure_by_round} if disclosure_by_round else {}),
+    }
+    split_manifest = {
+        "splits_sha256": sha256_file(paths.splits_parquet),
+        "rows_by_split": {str(k): int(v) for k, v in inputs.splits.groupby("split").size().items()},
+        "groups_by_split": {str(k): int(v) for k, v in inputs.splits.groupby("split").group_id.nunique().items()},
+        "group_scope": "region-scoped", "protocol": PROTOCOL_PATH,
+    }
+    looks_path = fdir.parent / VALIDATION_LOOKS_NAME
+    looks = int(read_json(looks_path)["looks"]) if looks_path.exists() else None
+
+    paths.releases_dir.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix="staging-", dir=paths.releases_dir))
+    try:
+        for name in ("pipeline.joblib", "model-manifest.json", "threshold.json"):
+            shutil.copyfile(fdir / name, staging / name)
+        write_json(staging / "dataset-manifest.json", dataset_manifest)
+        write_json(staging / "split-manifest.json", split_manifest)
+        release_id = compute_release_id(staging)
+        final_dir = paths.releases_dir / release_id
+        if final_dir.exists():
+            verify_sha256sums(final_dir, required=RELEASE_FILES)
+            if not all((final_dir / n).read_bytes() == (staging / n).read_bytes() for n in RELEASE_ID_MANIFESTS):
+                raise RuntimeError(f"{final_dir} exists with different manifests but the same id — impossible unless tampered")
+            return final_dir
+        write_json(staging / "metrics.json", {"release_id": release_id, "created_at": utc_now_iso(),
+                                              "validation": validation_doc, "test": test_metrics})
+        (staging / "model-card.md").write_text(render_model_card(release_id, model_manifest, threshold_doc, dataset_manifest,
+                                                                 split_manifest, test_metrics, looks), encoding="utf-8")
+        if not paths.lock_file.exists():
+            raise RuntimeError(f"lock file {paths.lock_file} is missing; the release must pin its environment")
+        shutil.copyfile(paths.lock_file, staging / "requirements-ml.lock.txt")
+        write_sha256sums(staging, list(RELEASE_FILES))
+        staging.rename(final_dir)
+        return final_dir
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging, ignore_errors=True)
+
+
+@dataclass
+class ReleaseBundle:
+    release_id: str
+    directory: Path
+    model: CalibratedModel
+    threshold: float
+    threshold_status: str
+    score_type: str
+    model_manifest: dict
+    threshold_manifest: dict
+    feature_names: np.ndarray
+    coef: np.ndarray
+    top_k: int = 10
+
+
+def load_release_bundle(directory: Path, *, verify: bool = True, top_k: int = 10) -> ReleaseBundle:
+    """Verify SHA256SUMS (every RELEASE_FILES name required), the directory name and the pipeline digest BEFORE joblib.load."""
+    directory = Path(directory)
+    if verify:
+        verify_sha256sums(directory, required=RELEASE_FILES)
+    release_id = compute_release_id(directory)
+    if directory.name != release_id:
+        raise ValueError(f"directory {directory.name} does not match its computed release_id {release_id}")
+    manifest = read_json(directory / "model-manifest.json")
+    if manifest["pipeline_sha256"] != sha256_file(directory / "pipeline.joblib"):
+        raise BundleIntegrityError("pipeline.joblib digest does not match model-manifest.json")
+    model = joblib.load(directory / "pipeline.joblib")
+    if not isinstance(model, CalibratedModel):
+        raise ValueError("pipeline.joblib is not a CalibratedModel")
+    threshold_doc = read_json(directory / "threshold.json")
+    names = _feature_names(model.pipeline)
+    coef = np.asarray(model.pipeline.named_steps["clf"].coef_[0], dtype=float)
+    return ReleaseBundle(release_id=release_id, directory=directory, model=model, threshold=float(threshold_doc["threshold"]),
+                         threshold_status=str(threshold_doc["status"]), score_type=str(threshold_doc["score_type"]),
+                         model_manifest=manifest, threshold_manifest=threshold_doc, feature_names=names, coef=coef,
+                         top_k=int(top_k))

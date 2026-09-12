@@ -396,3 +396,18 @@ def write_world(world: World, root: Path) -> ArtefactPaths:
     paths.lock_file.parent.mkdir(parents=True, exist_ok=True)
     paths.lock_file.write_text(SYNTHETIC_LOCK, encoding="utf-8")
     return paths
+
+
+def build_synthetic_release(root: Path) -> Path:
+    """Write make_world() and the synthetic config under root, then run the REAL train -> freeze-candidate ->
+    evaluate-final -> build-release and return the release directory (<root>/ml/artifacts/releases/<release_id>)."""
+    from ucc_ml.evaluation import run_evaluate_final
+    from ucc_ml.inference import run_build_release
+    from ucc_ml.training import run_freeze_candidate, run_train
+
+    write_world(make_world(), root)
+    config_path = write_config(root)
+    run_train(config_path)
+    run_freeze_candidate(config_path)
+    run_evaluate_final(config_path)
+    return run_build_release(config_path)
