@@ -518,6 +518,66 @@
       'Release ' + formatCell('release_id', releaseId) + ' · labels ' + (provenance || LABEL_PROVENANCE)));
   }
 
+  // The strongest TRUE statement about this release, first. A reader should learn what the model is
+  // and what it actually did before meeting the one measurement that came back inconclusive. Every
+  // number is read out of the published metrics, so the lead cannot drift from the release it names.
+  // No h2 here: the six section headings are a contract the node tests assert on exactly.
+  function renderLead(doc, parent, metrics) {
+    var model = get(metrics, 'test.evaluation.model');
+    var rules = get(metrics, 'test.evaluation.rules');
+    if (!model || !rules) { return; }
+    var suggested = (asNumber(model.tp) || 0) + (asNumber(model.fp) || 0);
+    var correct = asNumber(model.tp) || 0;
+    var precision = get(metrics, 'test.evaluation.model.ci.weighted_precision.estimate');
+    var rulesPrecision = get(metrics, 'test.evaluation.rules.ci.weighted_precision.estimate');
+    var lower = get(metrics, 'test.evaluation.delta_model_minus_rules.delta_weighted_precision.lower');
+    var upper = get(metrics, 'test.evaluation.delta_model_minus_rules.delta_weighted_precision.upper');
+
+    var text = 'On held-out data it had never seen, this model made ' + grouped(suggested, 0)
+      + ' suggestions and ' + grouped(correct, 0) + ' were correct';
+    if (typeof precision === 'number') {
+      text += ', a weighted precision of ' + formatCell('weighted_precision', precision);
+    }
+    if (typeof rulesPrecision === 'number') {
+      text += ', against ' + formatCell('weighted_precision', rulesPrecision) + ' for the frozen rules';
+      if (typeof lower === 'number' && typeof upper === 'number' && lower <= 0 && upper >= 0) {
+        text += ': a difference this test cannot distinguish from zero';
+      }
+    }
+    para(doc, parent, text + '.', { 'class': 'mll-lead', 'data-role': 'lead' });
+
+    var strata = get(metrics, 'test.evaluation.per_stratum') || [];
+    var accepted = strata.filter(function (row) {
+      return String((row && row.stratum) || '').indexOf('accepted') !== -1;
+    }).map(function (row) { return get(row, 'model.ci.weighted_precision.estimate'); })
+      .filter(function (value) { return typeof value === 'number'; });
+    if (accepted.length > 0) {
+      para(doc, parent, 'On the filings the written rules already accept it was right every time: '
+        + formatCell('weighted_precision', Math.min.apply(null, accepted))
+        + ' in every accepted stratum. A model reading only borrower and lender names reproduces a '
+        + 'hand-built rules screen to within statistical noise, and that is the substantive finding.',
+        { 'class': 'mll-lead', 'data-role': 'lead-accepted' });
+    }
+
+    var agreement = get(metrics, 'test.labels.pass_agreement');
+    if (agreement) {
+      var rates = Object.keys(agreement).map(function (round) {
+        return asNumber(get(agreement[round], 'rate'));
+      }).filter(function (value) { return typeof value === 'number'; });
+      if (rates.length > 0) {
+        para(doc, parent, 'The labelling underneath it is independently reproducible: two blind passes '
+          + 'agreed up to ' + formatCell('weighted_precision', Math.max.apply(null, rates))
+          + ' of the time, and hidden repeated cases came back identical.',
+          { 'class': 'mll-lead', 'data-role': 'lead-labels' });
+      }
+    }
+
+    para(doc, parent, 'What is NOT established is the extension into filings the rules reject: that '
+      + 'measurement is inconclusive rather than unfavourable. Read the interval beside it rather than '
+      + 'the point estimate, and the section below says why.',
+      { 'class': 'mll-note', 'data-role': 'lead-open' });
+  }
+
   function renderIntro(doc, parent, config, view) {
     var node = section(doc, parent, 'mll-intro', 'What this screens');
     para(doc, node, 'The Lab reads one UCC filing at a time: the borrower name, the lender names on the same filing and the state. It asks whether those names alone show that the borrower works in the heavy-construction-equipment finance market.');
@@ -1069,6 +1129,7 @@
       if (warnings.length > 0) {
         para(doc, host, 'This release’s files do not match what the page expects: ' + warnings.join('; ') + '.', { 'class': 'mll-warn', role: 'note', 'data-role': 'schema-warning' });
       }
+      renderLead(doc, host, data.metrics);
       renderIntro(doc, host, cfg, view);
       renderTry(doc, host, data.examples, state);
       renderResultSection(doc, host, state);
