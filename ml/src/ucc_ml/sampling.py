@@ -11,7 +11,7 @@ from collections.abc import Iterable, Mapping
 
 import pandas as pd
 
-from ucc_ml.contracts import STRATA, canonical_json, sha256_hex, stratum_name
+from ucc_ml.contracts import SPLITS, STRATA, canonical_json, sha256_hex, stratum_name
 
 #: WARNING: N_h and n_h differ only by case, and DuckDB resolves identifiers case-insensitively --
 #: read_parquet() renames the second to n_h_1 and `SELECT n_h` then returns the stratum POPULATION.
@@ -213,3 +213,47 @@ def draw_main_round(cases: pd.DataFrame, splits: pd.DataFrame, cells: pd.DataFra
                + [c for c in MAIN_ROUND_DESIGN_COLUMNS if c != "case_id"] + ["split"])
     return merged.sort_values(["split", "sampling_stratum", "screen_cell", "draw_rank"],
                               kind="mergesort")[ordered].reset_index(drop=True)
+
+
+# ============================================================================= the uniform main round
+# The screened round sub-divides a stratum into cells. A round with no screen is that same design with
+# ONE cell per stratum, so these two are thin wrappers rather than a second implementation: a second
+# one would drift from the first, and the design weights are the thing that must not drift.
+_UNSCREENED_CELL = "all"
+
+
+def _one_cell(cases: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame({"case_id": cases.case_id.to_numpy(), "screen_cell": _UNSCREENED_CELL})
+
+
+def split_stratum_populations(cases: pd.DataFrame, splits: pd.DataFrame,
+                              exclude_case_ids: Iterable[str] = ()) -> dict[str, dict[str, int]]:
+    """N_h for every (split, stratum), optionally over what is still drawable after an exclusion.
+
+    With no exclusion this is the population N_h itself. With one (the pilot, which K12 puts wholly in
+    train) it is the pool a later round may draw from, which is why held-out splits see pool_h == N_h.
+    """
+    excluded = set(exclude_case_ids)
+    frame = cases[~cases.case_id.isin(excluded)] if excluded else cases
+    per_cell = split_cell_populations(frame, splits, _one_cell(frame))
+    drawable = {split: {stratum: n for (stratum, _cell), n in cells.items()}
+                for split, cells in per_cell.items()}
+    # Built from the VOCABULARY, never from what the data happened to contain. A groupby emits no row
+    # for an empty cell, so keying the result off the observed combinations reproduces exactly the
+    # omission this is meant to prevent -- and hides it in any world dense enough that every cell is
+    # populated. The accepted strata are a small fraction of the rejected ones, so a held-out split
+    # can genuinely contain none of them; that is 0, not "no such stratum".
+    return {split: {stratum: drawable.get(split, {}).get(stratum, 0) for stratum in STRATA}
+            for split in SPLITS}
+
+
+def make_main_round(cases: pd.DataFrame, splits: pd.DataFrame, exclude_case_ids: Iterable[str],
+                    allocation: Mapping[str, Mapping[str, int]], seed: int,
+                    purpose: str = "main_v1") -> pd.DataFrame:
+    """Draw n_h per (split, stratum) with one rate per stratum: the design before any screen."""
+    cells = _one_cell(cases)
+    by_cell = {split: {(stratum, _UNSCREENED_CELL): n for stratum, n in per.items()}
+               for split, per in allocation.items()}
+    drawn = draw_main_round(cases, splits, cells, by_cell, seed=seed,
+                            exclude_case_ids=exclude_case_ids, purpose=purpose)
+    return drawn.drop(columns=["screen_cell"])
