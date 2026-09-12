@@ -106,7 +106,7 @@ def test_labels_manifest_carries_the_k3_statistics():
         assert key in manifest, key
     assert manifest["disclosure"] == "model-labelled, founder-adjudicated" and manifest["rows"] == 7
     assert manifest["counts_by_status"] == {"model_agreed": 2, "founder_confirmed": 1, "founder_adjudicated": 2,
-                                            "blind_repeat": 2}
+                                            "blind_unresolved": 0, "blind_repeat": 2}
     assert manifest["counts_by_round"] == {"pilot_v1": 5, "main_v1": 2} and manifest["cases_by_round"] == {"pilot_v1": 3, "main_v1": 2}
     assert manifest["pass_agreement"]["main_v1"] == {"n": 3, "agreed": 2, "rate": 2 / 3}
     assert manifest["founder_audit"]["pilot_v1"]["agreement_rate"] == 0.5
@@ -121,7 +121,8 @@ def test_round_report_is_k13_1():
 
     report = round_report(build_labels({"pilot_v1": PILOT, "main_v1": MAIN}), AGREEMENT, FOUNDER, "pilot_v1")
     assert report["cases"] == 3 and report["disclosure"] == "model-labelled, founder-adjudicated"
-    assert report["counts_by_status"] == {"model_agreed": 1, "founder_confirmed": 1, "founder_adjudicated": 1, "blind_repeat": 2}
+    assert report["counts_by_status"] == {"model_agreed": 1, "founder_confirmed": 1, "founder_adjudicated": 1,
+                                          "blind_unresolved": 0, "blind_repeat": 2}
     assert report["labelability"]["CT:rejected"] == {"n": 2, "insufficient": 0, "insufficient_share": 0.0}
     assert report["relevant_prevalence"]["CT:rejected"] == {"n": 2, "relevant": 1, "relevant_share": 0.5,
                                                             "resolved": 2, "relevant_share_of_resolved": 0.5}

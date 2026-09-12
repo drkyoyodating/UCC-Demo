@@ -56,6 +56,13 @@ labelling:
     yield_probe_v1: label_policy_v2
     main_v1: label_policy_v2
     queue_v1: label_policy_v2
+  rounds_in_labels: [pilot_v1, main_v1]  # ablation_v1 re-labels the pilot's OWN 200 cases to test whether
+                                         # the brief was the problem. It is an instrument experiment, never
+                                         # a label source: pooling it would label those 200 cases twice.
+  disagreement_policy_by_round:          # how a disagreement between the two blind passes is resolved
+    pilot_v1: founder                    # the 240 committed rows were founder-adjudicated; never restated
+    main_v1: unresolved                  # two independent readers disagreeing IS the finding: retained,
+                                         # never fitted, never evaluated, and disclosed as such
 
 screening:                               # the SAMPLING screen. Sets rates only; never a feature, never shown to a labeller.
   fit_split: train                       # the score is fitted on TRAIN groups only; validation and test are untouched

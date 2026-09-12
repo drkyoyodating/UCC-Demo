@@ -12,12 +12,21 @@ Identity rules (context pack §3, §6):
   case_id      = sha256(canonical_json([region, file_id, borrower_key]))
   group_id     = sha256(canonical_json([region, name_clean or "RAW:" + UPPER(TRIM(name))]))  -- region-scoped
 
-Label vocabulary (contract K3). A labels.csv row carries one of four adjudication statuses:
-  model_agreed         both blind Claude passes gave the same label; the founder did not review it
+Label vocabulary (contract K3). A labels.csv row carries one of five adjudication statuses:
+  model_agreed         both blind Claude passes gave the same label; no person reviewed it
   founder_confirmed    the founder re-read an agreed row (audit sample) and kept the label
   founder_adjudicated  the founder decided a disagreement, or overturned an agreed row
+  blind_unresolved     both passes answered and DISAGREED, and no person adjudicated it
   blind_repeat         one pass's answer on a hidden repeat; never fitted or evaluated
-There is no "pending" status: validate-labels refuses to write labels.csv while a disagreement is undecided.
+There is still no "pending" status. A round chooses one of two disagreement policies:
+  founder      a disagreement needs a founder decision; validate-labels refuses while one is blank
+  unresolved   a disagreement IS the finding -- two careful independent readers could not agree, so the
+               case is retained as INSUFFICIENT_EVIDENCE with status blind_unresolved, outside
+               RESOLVED_ADJUDICATION_STATUSES and outside RESOLVED_LABELS, and therefore never fitted
+               or evaluated. The build plan requires unresolved cases to be retained as such and
+               forbids relabelling uncertainty as a negative.
+Disclosure follows the policy, per round: a round nobody adjudicated must not be published as
+founder-adjudicated.
 """
 from __future__ import annotations
 
@@ -34,7 +43,8 @@ Region = Literal["CO", "CT"]
 BaselineRoute = Literal["lender", "borrower", "both", "neither"]
 SplitName = Literal["train", "validation", "test"]
 LabelValue = Literal["RELEVANT", "NOT_RELEVANT", "INSUFFICIENT_EVIDENCE"]
-AdjudicationStatus = Literal["model_agreed", "founder_confirmed", "founder_adjudicated", "blind_repeat"]
+AdjudicationStatus = Literal["model_agreed", "founder_confirmed", "founder_adjudicated",
+                             "blind_unresolved", "blind_repeat"]
 LabellingRound = Literal["pilot_v1", "ablation_v1", "yield_probe_v1", "main_v1", "queue_v1"]
 
 REGIONS: tuple[str, ...] = ("CO", "CT")
@@ -42,7 +52,8 @@ BASELINE_ROUTES: tuple[str, ...] = ("lender", "borrower", "both", "neither")
 LABELS: tuple[str, ...] = ("RELEVANT", "NOT_RELEVANT", "INSUFFICIENT_EVIDENCE")
 SPLITS: tuple[str, ...] = ("train", "validation", "test")
 STRATA: tuple[str, ...] = ("CO:accepted", "CO:rejected", "CT:accepted", "CT:rejected")
-ADJUDICATION_STATUSES: tuple[str, ...] = ("model_agreed", "founder_confirmed", "founder_adjudicated", "blind_repeat")
+ADJUDICATION_STATUSES: tuple[str, ...] = ("model_agreed", "founder_confirmed", "founder_adjudicated",
+                                          "blind_unresolved", "blind_repeat")
 RESOLVED_ADJUDICATION_STATUSES: tuple[str, ...] = ("model_agreed", "founder_confirmed", "founder_adjudicated")
 LABELLING_ROUNDS: tuple[str, ...] = ("pilot_v1", "ablation_v1", "yield_probe_v1", "main_v1", "queue_v1")
 
@@ -52,6 +63,13 @@ LABELLER_AGREED = "claude_blind_pass_a+claude_blind_pass_b"
 LABELLER_FOUNDER = "founder"
 PASS_LABELLERS: dict[str, str] = {"a": LABELLER_PASS_A, "b": LABELLER_PASS_B}
 LABEL_DISCLOSURE = "model-labelled, founder-adjudicated"
+#: A round whose disagreements nobody adjudicated is NOT founder-adjudicated, and saying so on a public
+#: artefact would be a false claim about provenance. The build plan requires the labelling arrangement to
+#: be disclosed as it actually was.
+LABEL_DISCLOSURE_BLIND = "model-labelled, two independent blind passes, disagreements retained as unresolved"
+DISCLOSURE_BY_DISAGREEMENT_POLICY: dict[str, str] = {"founder": LABEL_DISCLOSURE,
+                                                     "unresolved": LABEL_DISCLOSURE_BLIND}
+DISAGREEMENT_POLICIES: tuple[str, ...] = ("founder", "unresolved")
 
 #: The labeller's reason codes, by label family. The text of each is in ml/specs/label_policy_v1.md
 #: (Task 12) and a test there asserts the document lists every code below.
@@ -74,9 +92,13 @@ REASON_CODES: dict[str, tuple[str, ...]] = {
     ),
 }
 FOUNDER_REASON_CODE = "ADJUDICATED"
+#: Assigned at assembly time, never by a labeller -- like ADJUDICATED, and for the same reason: it records
+#: what the orchestrator did with two answers, not what a reader saw. It is therefore NOT in REASON_CODES,
+#: so the frozen label policies stay exactly as the labellers received them.
+UNRESOLVED_REASON_CODE = "PASSES_DISAGREED"
 ALL_REASON_CODES: tuple[str, ...] = tuple(
     code for label in LABELS for code in REASON_CODES[label]
-) + (FOUNDER_REASON_CODE,)
+) + (FOUNDER_REASON_CODE, UNRESOLVED_REASON_CODE)
 
 _HEX64 = re.compile(r"[0-9a-f]{64}")
 
@@ -252,6 +274,16 @@ class Label(BaseModel):
                 raise ValueError("a blind_repeat row is one blind pass's answer: labeller_id must be pass a or pass b")
         elif self.is_repeat:
             raise ValueError(f"is_repeat=True requires adjudication_status 'blind_repeat', not {status!r}")
+        if status == "blind_unresolved":
+            if self.label != "INSUFFICIENT_EVIDENCE":
+                raise ValueError("a blind_unresolved row is a case nobody resolved: label must be "
+                                 "INSUFFICIENT_EVIDENCE, never one of the two passes' answers")
+            if self.reason_code != UNRESOLVED_REASON_CODE:
+                raise ValueError(f"blind_unresolved rows carry reason_code {UNRESOLVED_REASON_CODE}")
+            if self.labeller_id != LABELLER_AGREED:
+                raise ValueError("a blind_unresolved row is both passes' joint output: labeller_id must "
+                                 "name the pass pair")
+            return self
         if status == "founder_adjudicated":
             if self.reason_code != FOUNDER_REASON_CODE:
                 raise ValueError("founder_adjudicated rows carry reason_code ADJUDICATED")

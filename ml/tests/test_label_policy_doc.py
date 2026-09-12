@@ -5,13 +5,19 @@ SPECS = Path(__file__).resolve().parents[1] / "specs"
 
 
 def test_policy_lists_every_label_and_reason_code():
-    from ucc_ml.contracts import ALL_REASON_CODES, LABELS
+    from ucc_ml.contracts import FOUNDER_REASON_CODE, LABELS, REASON_CODES, UNRESOLVED_REASON_CODE
 
     text = (SPECS / "label_policy_v1.md").read_text(encoding="utf-8")
     for label in LABELS:
         assert f"`{label}`" in text, label
-    for code in ALL_REASON_CODES:
-        assert f"`{code}`" in text, code
+    for label in LABELS:
+        for code in REASON_CODES[label]:
+            assert f"`{code}`" in text, code
+    # ADJUDICATED is documented on purpose: the policy describes the founder review it belongs to.
+    assert f"`{FOUNDER_REASON_CODE}`" in text
+    # PASSES_DISAGREED is not. It records what the orchestrator did with two answers, and a labeller who
+    # was offered it could use it to avoid deciding -- which is the one thing a blind pass must not do.
+    assert f"`{UNRESOLVED_REASON_CODE}`" not in text
     assert "policy_version: label_policy_v1" in text
 
 

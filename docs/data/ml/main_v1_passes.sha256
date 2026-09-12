@@ -27,4 +27,4 @@ e846317de3390421e85d956c92ab0444ccf599e60403d5b7d1b290aab0b93a8a  labeller_outpu
 # The main_v1 blind labeller outputs, frozen before the founder review (contract K14): two
 # independent tool-less Claude passes, one agent per queue chunk per pass; the orchestrator wrote each
 # raw CSV from the agent's structured output. The last two lines are the imported pass files.
-# Labels built from these passes are model-labelled, founder-adjudicated.
+# Labels built from these passes are model-labelled, two independent blind passes, disagreements retained as unresolved.

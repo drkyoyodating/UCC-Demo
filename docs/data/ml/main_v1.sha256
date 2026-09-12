@@ -17,4 +17,4 @@ b297dbd44307b0edda3a6c395c9cdd71dc27321d679bacbc1fc45348ca3d7e25  queue_main_v1_
 # the blind labellers see: case_id, borrower name, lender names, city, state -- nothing else. The key
 # holds the strata, N_h, inclusion probabilities and repeat aliases and stays private. Committing every
 # hash first proves the sample, the design weights and the repeat structure were fixed in advance.
-# Labels for this round will be model-labelled, founder-adjudicated.
+# Labels for this round will be model-labelled, two independent blind passes, disagreements retained as unresolved.

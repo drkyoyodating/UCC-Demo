@@ -49,7 +49,7 @@ def test_reason_codes_cover_every_label_and_are_unique():
     from ucc_ml.contracts import ALL_REASON_CODES, FOUNDER_REASON_CODE, LABELS, REASON_CODES
 
     assert tuple(REASON_CODES) == LABELS
-    assert len(set(ALL_REASON_CODES)) == len(ALL_REASON_CODES) == 11
+    assert len(set(ALL_REASON_CODES)) == len(ALL_REASON_CODES) == 12
     assert FOUNDER_REASON_CODE in ALL_REASON_CODES
     assert all(code.startswith(("R_", "N_", "I_")) for label in LABELS for code in REASON_CODES[label])
 
@@ -59,8 +59,15 @@ def test_label_vocabulary_is_the_k3_contract():
     from ucc_ml.config import DISCLOSURE
 
     assert typing.get_args(c.AdjudicationStatus) == c.ADJUDICATION_STATUSES == (
-        "model_agreed", "founder_confirmed", "founder_adjudicated", "blind_repeat")
+        "model_agreed", "founder_confirmed", "founder_adjudicated", "blind_unresolved", "blind_repeat")
+    # blind_unresolved is deliberately NOT resolved: nothing fits or evaluates on a case nobody settled.
     assert c.RESOLVED_ADJUDICATION_STATUSES == ("model_agreed", "founder_confirmed", "founder_adjudicated")
+    assert "blind_unresolved" not in c.RESOLVED_ADJUDICATION_STATUSES
+    assert c.UNRESOLVED_REASON_CODE == "PASSES_DISAGREED" and c.FOUNDER_REASON_CODE == "ADJUDICATED"
+    assert c.DISAGREEMENT_POLICIES == ("founder", "unresolved")
+    assert set(c.DISCLOSURE_BY_DISAGREEMENT_POLICY) == set(c.DISAGREEMENT_POLICIES)
+    # a round nobody adjudicated must never be published as founder-adjudicated
+    assert c.DISCLOSURE_BY_DISAGREEMENT_POLICY["unresolved"] != c.LABEL_DISCLOSURE
     assert typing.get_args(c.LabellingRound) == c.LABELLING_ROUNDS == (
         "pilot_v1", "ablation_v1", "yield_probe_v1", "main_v1", "queue_v1")
     assert c.LABELLER_PASS_A == "claude_blind_pass_a" and c.LABELLER_PASS_B == "claude_blind_pass_b"

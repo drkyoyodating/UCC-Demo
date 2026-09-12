@@ -90,6 +90,22 @@ def policy_version_for_round(cfg: RunConfig, round_name: str) -> str:
     return cfg.labelling.policy_version_by_round.get(round_name, cfg.version.label_policy_version)
 
 
+def disagreement_policy_for_round(cfg, round_name: str) -> str:
+    """How this round resolves a disagreement between the two blind passes: "founder" or "unresolved".
+
+    Defaults to "founder", so a round that predates this setting behaves exactly as it always did."""
+    if round_name not in LABELLING_ROUNDS:
+        raise ValueError(f"unknown labelling round {round_name!r}; expected one of {LABELLING_ROUNDS}")
+    return cfg.labelling.disagreement_policy_by_round.get(round_name, "founder")
+
+
+def disclosure_for_round(cfg, round_name: str) -> str:
+    """The provenance sentence for this round, which must describe what actually happened to it."""
+    from ucc_ml.contracts import DISCLOSURE_BY_DISAGREEMENT_POLICY
+
+    return DISCLOSURE_BY_DISAGREEMENT_POLICY[disagreement_policy_for_round(cfg, round_name)]
+
+
 def round_paths(cfg: RunConfig, round_name: str) -> RoundPaths:
     if round_name not in LABELLING_ROUNDS:
         raise ValueError(f"unknown labelling round {round_name!r}; expected one of {LABELLING_ROUNDS}")
@@ -238,13 +254,14 @@ def write_digest_file(path: Path, files: list[Path], comments: list[str]) -> str
     return sha256_file(path)
 
 
-def write_preregistration(rp: RoundPaths, part_paths: list[Path]) -> str:
+def write_preregistration(rp: RoundPaths, part_paths: list[Path],
+                          disclosure: str = LABEL_DISCLOSURE) -> str:
     comments = [
         f"Committed BEFORE any {rp.round_name} label exists (contract K13). The queue chunks are exactly what",
         "the blind labellers see: case_id, borrower name, lender names, city, state -- nothing else. The key",
         "holds the strata, N_h, inclusion probabilities and repeat aliases and stays private. Committing every",
         "hash first proves the sample, the design weights and the repeat structure were fixed in advance.",
-        f"Labels for this round will be {LABEL_DISCLOSURE}.",
+        f"Labels for this round will be {disclosure}.",
     ]
     return write_digest_file(rp.preregistration, [rp.cases, rp.manifest, rp.key, *part_paths], comments)
 
@@ -458,14 +475,15 @@ def import_round_passes(rp: RoundPaths, reason_max_chars: int) -> dict[str, pd.D
     return passes
 
 
-def write_passes_digest(rp: RoundPaths, parts: list[int]) -> str:
+def write_passes_digest(rp: RoundPaths, parts: list[int],
+                        disclosure: str = LABEL_DISCLOSURE) -> str:
     files = [rp.raw_output(letter, p) for letter in PASSES for p in parts]
     files += [rp.pass_file(letter) for letter in PASSES]
     comments = [
         f"The {rp.round_name} blind labeller outputs, frozen before the founder review (contract K14): two",
         "independent tool-less Claude passes, one agent per queue chunk per pass; the orchestrator wrote each",
         "raw CSV from the agent's structured output. The last two lines are the imported pass files.",
-        f"Labels built from these passes are {LABEL_DISCLOSURE}.",
+        f"Labels built from these passes are {disclosure}.",
     ]
     return write_digest_file(rp.passes_digest, files, comments)
 
@@ -639,7 +657,8 @@ def build_founder_workbook(review: pd.DataFrame, pass_a: pd.DataFrame, pass_b: p
 
 # ============================================================================= Task 18
 # Founder review import and the K3 assembly of one round's labels.
-from ucc_ml.contracts import FOUNDER_REASON_CODE, LABEL_COLUMNS, LABELLER_AGREED, LABELLER_FOUNDER, Label  # noqa: E402
+from ucc_ml.contracts import (FOUNDER_REASON_CODE, LABEL_COLUMNS, LABELLER_AGREED, LABELLER_FOUNDER,  # noqa: E402
+                              UNRESOLVED_REASON_CODE, Label)
 
 FOUNDER_DECISION_COLUMNS: tuple[str, ...] = (
     "case_id", "review_type", "founder_label", "founder_note", "decision", "reviewed_at",
@@ -758,15 +777,20 @@ def read_founder_decisions(path: Path) -> pd.DataFrame:
 
 
 def assemble_round_labels(pass_a: pd.DataFrame, pass_b: pd.DataFrame, decisions: pd.DataFrame, round_name: str,
-                          policy_version: str) -> pd.DataFrame:
+                          policy_version: str, disagreement_policy: str = "founder") -> pd.DataFrame:
     """One round's labels.csv rows under contract K3, each validated with contracts.Label.
 
     passes agree, no founder decision         -> model_agreed (pass A's reason, claude_blind_pass_a+claude_blind_pass_b)
     passes agree, founder confirmed           -> founder_confirmed (pass A's reason, founder)
     passes agree, founder overturned          -> founder_adjudicated (ADJUDICATED, the founder's note)
     passes disagree, founder adjudicated      -> founder_adjudicated (ADJUDICATED, the founder's note)
-    passes disagree, no founder decision      -> UndecidedDisagreements; nothing is returned
-    every hidden repeat, in each pass         -> blind_repeat (that pass's answer and labeller id)"""
+    passes disagree, no decision, "founder"   -> UndecidedDisagreements; nothing is returned
+    passes disagree, no decision, "unresolved" -> blind_unresolved (INSUFFICIENT_EVIDENCE, PASSES_DISAGREED)
+    every hidden repeat, in each pass         -> blind_repeat (that pass's answer and labeller id)
+
+    Under "unresolved" a disagreement is kept as a finding rather than forced into a label: two careful
+    independent readers could not agree, which is what INSUFFICIENT_EVIDENCE means. The row sits outside
+    RESOLVED_ADJUDICATION_STATUSES and outside RESOLVED_LABELS, so nothing fits or evaluates on it."""
     a, b = _originals(pass_a), _originals(pass_b)
     if set(a.index) != set(b.index):
         raise ValueError(f"{round_name}: pass a and pass b cover different cases")
@@ -788,10 +812,18 @@ def assemble_round_labels(pass_a: pd.DataFrame, pass_b: pd.DataFrame, decisions:
             "labeller_id": LABELLER_FOUNDER, "labelled_at": decision.reviewed_at,
             "adjudication_status": "founder_adjudicated"}
         if answer_a.label != answer_b.label:
-            if decision is None or decision.decision != "adjudicated":
+            if decision is not None and decision.decision == "adjudicated":
+                rows.append({**base, **founder_row})
+            elif disagreement_policy == "unresolved":
+                rows.append({**base, "label": "INSUFFICIENT_EVIDENCE", "reason_code": UNRESOLVED_REASON_CODE,
+                             "reason": f"pass a said {answer_a.label} ({answer_a.reason_code}); pass b said "
+                                       f"{answer_b.label} ({answer_b.reason_code}); nobody adjudicated it",
+                             "labeller_id": LABELLER_AGREED,
+                             "labelled_at": max(answer_a.labelled_at, answer_b.labelled_at),
+                             "adjudication_status": "blind_unresolved"})
+            else:
                 undecided.append(case_id)
                 continue
-            rows.append({**base, **founder_row})
         elif decision is None:
             rows.append({**base, "label": answer_a.label, "reason_code": answer_a.reason_code, "reason": answer_a.reason,
                          "labeller_id": LABELLER_AGREED, "labelled_at": max(answer_a.labelled_at, answer_b.labelled_at),
@@ -907,7 +939,7 @@ def labels_manifest(labels: pd.DataFrame, labels_sha256: str, agreements: Mappin
         pooled[letter] = {"n": int(n), "consistent": int(consistent), "rate": finite_or_none(consistent / n) if n else None}
     manifest = {
         "policy_version": policy_version,
-        "disclosure": LABEL_DISCLOSURE,
+        "disclosure": LABEL_DISCLOSURE,      # the project-level phrase; per round below, which is the truth
         "labels_sha256": labels_sha256,
         "rows": int(len(labels)),
         "rounds": rounds,
@@ -960,26 +992,53 @@ def round_report(labels: pd.DataFrame, agreement: dict, founder: dict, round_nam
     }
 
 
-def load_round_for_validation(rp: RoundPaths, policy_version: str) -> tuple[pd.DataFrame, dict, dict]:
+def load_round_for_validation(rp: RoundPaths, policy_version: str,
+                              disagreement_policy: str = "founder") -> tuple[pd.DataFrame, dict, dict]:
     """(K3 rows, agreement report, founder summary) for a round whose passes, review and decisions all exist.
 
-    Raises FileNotFoundError for a missing input and UndecidedDisagreements while a disagreement is blank."""
-    for required, what in ((rp.pass_file("a"), "pass a"), (rp.pass_file("b"), "pass b"),
-                           (rp.review_manifest, "the founder review manifest (run review-workbook)"),
-                           (rp.founder_decisions, "the founder decisions (run import-founder-review)")):
-        if not Path(required).exists():
-            raise FileNotFoundError(f"{rp.round_name}: {what} is missing: {required}")
+    Raises FileNotFoundError for a missing input and UndecidedDisagreements while a disagreement is blank.
+
+    Under the "unresolved" policy the founder decisions file is optional: nobody is asked to adjudicate,
+    so its absence is the normal case rather than a missing input. Any decisions that DO exist are still
+    honoured, so a partially reviewed round keeps every decision a person actually made."""
+    required = [(rp.pass_file("a"), "pass a"), (rp.pass_file("b"), "pass b"),
+                (rp.review_manifest, "the founder review manifest (run review-workbook)")]
+    if disagreement_policy != "unresolved":
+        required.append((rp.founder_decisions, "the founder decisions (run import-founder-review)"))
+    for path, what in required:
+        if not Path(path).exists():
+            raise FileNotFoundError(f"{rp.round_name}: {what} is missing: {path}")
     pass_a, pass_b = read_pass_file(rp.pass_file("a")), read_pass_file(rp.pass_file("b"))
-    decisions = read_founder_decisions(rp.founder_decisions)
-    labels = assemble_round_labels(pass_a, pass_b, decisions, rp.round_name, policy_version)
+    decisions = (read_founder_decisions(rp.founder_decisions) if Path(rp.founder_decisions).exists()
+                 else pd.DataFrame(columns=list(FOUNDER_DECISION_COLUMNS), dtype=object))
+    labels = assemble_round_labels(pass_a, pass_b, decisions, rp.round_name, policy_version, disagreement_policy)
     return labels, agreement_report(pass_a, pass_b, rp.round_name), founder_summary(decisions, read_json(rp.review_manifest))
+
+
+def pooled_disclosure(by_round: Mapping[str, str]) -> str:
+    """One provenance sentence for a file that may hold rounds labelled under different arrangements.
+
+    When every round shares an arrangement, that sentence is simply true of the file. When they differ,
+    naming one of them would assert something about rows it does not cover, so each round is named."""
+    if not by_round:
+        return LABEL_DISCLOSURE
+    distinct = set(by_round.values())
+    if len(distinct) == 1:
+        return next(iter(distinct))
+    return "mixed by round -- " + "; ".join(f"{r}: {d}" for r, d in sorted(by_round.items()))
 
 
 def write_labels_digest(public_data_dir: Path, labels_csv: Path, manifest_path: Path, manifest: dict) -> Path:
     path = Path(public_data_dir) / "labels_v1.sha256"
     status = manifest["counts_by_status"]
+    # The disclosure comes from the manifest, never from the module constant: this file can hold rounds
+    # that were labelled under different arrangements, and stating one of them as if it covered all of
+    # them would be a false claim about how the labels were produced.
+    by_round = manifest.get("disclosure_by_round") or {}
     comments = [
-        f"labels.csv and labels_manifest.json for rounds {', '.join(manifest['rounds'])}; labels are {LABEL_DISCLOSURE}.",
+        f"labels.csv and labels_manifest.json for rounds {', '.join(manifest['rounds'])}; "
+        f"labels are {manifest['disclosure']}.",
+        *(["disclosure_by_round " + "; ".join(f"{r}: {d}" for r, d in by_round.items())] if by_round else []),
         "counts_by_status " + ", ".join(f"{s}={status[s]}" for s in ADJUDICATION_STATUSES),
         "pass_agreement " + ", ".join(f"{r}={v['agreed']}/{v['n']}" for r, v in manifest["pass_agreement"].items()),
         "founder_audit " + ", ".join(f"{r}={v['n_confirmed']}/{v['n_audited']}" for r, v in manifest["founder_audit"].items()),

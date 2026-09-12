@@ -98,6 +98,34 @@ class Labelling(BaseModel):
     #: policy each round was labelled under; rounds absent here use version.label_policy_version.
     #: Rows of different policy versions are NEVER pooled in a reported statistic.
     policy_version_by_round: dict[str, str] = {}
+    #: how each round resolves a disagreement between the two blind passes: "founder" (a person decides;
+    #: validate-labels refuses while one is blank) or "unresolved" (the case is retained as unresolved and
+    #: never fitted or evaluated). Rounds absent here use "founder", so existing rounds are unaffected.
+    disagreement_policy_by_round: dict[str, str] = {}
+    #: which rounds contribute rows to labels.csv. Empty means "every round whose passes exist", which is
+    #: what the pipeline did before this setting. A round that RE-LABELS another round's cases is an
+    #: instrument experiment, not a label source: build_labels refuses a case labelled twice across rounds.
+    rounds_in_labels: list[str] = []
+
+    @field_validator("rounds_in_labels")
+    @classmethod
+    def _known_label_rounds(cls, v: list[str]) -> list[str]:
+        from ucc_ml.contracts import LABELLING_ROUNDS
+
+        bad = [r for r in v if r not in LABELLING_ROUNDS]
+        if bad:
+            raise ValueError(f"labelling.rounds_in_labels {bad} must be among {LABELLING_ROUNDS}")
+        return v
+
+    @field_validator("disagreement_policy_by_round")
+    @classmethod
+    def _known_disagreement_policy(cls, v: dict[str, str]) -> dict[str, str]:
+        from ucc_ml.contracts import DISAGREEMENT_POLICIES
+
+        bad = {r: p for r, p in v.items() if p not in DISAGREEMENT_POLICIES}
+        if bad:
+            raise ValueError(f"labelling.disagreement_policy_by_round {bad} must be one of {DISAGREEMENT_POLICIES}")
+        return v
 
     @field_validator("disclosure")
     @classmethod

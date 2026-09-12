@@ -202,7 +202,7 @@ def cmd_label_blind(ns: argparse.Namespace) -> int:
         labeling.write_csv(chunk, rp.queue_part(part))
         part_paths.append(rp.queue_part(part))
     key_sha = labeling.write_csv(key, rp.key)
-    labeling.write_preregistration(rp, part_paths)
+    labeling.write_preregistration(rp, part_paths, labeling.disclosure_for_round(cfg, ns.round))
     originals = key[~key.is_repeat]
     print(f"round={ns.round} cases={len(originals)} repeats={int(key.is_repeat.sum())} parts={len(chunks)} "
           f"chunk_size={chunk_size}")
@@ -296,7 +296,8 @@ def cmd_import_labels(ns: argparse.Namespace) -> int:
         originals = frame[~frame.is_repeat]
         print(f"pass {letter}: cases={len(originals)} repeats={int(frame.is_repeat.sum())} "
               f"labels={originals.label.value_counts().sort_index().to_dict()} sha256={sha}")
-    labeling.write_passes_digest(rp, labeling.queue_parts(labeling.read_key(rp.key)))
+    labeling.write_passes_digest(rp, labeling.queue_parts(labeling.read_key(rp.key)),
+                                 labeling.disclosure_for_round(cfg, ns.round))
     print(f"wrote {rp.pass_file('a')}, {rp.pass_file('b')} and {rp.passes_digest}")
     return 0
 
@@ -376,6 +377,12 @@ def cmd_validate_labels(ns: argparse.Namespace) -> int:
     paths = artefact_paths(cfg)
     rounds = [r for r in labeling.LABELLING_ROUNDS
               if any(labeling.round_paths(cfg, r).pass_file(letter).exists() for letter in labeling.PASSES)]
+    allowed = cfg.labelling.rounds_in_labels
+    if allowed:
+        skipped = [r for r in rounds if r not in allowed]
+        rounds = [r for r in rounds if r in allowed]
+        if skipped:
+            print(f"not a label source (labelling.rounds_in_labels): {', '.join(skipped)}")
     if "pilot_v1" not in rounds:
         print("REFUSED: the pilot_v1 passes have not been imported (run import-labels --round pilot_v1)")
         return 1
@@ -384,19 +391,26 @@ def cmd_validate_labels(ns: argparse.Namespace) -> int:
         rp = labeling.round_paths(cfg, round_name)
         try:
             frames[round_name], agreements[round_name], founder[round_name] = labeling.load_round_for_validation(
-                rp, labeling.policy_version_for_round(cfg, round_name))
+                rp, labeling.policy_version_for_round(cfg, round_name),
+                labeling.disagreement_policy_for_round(cfg, round_name))
         except (labeling.UndecidedDisagreements, FileNotFoundError) as exc:
             print(f"REFUSED: {exc}; labels.csv was not written")
             return 1
         for used in (rp.pass_file("a"), rp.pass_file("b"), rp.review_manifest, rp.founder_decisions):
-            inputs[str(used.relative_to(cfg.repo_root))] = sha256_file(used)
+            if used.exists():   # a round under the "unresolved" policy has no founder decisions file
+                inputs[str(used.relative_to(cfg.repo_root))] = sha256_file(used)
     labels = labeling.build_labels(frames)
     labels_sha = labeling.write_csv(labels, paths.labels_csv)
+    disclosure_by_round = {r: labeling.disclosure_for_round(cfg, r) for r in rounds}
     manifest = labeling.labels_manifest(
         labels, labels_sha, agreements, founder, cfg.version.label_policy_version,
         extra={"created_at": utc_now_iso(), "git_head": git_head(cfg.repo_root), "config_sha256": cfg.config_sha256,
                "inputs_sha256": inputs,
-               "policy_version_by_round": {r: labeling.policy_version_for_round(cfg, r) for r in rounds}})
+               "policy_version_by_round": {r: labeling.policy_version_for_round(cfg, r) for r in rounds},
+               "disagreement_policy_by_round": {r: labeling.disagreement_policy_for_round(cfg, r) for r in rounds},
+               "disclosure_by_round": disclosure_by_round,
+               # overrides the module default: this file holds more than one arrangement
+               "disclosure": labeling.pooled_disclosure(disclosure_by_round)})
     write_json(paths.labels_manifest, manifest)
     for round_name in rounds:
         rp = labeling.round_paths(cfg, round_name)
