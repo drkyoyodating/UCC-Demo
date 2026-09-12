@@ -90,7 +90,11 @@ training:
   cv_folds: 5                            # StratifiedGroupKFold inside TRAIN only
   c_grid: [0.1, 1.0, 10.0]
   class_weight: null
-  weighting: design_weight_normalised    # N_train_h / n_h per TRAIN stratum, mean 1 within each fit (Plan B protocol §2)
+  weighting: inverse_inclusion_probability_normalised   # 1/inclusion_probability per ROW, mean 1 within each fit.
+                                         # NOT N_h/n_h in TRAIN: the pilot and the main round draw the same stratum
+                                         # at different rates (CO:rejected 5.966e-05 vs 3.030e-04), and the screened
+                                         # round puts six cell rates inside one stratum. The two agree only when a
+                                         # stratum holds one cell at one rate, which is why it was invisible before.
   selection_metric: weighted_average_precision
   candidate_variant: borrower_lender     # Codex §7: the candidate production model
   max_iter: 2000
