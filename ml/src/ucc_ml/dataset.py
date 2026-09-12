@@ -19,6 +19,7 @@ No status or filing-type filter; heavy_row is never an eligibility test.
 """
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterable, Sequence
 from datetime import date
 from pathlib import Path
@@ -28,19 +29,22 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ucc_ml import legacy
+from ucc_ml import __version__, legacy
 from ucc_ml.contracts import (
     BASELINE_ROUTES,
     CASE_COLUMNS,
     REGIONS,
+    STRATA,
     Case,
     check_column,
     is_sha256_hex,
     make_borrower_key,
     make_case_id,
     make_group_id,
+    norm_key,
+    stratum_name,
 )
-from ucc_ml.provenance import sha256_file
+from ucc_ml.provenance import read_json, sha256_file, utc_now_iso, write_json
 
 SNAPSHOT_TABLES: tuple[str, ...] = ("co_filings", "co_debtors", "co_secured_parties", "ct_filings", "scope_all")
 
@@ -441,3 +445,153 @@ def read_candidates(path: Path) -> pd.DataFrame:
         dupes = sorted(set(df.case_id[df.case_id.duplicated()]))
         raise ValueError(f"{path}: column 'case_id' has {len(dupes)} duplicate value(s): {dupes[:5]}")
     return _nullable_to_object(df)
+# ----------------------------------------------------------------------------- reconciliation
+
+_EXAMPLE_CAP = 20
+
+
+def _example(region, file_id, borrower, lender=None) -> dict:
+    return {"region": region, "file_id": file_id, "borrower": borrower, "lender": lender}
+
+
+def reconcile(con: duckdb.DuckDBPyConnection, cases: pd.DataFrame) -> dict:
+    """Row-by-row parity of scope_all against the candidate cases, plus population statistics.
+
+    Every scope_all row is re-keyed with the SAME Python identity functions the cases used
+    (borrower_key over borrower/address/city/state/zip, case_id over region/fileid/key), so the
+    match is exact and the ß/trim divergence between DuckDB and Python cannot create phantom deltas.
+    """
+    scope = con.execute("SELECT * FROM scope_all").df()
+    scope = scope.astype(object).where(pd.notna(scope), None)     # None, not NaN (pandas 3 str dtype)
+    scope["case_id"] = [
+        make_case_id(r, f, make_borrower_key(b, a, c, s, z))
+        for r, f, b, a, c, s, z in zip(scope.region, scope.fileid, scope.borrower, scope.borrower_address,
+                                       scope.borrower_city, scope.borrower_state, scope.borrower_zip)
+    ]
+    scope["borrower_norm"] = [norm_key(b) for b in scope.borrower]
+    scope["lender_trim"] = [l.strip() if isinstance(l, str) else "" for l in scope.lender]
+
+    by_id = cases.set_index("case_id")
+    qualifying = cases[cases.baseline_qualifies]
+    missing, not_qual, lender_missing = [], [], []
+    for r in scope.itertuples(index=False):
+        if r.case_id not in by_id.index:
+            missing.append(_example(r.region, r.fileid, r.borrower, r.lender))
+            continue
+        case = by_id.loc[r.case_id]
+        if not bool(case.baseline_qualifies):
+            not_qual.append(_example(r.region, r.fileid, r.borrower, r.lender))
+        if r.lender_trim and r.lender_trim not in case.lender_names_raw:
+            lender_missing.append(_example(r.region, r.fileid, r.borrower, r.lender))
+
+    scope_triples_norm = scope[["region", "fileid", "borrower_norm"]].drop_duplicates()
+    qual_triples = pd.DataFrame({
+        "region": qualifying.region, "fileid": qualifying.file_id,
+        "borrower_norm": [norm_key(b) for b in qualifying.borrower_name_raw],
+    }).drop_duplicates()
+    scope_ids = set(scope.case_id)
+    extra = qualifying[~qualifying.case_id.isin(scope_ids)]
+
+    def _dist(col: str) -> dict:
+        return {region: dict(sorted(Counter(v for v in sub[col] if v is not None).most_common(20)))
+                for region, sub in cases.groupby("region")}
+
+    by_region = {}
+    for region, sub in scope.groupby("region"):
+        by_region[region] = {
+            "rows": int(len(sub)),
+            "distinct_triples_raw": int(len(sub[["fileid", "borrower"]].drop_duplicates())),
+            "distinct_triples_normalised": int(len(sub[["fileid", "borrower_norm"]].drop_duplicates())),
+        }
+    strata = Counter(stratum_name(r, q) for r, q in zip(cases.region, cases.baseline_qualifies))
+    report = {
+        "scope_all": {
+            "rows": int(len(scope)),
+            "null_lender_rows": int(sum(1 for l in scope.lender if l is None)),
+            "distinct_region_fileid": int(len(scope[["region", "fileid"]].drop_duplicates())),
+            "distinct_triples_raw": int(len(scope[["region", "fileid", "borrower"]].drop_duplicates())),
+            "distinct_triples_normalised": int(len(scope_triples_norm)),
+            "by_region": by_region,
+        },
+        "coverage": {
+            "missing_case": {"count": len(missing), "examples": missing[:_EXAMPLE_CAP]},
+            "case_not_qualifying": {"count": len(not_qual), "examples": not_qual[:_EXAMPLE_CAP]},
+            "lender_not_in_set": {"count": len(lender_missing), "examples": lender_missing[:_EXAMPLE_CAP]},
+        },
+        "counts": {
+            "qualifying_cases": int(len(qualifying)),
+            "qualifying_triples_normalised": int(len(qual_triples)),
+            "scope_all_triples_normalised": int(len(scope_triples_norm)),
+            "delta_triples": int(len(qual_triples) - len(scope_triples_norm)),
+            "scope_all_case_ids": int(len(scope_ids)),
+            "qualifying_case_ids_not_in_scope_all": {
+                "count": int(len(extra)),
+                "examples": [_example(r.region, r.file_id, r.borrower_name_raw, " | ".join(r.lender_names_raw))
+                             for r in extra.head(_EXAMPLE_CAP).itertuples(index=False)],
+            },
+        },
+        "strata": {k: int(strata.get(k, 0)) for k in STRATA},
+        "routes": {k: int(v) for k, v in sorted(Counter(cases.baseline_route).items())},
+        "source_filing_type": _dist("source_filing_type"),
+        "source_status": _dist("source_status"),
+        "parity": {
+            "ok": not missing and not not_qual,
+            "rule": "every scope_all row maps to a qualifying case (missing_case == 0 and case_not_qualifying == 0)",
+        },
+    }
+    return report
+
+
+def build_candidates(snapshot_dir: Path, out_dir: Path, dataset_version: str, year_min: str,
+                     junk: Sequence[str], provenance: dict) -> dict:
+    snapshot_dir, out_dir = Path(snapshot_dir), Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_manifest = read_json(snapshot_dir / "manifest.json")
+    con = connect_snapshot(snapshot_dir)
+    try:
+        exclusions: dict[str, dict] = {}
+        frames = []
+        for region in ("CO", "CT"):
+            obs, excl = extract_region(con, region, year_min, junk)
+            exclusions[region] = excl
+            frames.append(obs)
+            print(f"{region}: eligible_rows={excl['waterfall']['eligible_rows']:,} cases={excl['cases']:,}", flush=True)
+        cases = finalize_cases(pd.concat(frames, ignore_index=True), dataset_version)
+        if not cases.case_id.is_unique:
+            raise RuntimeError("duplicate case_id across regions")
+        n = validate_cases(cases)
+        parquet_path = out_dir / "candidates.parquet"
+        sha = write_candidates(cases, parquet_path)
+        report = reconcile(con, cases)
+    finally:
+        con.close()
+    report["exclusions"] = exclusions
+    write_json(out_dir / "reconciliation.json", report)
+    manifest = {
+        "dataset_version": dataset_version,
+        "created_at": utc_now_iso(),
+        "ucc_ml_version": __version__,
+        "git_head": provenance.get("git_head"),
+        "config_path": provenance.get("config_path"),
+        "config_sha256": provenance.get("config_sha256"),
+        "eligibility": {"year_min": year_min, "junk_addresses": list(junk)},
+        "baseline_version": legacy.BASELINE_VERSION,
+        "vendor_sha256": provenance.get("vendor"),
+        "snapshot": {
+            "dir": str(snapshot_dir),
+            "manifest_sha256": sha256_file(snapshot_dir / "manifest.json"),
+            "source_sha256": snapshot_manifest.get("source_sha256"),
+            "duckdb_version": snapshot_manifest.get("duckdb_version"),
+            "tables": {k: {"row_count": v["row_count"], "sha256": v["sha256"]}
+                       for k, v in snapshot_manifest["tables"].items()},
+        },
+        "candidates": {
+            "path": str(parquet_path), "sha256": sha, "rows": n, "columns": list(CASE_COLUMNS),
+            "by_region": {k: int(v) for k, v in sorted(Counter(cases.region).items())},
+            "by_stratum": report["strata"], "by_route": report["routes"],
+        },
+        "exclusions": exclusions,
+        "parity_ok": bool(report["parity"]["ok"]),
+    }
+    write_json(out_dir / "candidates_manifest.json", manifest)
+    return manifest

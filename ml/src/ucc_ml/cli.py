@@ -36,8 +36,33 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"ucc_ml {__version__}")
     sub = parser.add_subparsers(dest="command", metavar="<command>")
+    sp = sub.add_parser("build-candidates", help="snapshot Parquet -> candidates.parquet + reconciliation")
+    _add_config_arg(sp)
+    sp.set_defaults(func=cmd_build_candidates)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
+
+
+def cmd_build_candidates(ns: argparse.Namespace) -> int:
+    from ucc_ml import dataset, legacy
+    from ucc_ml.config import artefact_paths, load_config
+    from ucc_ml.provenance import git_head
+
+    cfg = load_config(ns.config)
+    paths = artefact_paths(cfg)
+    vendor = legacy.verify_vendor_hashes()
+    manifest = dataset.build_candidates(
+        snapshot_dir=cfg.path("snapshot_dir"), out_dir=cfg.path("candidates_dir"),
+        dataset_version=cfg.version.dataset_version, year_min=cfg.eligibility.year_min,
+        junk=cfg.eligibility.junk_addresses,
+        provenance={"config_sha256": cfg.config_sha256, "config_path": str(cfg.config_path),
+                    "git_head": git_head(cfg.repo_root), "vendor": vendor},
+    )
+    c = manifest["candidates"]
+    print(f"cases={c['rows']} by_region={c['by_region']} strata={c['by_stratum']} routes={c['by_route']}")
+    print(f"parity: {'OK' if manifest['parity_ok'] else 'FAILED -- read reconciliation.json'}")
+    print(f"wrote {paths.candidates_parquet} sha256={c['sha256']}")
+    return 0 if manifest["parity_ok"] else 1
 
 
 # --- cmd_<name> functions are added above this line by later tasks; each imports its implementation lazily ---
