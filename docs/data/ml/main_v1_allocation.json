@@ -1,0 +1,111 @@
+{
+  "allocation": {
+    "test": {
+      "CO:accepted|A1_lender_only": 60,
+      "CO:accepted|A2_name_decidable": 60,
+      "CO:rejected|B1_maker_group": 60,
+      "CO:rejected|B2_score_top": 60,
+      "CO:rejected|B3_declared_words": 60,
+      "CO:rejected|B4_remainder": 134,
+      "CT:accepted|A1_lender_only": 60,
+      "CT:accepted|A2_name_decidable": 60,
+      "CT:rejected|B1_maker_group": 60,
+      "CT:rejected|B2_score_top": 60,
+      "CT:rejected|B3_declared_words": 60,
+      "CT:rejected|B4_remainder": 66
+    },
+    "train": {
+      "CO:accepted|A1_lender_only": 100,
+      "CO:accepted|A2_name_decidable": 100,
+      "CO:rejected|B1_maker_group": 100,
+      "CO:rejected|B2_score_top": 100,
+      "CO:rejected|B3_declared_words": 100,
+      "CO:rejected|B4_remainder": 100,
+      "CT:accepted|A1_lender_only": 100,
+      "CT:accepted|A2_name_decidable": 100,
+      "CT:rejected|B1_maker_group": 100,
+      "CT:rejected|B2_score_top": 100,
+      "CT:rejected|B3_declared_words": 100,
+      "CT:rejected|B4_remainder": 100
+    },
+    "validation": {
+      "CO:accepted|A1_lender_only": 20,
+      "CO:accepted|A2_name_decidable": 20,
+      "CO:rejected|B1_maker_group": 20,
+      "CO:rejected|B2_score_top": 20,
+      "CO:rejected|B3_declared_words": 20,
+      "CO:rejected|B4_remainder": 167,
+      "CT:accepted|A1_lender_only": 20,
+      "CT:accepted|A2_name_decidable": 20,
+      "CT:rejected|B1_maker_group": 20,
+      "CT:rejected|B2_score_top": 20,
+      "CT:rejected|B3_declared_words": 20,
+      "CT:rejected|B4_remainder": 33
+    }
+  },
+  "b4_floor_per_split": 200,
+  "candidates_sha256": "0d508c2b85a7ac2b00f5ccb90049477b9df606e5f805590941ea9dbc21d1191d",
+  "created_at": "2026-09-12T05:07:05Z",
+  "founder_decision": {
+    "approved": "the sampling METHOD, in writing, on 2026-09-12",
+    "default_allocation_used_unchanged": true,
+    "instruction": "implement both and draw the main labelling round using the boundary stratified sample instead of uniform",
+    "per_cell_signature_captured_before_the_draw": false
+  },
+  "git_head": "2bb4b2f98166dc8214efab9ddb4f93202c7dad14",
+  "main_cases_sha256": "dff7a66928af8bbe549e715e56e0858ace56cb0c7994c6c0fe2679bf49c6d5e2",
+  "main_manifest_sha256": "23b9b71c5483ab9af34a17525c109c37afe6f92790e5d6dfcd1f95c4835fe11e",
+  "populations": {
+    "test": {
+      "CO:accepted|A1_lender_only": 7008,
+      "CO:accepted|A2_name_decidable": 5695,
+      "CO:rejected|B1_maker_group": 10453,
+      "CO:rejected|B2_score_top": 3090,
+      "CO:rejected|B3_declared_words": 1501,
+      "CO:rejected|B4_remainder": 149885,
+      "CT:accepted|A1_lender_only": 612,
+      "CT:accepted|A2_name_decidable": 680,
+      "CT:rejected|B1_maker_group": 1315,
+      "CT:rejected|B2_score_top": 1215,
+      "CT:rejected|B3_declared_words": 883,
+      "CT:rejected|B4_remainder": 58643
+    },
+    "train": {
+      "CO:accepted|A1_lender_only": 24663,
+      "CO:accepted|A2_name_decidable": 19199,
+      "CO:rejected|B1_maker_group": 38327,
+      "CO:rejected|B2_score_top": 10208,
+      "CO:rejected|B3_declared_words": 5248,
+      "CO:rejected|B4_remainder": 494927,
+      "CT:accepted|A1_lender_only": 2605,
+      "CT:accepted|A2_name_decidable": 3304,
+      "CT:rejected|B1_maker_group": 5307,
+      "CT:rejected|B2_score_top": 3956,
+      "CT:rejected|B3_declared_words": 3082,
+      "CT:rejected|B4_remainder": 190781
+    },
+    "validation": {
+      "CO:accepted|A1_lender_only": 6457,
+      "CO:accepted|A2_name_decidable": 4049,
+      "CO:rejected|B1_maker_group": 12138,
+      "CO:rejected|B2_score_top": 2247,
+      "CO:rejected|B3_declared_words": 1172,
+      "CO:rejected|B4_remainder": 108930,
+      "CT:accepted|A1_lender_only": 425,
+      "CT:accepted|A2_name_decidable": 577,
+      "CT:rejected|B1_maker_group": 1530,
+      "CT:rejected|B2_score_top": 923,
+      "CT:rejected|B3_declared_words": 611,
+      "CT:rejected|B4_remainder": 44611
+    }
+  },
+  "provenance_note": "Written AFTER the draw. The plan called for a separate approve-main-allocation command to record a per-cell founder signature before make-main-round drew; that command was not built, and this document does not claim one. The allocation was still fixed in public before any label existed: it is recorded inside main_manifest.json, whose sha256 is committed in docs/data/ml/main_v1.sha256 together with the cases file, the private key and all twelve blind chunks.",
+  "round": "main_v1",
+  "screen_cells_sha256": "bd29e0efd2d449b0d720df20a367cb29b18f47e8287e65892518511e71f4901d",
+  "splits_sha256": "f68ad5269de3b56d9e2c9008d781ef3295300d03a3ada368698e0083e7c288fa",
+  "totals": {
+    "test": 800,
+    "train": 1200,
+    "validation": 400
+  }
+}
