@@ -312,3 +312,149 @@ def evaluate_split(y_all, pred_model_all, pred_rules_all, strata_all, groups_all
             "bootstrap": {"method": BOOTSTRAP_METHOD, "n_resamples": n_resamples, "seed": seed, "level": level,
                           "n_clusters": int(len(clusters)),
                           "straddling_groups": int((clusters.groupby("group_id").size() > 1).sum())}}
+
+
+# ---------------------------------------------------------------------------
+# Threshold objective (protocol §6), calibration diagnostics, the probability gate, unresolved prevalence
+# ---------------------------------------------------------------------------
+
+
+def decide_from_scores(scores, threshold: float) -> np.ndarray:
+    return (np.asarray(scores, dtype=float) >= float(threshold)).astype(int)
+
+
+@dataclass
+class ThresholdSelection:
+    threshold: float
+    status: str                      # 'production' | 'experimental'
+    weighted_precision: float | None
+    weighted_recall: float | None
+    weighted_f1: float | None
+    predicted_positives: int
+    weighted_predicted_positives: float
+    n: int
+    positives: int
+    objective: dict
+    fallback: str | None
+    curve: list[dict] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {"threshold": self.threshold, "status": self.status,
+                "weighted_precision": self.weighted_precision, "weighted_recall": self.weighted_recall,
+                "weighted_f1": self.weighted_f1, "predicted_positives": self.predicted_positives,
+                "weighted_predicted_positives": self.weighted_predicted_positives, "n": self.n,
+                "positives": self.positives, "objective": self.objective, "fallback": self.fallback,
+                "curve": self.curve}
+
+
+def select_threshold(scores, y, w, *, min_weighted_precision: float, min_predicted_positives: int) -> ThresholdSelection:
+    """Max weighted recall s.t. weighted precision >= floor with >= min_predicted_positives
+    labelled cases at/above the threshold (unweighted count here; freeze-candidate then checks the Kish
+    effective count and the one-sided lower bound at the chosen threshold). Ties → higher precision, then
+    higher threshold. If nothing qualifies: 'experimental', threshold = best weighted F1 among thresholds
+    with enough predicted positives, or 0.5 when even that is impossible."""
+    scores = np.asarray(scores, dtype=float); y = _as_int_array(y); w = np.asarray(w, dtype=float)
+    objective = {"min_weighted_precision": float(min_weighted_precision),
+                 "min_predicted_positives": int(min_predicted_positives), "selected_on": "validation"}
+    curve: list[dict] = []
+    for t in np.unique(scores)[::-1]:
+        m = weighted_metrics(y, decide_from_scores(scores, t), w)
+        curve.append({"threshold": float(t), "predicted_positives": m["predicted_positives"],
+                      "weighted_predicted_positives": m["weighted_predicted_positives"],
+                      "weighted_precision": m["weighted_precision"], "weighted_recall": m["weighted_recall"],
+                      "weighted_f1": m["weighted_f1"]})
+    supported = [c for c in curve if c["predicted_positives"] >= min_predicted_positives]
+    feasible = [c for c in supported if c["weighted_precision"] is not None and c["weighted_precision"] >= min_weighted_precision]
+    n = int(len(y)); positives = int((y == 1).sum())
+
+    def _build(c: dict, status: str, fallback: str | None) -> ThresholdSelection:
+        return ThresholdSelection(threshold=c["threshold"], status=status, weighted_precision=c["weighted_precision"],
+                                  weighted_recall=c["weighted_recall"], weighted_f1=c["weighted_f1"],
+                                  predicted_positives=c["predicted_positives"],
+                                  weighted_predicted_positives=c["weighted_predicted_positives"], n=n,
+                                  positives=positives, objective=objective, fallback=fallback, curve=curve)
+
+    if feasible:
+        best = max(feasible, key=lambda c: (c["weighted_recall"], c["weighted_precision"], c["threshold"]))
+        return _build(best, "production", None)
+    if supported:
+        best = max(supported, key=lambda c: (c["weighted_f1"] if c["weighted_f1"] is not None else -1.0, c["threshold"]))
+        return _build(best, "experimental", "max_weighted_f1_with_min_predicted_positives")
+    m = weighted_metrics(y, decide_from_scores(scores, 0.5), w)
+    fallback = {"threshold": 0.5, "predicted_positives": m["predicted_positives"],
+                "weighted_predicted_positives": m["weighted_predicted_positives"],
+                "weighted_precision": m["weighted_precision"], "weighted_recall": m["weighted_recall"],
+                "weighted_f1": m["weighted_f1"]}
+    return _build(fallback, "experimental", "insufficient_predicted_positives")
+
+
+def weighted_ece(y, p, w, n_bins: int = 10) -> dict:
+    """Weighted expected calibration error over equal-width bins on [0, 1]."""
+    y = _as_int_array(y); p = np.asarray(p, dtype=float); w = np.asarray(w, dtype=float)
+    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    idx = np.clip(np.digitize(p, edges[1:-1], right=False), 0, n_bins - 1)
+    total_w = float(w.sum())
+    bins, ece = [], 0.0
+    for b in range(n_bins):
+        mask = idx == b
+        wb = float(w[mask].sum())
+        if wb > 0:
+            mean_score = float((w[mask] * p[mask]).sum() / wb)
+            observed = float((w[mask] * y[mask]).sum() / wb)
+            ece += (wb / total_w) * abs(observed - mean_score)
+        else:
+            mean_score, observed = None, None
+        bins.append({"lo": float(edges[b]), "hi": float(edges[b + 1]), "n": int(mask.sum()),
+                     "weight_share": (wb / total_w) if total_w else 0.0, "mean_score": mean_score,
+                     "observed_rate": observed})
+    return {"ece": float(ece), "n_bins": int(n_bins), "bins": bins}
+
+
+def probability_gate(y, p, w, *, n_bins: int = 10, max_ece: float = 0.10, decision_score: float = 0.3,
+                     max_decision_ece: float = 0.15, min_decision_cases: int = 20) -> dict:
+    """Design weights put most validation weight near score 0, where overall ECE says little about the decision region.
+    A score is called a probability only when the overall AND the decision-region weighted ECE are small."""
+    y = _as_int_array(y); p = np.asarray(p, dtype=float); w = np.asarray(w, dtype=float)
+    overall = weighted_ece(y, p, w, n_bins)["ece"]
+    region = p >= decision_score
+    decision = weighted_ece(y[region], p[region], w[region], n_bins)["ece"] if int(region.sum()) >= min_decision_cases else None
+    ok = overall <= max_ece and decision is not None and decision <= max_decision_ece
+    return {"weighted_ece": overall, "decision_region_weighted_ece": decision, "decision_score": decision_score,
+            "decision_region_cases": int(region.sum()), "score_type": "calibrated_probability" if ok else "raw_score"}
+
+
+def precision_lower_bound(y_all, pred_model_all, pred_rules_all, strata_all, groups_all, N_h, weights, *,
+                          n_resamples: int, seed: int, alpha: float = 0.05):
+    """One-sided (1 - alpha) lower bound of design-weighted precision from the protocol §5 draws (None: no positives).
+
+    Takes the caller's per-row design weight for the same reason evaluate_split does: it cannot be derived from N_h
+    and a stratum count, which give only the stratum average the protocol forbids applying to a row."""
+    draws = jeffreys_cluster_draws(y_all, pred_model_all, pred_rules_all, strata_all, groups_all, N_h, weights,
+                                   n_resamples=n_resamples, seed=seed)
+    prec = draws_to_rates(draws, sorted(draws))["model"]["weighted_precision"]
+    return None if np.isnan(prec).all() else float(np.nanpercentile(prec, 100 * alpha))
+
+
+def unresolved_prevalence(table: pd.DataFrame, N_h: Mapping[str, int], pred=None) -> list[dict]:
+    """INSUFFICIENT_EVIDENCE share per (region, stratum) and an N_h-weighted total for ONE split; ``table`` holds every
+    non-repeat labelled row of that split. ``pred`` (aligned to ``table``) adds the weighted share among predicted positives."""
+    rows = []
+    for (region, stratum), sub in table.groupby(["region", "stratum"], sort=True):
+        n_unres = int(sub.y.isna().sum())
+        rows.append({"region": str(region), "stratum": str(stratum), "n_labelled": int(len(sub)), "n_unresolved": n_unres,
+                     "share_unresolved": (n_unres / len(sub)) if len(sub) else None})
+    covered = [r for r in rows if r["share_unresolved"] is not None]
+    total_N = float(sum(N_h[r["stratum"]] for r in covered))
+    total = {"region": "total", "stratum": "all", "n_labelled": int(len(table)), "n_unresolved": int(table.y.isna().sum()),
+             "share_unresolved": (sum(N_h[r["stratum"]] * r["share_unresolved"] for r in covered) / total_N) if total_N else None,
+             "weighting": "N_h-weighted over strata"}
+    if pred is not None:
+        # The row's own cell rate, not N_h / n_h. That stratum average is the retired weight, and this is the
+        # third place it was rebuilt; here it would have skewed the unresolved share among the model's
+        # predicted positives -- precisely the figure a reviewer of the queue is told to expect.
+        w = (1.0 / table.inclusion_probability.astype(float)).to_numpy()
+        pp = np.asarray(pred, dtype=int) == 1
+        total["share_unresolved_among_predicted_positive"] = (float((w * (pp & table.y.isna().to_numpy())).sum() / (w * pp).sum())
+                                                              if pp.any() else None)
+    rows.append(total)
+    return rows
