@@ -441,8 +441,15 @@ def unresolved_prevalence(table: pd.DataFrame, N_h: Mapping[str, int], pred=None
     rows = []
     for (region, stratum), sub in table.groupby(["region", "stratum"], sort=True):
         n_unres = int(sub.y.isna().sum())
+        # The WITHIN-stratum share is design-weighted too. An unweighted count ratio is the right
+        # estimator only if every case in the stratum had one chance of selection, and the screen made
+        # that false: this function's other figure was already repaired to the row's own cell rate, so
+        # leaving this one unweighted published two unresolved numbers computed two different ways.
+        # The across-stratum N_h weighting below is correct and unchanged. Raw counts stay beside it.
+        w = (1.0 / sub.inclusion_probability.astype(float)).to_numpy()
+        share = float((w * sub.y.isna().to_numpy()).sum() / w.sum()) if len(sub) else None
         rows.append({"region": str(region), "stratum": str(stratum), "n_labelled": int(len(sub)), "n_unresolved": n_unres,
-                     "share_unresolved": (n_unres / len(sub)) if len(sub) else None})
+                     "share_unresolved": share})
     covered = [r for r in rows if r["share_unresolved"] is not None]
     total_N = float(sum(N_h[r["stratum"]] for r in covered))
     total = {"region": "total", "stratum": "all", "n_labelled": int(len(table)), "n_unresolved": int(table.y.isna().sum()),

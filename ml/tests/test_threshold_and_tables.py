@@ -137,6 +137,8 @@ def test_unresolved_prevalence_weights_the_total_by_stratum_population():
                           "y": [np.nan] + [1.0] * 9 + [np.nan] * 5 + [0.0] * 5})
     pred = [1] * 5 + [0] * 5 + [1] + [0] * 4 + [1] + [0] * 4
     rows = unresolved_prevalence(table, {"CO:accepted": 100, "CO:rejected": 900}, pred=pred)
+    # single-rate fixture, so the design-weighted within-stratum share equals the count ratio here;
+    # test_bootstrap.py covers the multi-rate case where they diverge.
     assert rows[0] == {"region": "CO", "stratum": "CO:accepted", "n_labelled": 10, "n_unresolved": 1, "share_unresolved": 0.1}
     total = rows[-1]
     assert total["share_unresolved"] == pytest.approx((100 * 0.1 + 900 * 0.5) / 1000)      # unweighted pooling: 0.30
@@ -167,3 +169,23 @@ def test_evaluate_split_report_on_the_synthetic_world():
     assert {r["stratum"] for r in report["weights"]} == set(STRATA)
     assert report["review_queue"]["n"] == int((ok & val.stratum.str.endswith(":rejected").to_numpy()).sum())
     assert canonical_json_bytes(report)
+
+
+def test_the_within_stratum_unresolved_share_is_design_weighted():
+    """Two cells, 9x apart in rate, with the unresolved cases concentrated in the lightly sampled one.
+    An unweighted count ratio reports the sample's composition; the design-weighted share reports the
+    population's. Measured on the real data the two differ by up to 0.24 in a rejected stratum."""
+    table = pd.DataFrame({
+        "region": ["CO"] * 20,
+        "stratum": ["CO:rejected"] * 20,
+        # boundary cell: 10 drawn from 100. remainder: 10 drawn from 900. sum(1/pi) = 1000 = N_h.
+        "inclusion_probability": [10 / 100] * 10 + [10 / 900] * 10,
+        # every unresolved case sits in the lightly sampled cell, which carries 90% of the population
+        "y": [1.0] * 10 + [np.nan] * 10,
+    })
+    rows = unresolved_prevalence(table, {"CO:rejected": 1000})
+    unweighted = 10 / 20
+    weighted = (10 * 90.0) / (10 * 10.0 + 10 * 90.0)
+    assert rows[0]["share_unresolved"] == pytest.approx(weighted)
+    assert rows[0]["share_unresolved"] != pytest.approx(unweighted)
+    assert rows[0]["n_labelled"] == 20 and rows[0]["n_unresolved"] == 10   # raw counts unchanged
