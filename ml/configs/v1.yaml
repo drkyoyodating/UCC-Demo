@@ -1,0 +1,125 @@
+# ml/configs/v1.yaml -- the v1 ML Lab run: the single source of truth for paths, versions, seeds,
+# eligibility, sampling, split ratios, labelling, the main-round budget, and every setting Plans B and C
+# read. Owned by Plan A (contract K4): Plans B and C read sections with RunConfig.section(name) and
+# never write this file. load_config refuses a key that appears twice. Artefact locations come from
+# ucc_ml.config.artefact_paths (K5), so no section below repeats a path. Edit by commit only; every
+# manifest records this file's sha256. The release id is computed from the bundle, never set here.
+
+version:
+  dataset_version: v1
+  label_policy_version: label_policy_v1
+  baseline_version: heavy_filter_v1      # ml/src/ucc_ml/vendor/MANIFEST.json
+
+seed: 20260912                           # date-stamped, like SEED = 20260830 in src/splink_contract.py
+
+paths:                                   # relative to the repository root
+  source_duckdb: ucc.duckdb              # opened read_only, by ml/tools/export_snapshot.py only
+  snapshot_dir: ml/data/snapshots/v1
+  candidates_dir: ml/data/candidates/v1
+  pilot_dir: ml/data/pilot/v1
+  main_round_dir: ml/data/main/v1
+  splits_dir: ml/data/splits/v1
+  labels_dir: ml/data/labels/v1
+  predictions_dir: ml/data/predictions
+  artifacts_dir: ml/artifacts
+  mlflow_dir: ml/mlflow
+  reports_dir: ml/reports
+  public_data_dir: docs/data/ml
+  specs_dir: ml/specs
+
+eligibility:                             # copied from src/build_scope.py:27-28, 42-44, 57-59. DO NOT EDIT.
+  year_min: "1990"
+  junk_addresses: ["", "NONE", "NONE PROVIDED", "NA", "N/A", "UNKNOWN", "SAME", "COMPANY",
+                   "NOT PROVIDED", "TBD", "X", "XX", "NO ADDRESS", "ADDRESS UNKNOWN", "VARIOUS"]
+
+sampling:
+  strata: ["CO:accepted", "CO:rejected", "CT:accepted", "CT:rejected"]   # region x baseline_qualifies (K2)
+  pilot_per_stratum: 50                  # 200-case pilot: 100 CO / 100 CT, 50 accepted / 50 rejected each
+  repeat_fraction: 0.10                  # hidden blind repeats inside every queue chunk
+
+splits:                                  # grouped by region-scoped group_id; pilot groups all go to train (K12)
+  train: 0.65
+  validation: 0.15
+  test: 0.20
+
+labelling:
+  labels: [RELEVANT, NOT_RELEVANT, INSUFFICIENT_EVIDENCE]
+  reason_max_chars: 300
+  disclosure: "model-labelled, founder-adjudicated"
+  chunk_size: 200                        # one blind labeller agent per chunk per pass (K14)
+  founder_audit_per_split_stratum: 10    # agreed rows the founder re-reads per (split, stratum), plus every disagreement
+
+budget:                                  # main labelling round (K13.2): the default proposal shown at the Task 20 founder gate
+  main_round: {train: 1200, validation: 400, test: 800}   # per split, evenly across the four strata, capped by each pool;
+                                         # the founder-approved numbers are committed in docs/data/ml/main_v1_allocation.json
+
+# --- Plan B: model, evaluation, release (values from docs/superpowers/plans/2026-09-12-ucc-ml-b.md) ---
+mlflow:                                  # tracking db / artifact root: artefact_paths(cfg).mlflow_db / .mlflow_artifacts
+  experiment: ucc-ml-v1
+
+features:                                # feature policy v1 (Plan B features.py)
+  policy_version: features_v1
+  lender_join: " | "
+  word:
+    analyzer: word
+    ngram_range: [1, 2]
+    lowercase: true
+    token_pattern: '(?u)\b\w+\b'
+  char:
+    analyzer: char_wb
+    ngram_range: [3, 5]
+    lowercase: false
+
+training:
+  seed: 20260912
+  cv_folds: 5                            # StratifiedGroupKFold inside TRAIN only
+  c_grid: [0.1, 1.0, 10.0]
+  class_weight: null
+  weighting: design_weight_normalised    # N_train_h / n_h per TRAIN stratum, mean 1 within each fit (Plan B protocol §2)
+  selection_metric: weighted_average_precision
+  candidate_variant: borrower_lender     # Codex §7: the candidate production model
+  max_iter: 2000
+  artifacts_dir: ml/artifacts/train/v1
+
+calibration:
+  method: auto                           # auto | isotonic | sigmoid
+  isotonic_min_effective_positives: 200  # auto -> isotonic when the Kish effective OOF positives >= this, else sigmoid
+  max_weighted_ece_for_probability: 0.10
+  n_bins: 10
+  decision_region_min_score: 0.3         # probability gate: the weighted ECE among scores >= this ...
+  max_decision_region_ece: 0.15          # ... must be <= this ...
+  decision_region_min_cases: 20          # ... over at least this many validation cases (Plan B protocol §6)
+
+threshold:                               # chosen on VALIDATION only; frozen dir: artefact_paths(cfg).frozen_dir
+  min_weighted_precision: 0.95
+  min_predicted_positives: 30
+
+evaluation:                              # final eval dir: artefact_paths(cfg).final_eval_dir
+  bootstrap_resamples: 2000
+  bootstrap_seed: 20260912
+  ci_level: 0.95
+
+release:                                 # releases / predictions / lock file: artefact_paths(cfg)
+  top_k_contributions: 10
+  batch_chunk_rows: 20000
+
+# --- Plan C: serving and public export (values from docs/superpowers/plans/2026-09-12-ucc-ml-c.md) ---
+service:
+  max_body_bytes: 16384
+  max_name_chars: 300
+  max_lenders: 20
+  max_lender_chars: 300
+  allowed_origins: ["https://drkyoyodating.github.io", "http://127.0.0.1:8080", "http://localhost:8080"]
+  rate_capacity: 30.0                    # token bucket burst per client IP
+  rate_refill_per_second: 0.5            # sustained 30 requests/minute per client IP
+
+export:
+  unlabelled_cap: 2000
+  curated_examples:
+    per_cell_cap: 9
+    error_cap_per_cell: 3
+    minimum: 50
+    maximum: 100
+  latency:
+    warm_calls: 200
+    batch_size: 1000
