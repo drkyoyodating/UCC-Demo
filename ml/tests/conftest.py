@@ -344,3 +344,26 @@ def reviewed_pilot_repo(tmp_path: Path, decide_all: bool = True, **kwargs) -> Pa
     fill_founder_workbook(round_paths(load_config(cfg), "pilot_v1").workbook, founder_answers(cfg, "pilot_v1", decide_all))
     assert main(["import-founder-review", "--config", str(cfg), "--round", "pilot_v1"]) == (0 if decide_all else 1)
     return cfg
+
+
+# --- Plan C: one real release, built once per test session (contract K10) -------------------
+
+
+@pytest.fixture(scope="session")
+def synthetic_release_dir(tmp_path_factory) -> Path:
+    """A REAL release bundle built by running train -> freeze-candidate -> evaluate-final ->
+    build-release on the synthetic world (ucc_ml.synthetic.build_synthetic_release).
+
+    Plan C never hand-rolls a bundle: every serving, export and page test must run against the
+    documents build-release actually writes, so a change in Plan B's manifests or metrics fails a
+    Plan C test instead of reaching the public page. The world root is the bundle's
+    parents[3], which holds ml/configs/v1.yaml and the artefacts the export reads."""
+    from ucc_ml.synthetic import build_synthetic_release
+
+    return build_synthetic_release(tmp_path_factory.mktemp("release"))
+
+
+@pytest.fixture(scope="session")
+def synthetic_world_config(synthetic_release_dir) -> Path:
+    """The config of the world `synthetic_release_dir` was built in."""
+    return synthetic_release_dir.parents[3] / "ml" / "configs" / "v1.yaml"
