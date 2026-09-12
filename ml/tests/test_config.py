@@ -168,6 +168,8 @@ def test_artefact_paths_are_the_k5_locations(tmp_path):
         "main_manifest": root / "ml/data/main/v1/main_manifest.json",
         "ablation_cases": root / "ml/data/ablation/v1/ablation_cases.parquet",
         "ablation_manifest": root / "ml/data/ablation/v1/ablation_manifest.json",
+        "screen_cells": root / "ml/data/screening/v1/screen_cells.parquet",
+        "screening_manifest": root / "ml/data/screening/v1/screening_manifest.json",
         "splits_parquet": root / "ml/data/splits/v1/splits.parquet",
         "split_manifest": root / "ml/data/splits/v1/split_manifest.json",
         "labels_csv": root / "ml/data/labels/v1/labels.csv",

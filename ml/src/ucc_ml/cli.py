@@ -87,6 +87,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("validate-labels", help="merge every validated round into labels.csv + labels_manifest.json (refuses undecided disagreements)")
     _add_config_arg(sp)
     sp.set_defaults(func=cmd_validate_labels)
+    sp = sub.add_parser("build-screen", help="fit the sampling screen and assign every case a cell")
+    _add_config_arg(sp)
+    sp.set_defaults(func=cmd_build_screen)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -409,6 +412,18 @@ def cmd_validate_labels(ns: argparse.Namespace) -> int:
     print(f"labels rows={manifest['rows']} counts_by_status={manifest['counts_by_status']} "
           f"counts_by_round={manifest['counts_by_round']} ({manifest['disclosure']})")
     print(f"wrote {paths.labels_csv}, {paths.labels_manifest} and {digest}")
+    return 0
+
+
+def cmd_build_screen(ns: argparse.Namespace) -> int:
+    from ucc_ml.screening import build_screen
+
+    out = build_screen(ns.config)
+    print(out["counts"].to_string(index=False))
+    m = out["manifest"]
+    print(f"fit on {m['fit_split']}: {m['fit_positives']:,} positive / {m['fit_negatives']:,} negative")
+    print(f"rules words among the top 200 features: {m['rules_words_in_top_200_features']}")
+    print(f"wrote {out['cells']} sha256={m['screen_cells_sha256']}")
     return 0
 
 

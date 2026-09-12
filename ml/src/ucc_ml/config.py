@@ -36,6 +36,7 @@ class Paths(BaseModel):
     pilot_dir: Path
     main_round_dir: Path = Path("ml/data/main/v1")
     ablation_dir: Path = Path("ml/data/ablation/v1")
+    screening_dir: Path = Path("ml/data/screening/v1")
     splits_dir: Path
     labels_dir: Path
     predictions_dir: Path = Path("ml/data/predictions")
@@ -186,6 +187,8 @@ class ArtefactPaths:
     main_manifest: Path
     ablation_cases: Path
     ablation_manifest: Path
+    screen_cells: Path
+    screening_manifest: Path
     splits_parquet: Path
     split_manifest: Path
     labels_csv: Path
@@ -215,6 +218,8 @@ def artefact_paths(cfg: RunConfig) -> ArtefactPaths:
         main_manifest=cfg.path("main_round_dir") / "main_manifest.json",
         ablation_cases=cfg.path("ablation_dir") / "ablation_cases.parquet",
         ablation_manifest=cfg.path("ablation_dir") / "ablation_manifest.json",
+        screen_cells=cfg.path("screening_dir") / "screen_cells.parquet",
+        screening_manifest=cfg.path("screening_dir") / "screening_manifest.json",
         splits_parquet=cfg.path("splits_dir") / "splits.parquet",
         split_manifest=cfg.path("splits_dir") / "split_manifest.json",
         labels_csv=cfg.path("labels_dir") / "labels.csv",

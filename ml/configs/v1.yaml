@@ -19,6 +19,7 @@ paths:                                   # relative to the repository root
   pilot_dir: ml/data/pilot/v1
   main_round_dir: ml/data/main/v1
   ablation_dir: ml/data/ablation/v1
+  screening_dir: ml/data/screening/v1
   splits_dir: ml/data/splits/v1
   labels_dir: ml/data/labels/v1
   predictions_dir: ml/data/predictions
@@ -55,6 +56,13 @@ labelling:
     yield_probe_v1: label_policy_v2
     main_v1: label_policy_v2
     queue_v1: label_policy_v2
+
+screening:                               # the SAMPLING screen. Sets rates only; never a feature, never shown to a labeller.
+  fit_split: train                       # the score is fitted on TRAIN groups only; validation and test are untouched
+  positive_route: lender                 # anchored on cases the rules accepted for their LENDER ALONE
+  score_quantile: 0.02                   # B2 takes the top 2% within (region, split) among non-B1 cases
+  b4_floor_per_split: 200                # REFUSAL condition, not a guideline: the unscreened cell is always sampled
+  seed: 20260912
 
 budget:                                  # main labelling round (K13.2): the default proposal shown at the Task 20 founder gate
   main_round: {train: 1200, validation: 400, test: 800}   # per split, evenly across the four strata, capped by each pool;
