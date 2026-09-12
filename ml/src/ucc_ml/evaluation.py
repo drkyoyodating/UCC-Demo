@@ -465,3 +465,142 @@ def unresolved_prevalence(table: pd.DataFrame, N_h: Mapping[str, int], pred=None
                                                               if pp.any() else None)
     rows.append(total)
     return rows
+
+
+# ---------------------------------------------------------------------------
+# evaluate-final — the single TEST run (protocol §7)
+# ---------------------------------------------------------------------------
+import shutil  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import joblib  # noqa: E402
+
+from ucc_ml.provenance import read_json, sha256_file, utc_now_iso, verify_sha256sums, write_json  # noqa: E402
+
+FINAL_METRICS_NAME = "metrics.json"
+TEST_PREDICTIONS_NAME = "test_predictions.parquet"
+FORCE_LOG_NAME = "FORCE_LOG.txt"
+PRIMARY_QUANTITY = "review-queue weighted precision (rules-rejected strata), pre-registered"
+
+
+class FinalEvaluationRefused(RuntimeError):
+    """TEST was already evaluated against the frozen candidate and --force-i-know was not given."""
+
+
+def _direction(d: dict) -> str:
+    if d["lower"] is None or d["upper"] is None:
+        return "no interval"
+    return "higher" if d["lower"] > 0 else ("lower" if d["upper"] < 0 else "not distinguishable")
+
+
+def final_verdict(report: dict) -> dict:
+    """The pre-registered primary quantity, then the two secondary model − rules comparisons with a direction each."""
+    d_rec = report["delta_model_minus_rules"]["delta_weighted_recall"]
+    d_prec = report["delta_model_minus_rules"]["delta_weighted_precision"]
+    rq = report["review_queue"]["model"]["ci"]["weighted_precision"]
+    return {"primary": PRIMARY_QUANTITY,
+            "review_queue_weighted_precision": rq,
+            "delta_recall": _direction(d_rec), "delta_precision": _direction(d_prec),
+            "text": (f"review-queue precision {rq['estimate']} [{rq['lower']}, {rq['upper']}]; model recall vs rules: "
+                     f"{_direction(d_rec)}; model precision vs rules: {_direction(d_prec)} "
+                     "(95% intervals; two secondary comparisons, not multiplicity-adjusted)")}
+
+
+def run_evaluate_final(config_path: Path, *, force_i_know: bool = False) -> dict:
+    """CLI `evaluate-final`: score TEST once with the frozen candidate and return the final metrics document.
+
+    Raises FinalEvaluationRefused when TEST_EVALUATED.json exists and force_i_know is False, and
+    BundleIntegrityError (a ValueError) naming the file when the frozen SHA256SUMS does not verify."""
+    # Imported here: training imports evaluation, so evaluation must not import training at module level.
+    from ucc_ml.config import artefact_paths, load_config
+    from ucc_ml.features import build_feature_frame
+    from ucc_ml.training import (FROZEN_FILES, GUARD_FILE_NAME, PROTOCOL_PATH, MlflowSession, build_model_table,
+                                 check_stratum_alignment, labels_summary, provenance, read_plan_a_inputs,
+                                 split_populations)
+
+    cfg = load_config(config_path)
+    paths = artefact_paths(cfg)
+    ecfg, ccfg = cfg.section("evaluation"), cfg.section("calibration")
+    fe_dir, fdir = paths.final_eval_dir, paths.frozen_dir
+    guard = fe_dir / GUARD_FILE_NAME
+    if guard.exists() and not force_i_know:
+        raise FinalEvaluationRefused(
+            f"REFUSED: {guard} exists — TEST has already been evaluated once against this frozen candidate. Re-run with "
+            "--force-i-know only if you understand that repeated test scoring is no longer a held-out measurement; the "
+            "first result stays on disk either way.")
+    verified = verify_sha256sums(fdir, required=FROZEN_FILES)   # before anything in the frozen dir is trusted
+    threshold_doc = read_json(fdir / "threshold.json")
+    manifest = read_json(fdir / "model-manifest.json")
+    model = joblib.load(fdir / "pipeline.joblib")
+
+    prov = provenance(cfg, paths)
+    inputs = read_plan_a_inputs(paths)
+    table = build_model_table(inputs.candidates, inputs.splits, inputs.labels)
+    check_stratum_alignment(table)
+    N_h = split_populations(inputs.candidates, inputs.splits)["test"]
+    test_all = table[table.split == "test"].reset_index(drop=True)
+    w_all = design_weights(test_all, N_h)
+    threshold = float(threshold_doc["threshold"])
+    scores_all = model.scores(build_feature_frame(test_all))
+    pred_all = decide_from_scores(scores_all, threshold)
+    rules_all = test_all.baseline_qualifies.to_numpy().astype(int)
+    y_all = test_all.y.fillna(-1).to_numpy().astype(int)
+    # w_all is the design weight of EVERY non-repeat labelled TEST row, which is exactly what y_all covers.
+    # The resolved-only subset would be refused for length, and would be wrong in principle: the unresolved
+    # rows carry the weight the unresolved-share figures in this same report block are computed from.
+    report = evaluate_split(y_all, pred_all, rules_all, test_all.stratum.to_numpy(), test_all.group_id.to_numpy(),
+                            test_all.region.to_numpy(), N_h, w_all, n_resamples=int(ecfg["bootstrap_resamples"]),
+                            seed=int(ecfg["bootstrap_seed"]), level=float(ecfg["ci_level"]))
+    keep = y_all >= 0
+    n_bins = int(threshold_doc["calibration"]["n_bins"])
+    ece = weighted_ece(y_all[keep], scores_all[keep], w_all[keep], n_bins=n_bins)
+    gate = probability_gate(y_all[keep], scores_all[keep], w_all[keep], n_bins=n_bins,
+                            max_ece=float(ccfg["max_weighted_ece_for_probability"]),
+                            decision_score=float(ccfg["decision_region_min_score"]),
+                            max_decision_ece=float(ccfg["max_decision_region_ece"]),
+                            min_decision_cases=int(ccfg["decision_region_min_cases"]))
+    verdict = final_verdict(report)
+
+    fe_dir.mkdir(parents=True, exist_ok=True)
+    forced = guard.exists() and force_i_know
+    if forced:
+        backup = fe_dir / f"metrics.{utc_now_iso().replace(':', '')}.json"
+        shutil.copyfile(fe_dir / FINAL_METRICS_NAME, backup)
+        with (fe_dir / FORCE_LOG_NAME).open("a", encoding="utf-8") as fh:
+            fh.write(f"{utc_now_iso()} evaluate-final --force-i-know; previous result kept as {backup.name}\n")
+    metrics = {
+        "protocol": PROTOCOL_PATH, "split": "test", "evaluated_at": utc_now_iso(), "forced": bool(forced),
+        "frozen": {"frozen_dir": str(fdir), "sha256sums_sha256": sha256_file(fdir / "SHA256SUMS"),
+                   "pipeline_sha256": manifest["pipeline_sha256"], "variant": manifest["variant"], "threshold": threshold,
+                   "status": threshold_doc["status"], "score_type": threshold_doc["score_type"],
+                   "calibration_method": manifest["calibration_method"], "verified_files": sorted(verified)},
+        "evaluation": report, "calibration": {**ece, "probability_gate": gate},
+        "unresolved": unresolved_prevalence(test_all, N_h, pred=pred_all),
+        "labels": labels_summary(table, "test", inputs.labels_manifest), "verdict": verdict, "provenance": prov,
+    }
+    pd.DataFrame({"case_id": test_all.case_id.to_numpy(), "region": test_all.region.to_numpy(),
+                  "stratum": test_all.stratum.to_numpy(), "group_id": test_all.group_id.to_numpy(),
+                  "labelling_round": test_all.labelling_round.to_numpy(), "y": test_all.y.to_numpy(),
+                  "sample_weight_eval": w_all, "score": scores_all, "pred": pred_all,
+                  "rules": rules_all}).to_parquet(fe_dir / TEST_PREDICTIONS_NAME, index=False)
+    metrics_sha = write_json(fe_dir / FINAL_METRICS_NAME, metrics)
+    write_json(guard, {"evaluated_at": metrics["evaluated_at"], "frozen_sha256sums_sha256": metrics["frozen"]["sha256sums_sha256"],
+                       "metrics_sha256": metrics_sha, "forced": bool(forced)})
+    m, r = report["model"], report["rules"]
+    MlflowSession(cfg, paths).log_run(
+        f"final-test-{manifest['variant']}",
+        params={"stage": "final_test", "variant": manifest["variant"], "threshold": threshold,
+                "pipeline_sha256": manifest["pipeline_sha256"], "forced": forced,
+                **{k: prov[k] for k in ("candidates_sha256", "splits_sha256", "labels_sha256", "policy_version",
+                                        "lock_sha256", "source_commit")}},
+        metrics={"test_weighted_precision": m["weighted_precision"], "test_weighted_recall": m["weighted_recall"],
+                 "test_weighted_f1": m["weighted_f1"], "test_rules_weighted_precision": r["weighted_precision"],
+                 "test_rules_weighted_recall": r["weighted_recall"],
+                 "test_review_queue_weighted_precision": report["review_queue"]["model"]["weighted_precision"],
+                 "test_delta_weighted_recall": report["delta_model_minus_rules"]["delta_weighted_recall"]["estimate"],
+                 "test_weighted_ece": ece["ece"]},
+        tags={"stage": "final_test", "forced": str(forced)},
+        artifacts=[fe_dir / FINAL_METRICS_NAME, fe_dir / TEST_PREDICTIONS_NAME, guard])
+    print(f"TEST (n={report['n']}, positives={report['positives']}): model wP={m['weighted_precision']} "
+          f"wR={m['weighted_recall']} | rules wP={r['weighted_precision']} wR={r['weighted_recall']} | {verdict['text']}")
+    return metrics
