@@ -1,0 +1,20 @@
+dff7a66928af8bbe549e715e56e0858ace56cb0c7994c6c0fe2679bf49c6d5e2  main_cases.parquet
+23b9b71c5483ab9af34a17525c109c37afe6f92790e5d6dfcd1f95c4835fe11e  main_manifest.json
+5aefb7876dd3ce59b6b62de1b7fdbe2595f4910c241ab6c0402b44a79d6275aa  queue_key_main_v1.csv
+a80f71e832eb9dba35e3ece12b81bf2ccfc09f16d2001ac93099900f5bac0724  queue_main_v1_part_001.csv
+2a6867ab62f60f36cdabaf2ae3ede5ab0981fe1f035870439a9650e334712c1b  queue_main_v1_part_002.csv
+4c83c20d69a84c285ffe4260ec315ec615bd2dc7bc8e06de2fbb7c888ea99e4b  queue_main_v1_part_003.csv
+a27765cc60d0b883a6621cbb95ca938983b6394bf71d500c18cb49258c60a113  queue_main_v1_part_004.csv
+094ee63bc1fbb8eb2dd90cd4b18ac4e01da833acda08d0c9aa79799cc76893b0  queue_main_v1_part_005.csv
+400fb5c807a384d163e361028f6abae07bd29a194df8d4ab27596c03843ca7e4  queue_main_v1_part_006.csv
+5f36aef2cd24db303a81f4ec8ed27a317ed19330f367e4e764f5228d9f2f1085  queue_main_v1_part_007.csv
+2df2237fe3e7854b684210466e11ea1175f2ec5422d415b42e92f9b3c3c04279  queue_main_v1_part_008.csv
+2f157ba0aef391e56e9a4ccdae02016bdf8d6339dc3a148bd8fab36ade245d7a  queue_main_v1_part_009.csv
+a1d6c1bcccb305bcdd851e6cd50daebc42bc5a25de8a07562f27cef79222b6e7  queue_main_v1_part_010.csv
+0952d57f980161eee287bff771b91737fec5d08c5c160d9ffc1589cb50d2d690  queue_main_v1_part_011.csv
+b297dbd44307b0edda3a6c395c9cdd71dc27321d679bacbc1fc45348ca3d7e25  queue_main_v1_part_012.csv
+# Committed BEFORE any main_v1 label exists (contract K13). The queue chunks are exactly what
+# the blind labellers see: case_id, borrower name, lender names, city, state -- nothing else. The key
+# holds the strata, N_h, inclusion probabilities and repeat aliases and stays private. Committing every
+# hash first proves the sample, the design weights and the repeat structure were fixed in advance.
+# Labels for this round will be model-labelled, founder-adjudicated.
