@@ -266,3 +266,248 @@ def labels_summary(table: pd.DataFrame, split: str, labels_manifest: Mapping) ->
         # one phrase that covers only some of the rows.
         block["disclosure_by_round"] = dict(by_round)
     return block
+
+
+# ---------------------------------------------------------------------------
+# Part 3 — grouped CV inside TRAIN, grid, OOF, refit, provenance, MLflow, run_train
+# ---------------------------------------------------------------------------
+import os  # noqa: E402
+import platform  # noqa: E402
+import subprocess  # noqa: E402
+import time  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import joblib  # noqa: E402
+import sklearn  # noqa: E402
+from sklearn.metrics import average_precision_score, log_loss  # noqa: E402
+from sklearn.model_selection import StratifiedGroupKFold  # noqa: E402
+
+from ucc_ml.config import artefact_paths, load_config  # noqa: E402
+from ucc_ml.evaluation import design_weights, weighted_metrics  # noqa: E402
+from ucc_ml.features import VARIANTS, build_feature_frame, feature_names, make_pipeline  # noqa: E402
+from ucc_ml.provenance import finite_or_none, git_head, read_json, sha256_file, write_json  # noqa: E402
+
+TRAIN_REPORT_NAME = "train-report.json"
+TRAINING_WEIGHTING = "inverse_inclusion_probability_normalised"
+SAMPLE_WEIGHT_NORMALISATION = "mean 1 within each fit"
+
+
+@dataclass
+class CVResult:
+    variant: str
+    C: float
+    fold_weighted_ap: list[float]
+    mean_weighted_ap: float
+    std_weighted_ap: float
+    oof_weighted_ap: float
+    oof_weighted_logloss: float
+
+    def to_dict(self) -> dict:
+        return {"variant": self.variant, "C": self.C, "fold_weighted_ap": [finite_or_none(v) for v in self.fold_weighted_ap],
+                "mean_weighted_ap": finite_or_none(self.mean_weighted_ap),
+                "std_weighted_ap": finite_or_none(self.std_weighted_ap),
+                "oof_weighted_ap": finite_or_none(self.oof_weighted_ap),
+                "oof_weighted_logloss": finite_or_none(self.oof_weighted_logloss)}
+
+
+def grouped_folds(y, groups, n_splits: int, seed: int) -> list[tuple[np.ndarray, np.ndarray]]:
+    y = np.asarray(y, dtype=int)
+    splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+    return [(tr, te) for tr, te in splitter.split(np.zeros((len(y), 1)), y, groups=np.asarray(groups))]
+
+
+def cross_validate_variant(frame: pd.DataFrame, y, w, groups, variant: str, C: float, folds, *, seed: int,
+                           max_iter: int) -> tuple[CVResult, np.ndarray, np.ndarray]:
+    y = np.asarray(y, dtype=int); w = np.asarray(w, dtype=float)
+    oof = np.full(len(y), np.nan); fold_ix = np.full(len(y), -1, dtype=int)
+    fold_ap: list[float] = []
+    for k, (tr, te) in enumerate(folds):
+        pipe = make_pipeline(variant, C, max_iter=max_iter, seed=seed)
+        pipe.fit(frame.iloc[tr], y[tr], clf__sample_weight=w[tr] / w[tr].mean())   # scale-free: keeps C meaningful
+        oof[te] = pipe.decision_function(frame.iloc[te])
+        fold_ix[te] = k
+        fold_ap.append(float(average_precision_score(y[te], oof[te], sample_weight=w[te])))
+    prob = 1.0 / (1.0 + np.exp(-oof))
+    result = CVResult(variant=variant, C=float(C), fold_weighted_ap=fold_ap, mean_weighted_ap=float(np.mean(fold_ap)),
+                      std_weighted_ap=float(np.std(fold_ap)),
+                      oof_weighted_ap=float(average_precision_score(y, oof, sample_weight=w)),
+                      oof_weighted_logloss=float(log_loss(y, prob, sample_weight=w, labels=[0, 1])))
+    return result, oof, fold_ix
+
+
+def run_grid(frame, y, w, groups, variant: str, c_grid, folds, *, seed: int, max_iter: int):
+    results, oofs, fold_ixs = [], {}, {}
+    for C in c_grid:
+        res, oof, fx = cross_validate_variant(frame, y, w, groups, variant, float(C), folds, seed=seed, max_iter=max_iter)
+        results.append(res); oofs[float(C)] = oof; fold_ixs[float(C)] = fx
+    best = max(results, key=lambda r: (r.mean_weighted_ap, -r.C))     # ties → smaller C
+    return results, best, oofs[best.C], fold_ixs[best.C]
+
+
+def fit_full(frame, y, w, variant: str, C: float, *, seed: int, max_iter: int) -> Pipeline:
+    pipe = make_pipeline(variant, C, max_iter=max_iter, seed=seed)
+    w = np.asarray(w, dtype=float)
+    pipe.fit(frame, np.asarray(y, dtype=int), clf__sample_weight=w / w.mean())   # scale-free: keeps C meaningful
+    return pipe
+
+
+def git_dirty(repo_root: Path) -> bool:
+    """True when tracked files differ from HEAD (False outside a git work tree)."""
+    try:
+        out = subprocess.run(["git", "-C", str(repo_root), "status", "--porcelain", "--untracked-files=no"],
+                             capture_output=True, text=True, check=False, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return out.returncode == 0 and bool(out.stdout.strip())
+
+
+def provenance(cfg, paths) -> dict:
+    """Digests of every input, the label policy and disclosure, the source commit and the package versions."""
+    manifest = read_json(paths.labels_manifest)
+    for key in ("policy_version", "disclosure"):
+        if key not in manifest:
+            raise ValueError(f"{paths.labels_manifest} must carry {key!r}")
+    head = git_head(cfg.repo_root)
+    return {
+        "candidates_sha256": sha256_file(paths.candidates_parquet), "splits_sha256": sha256_file(paths.splits_parquet),
+        "labels_sha256": sha256_file(paths.labels_csv), "labels_manifest_sha256": sha256_file(paths.labels_manifest),
+        "policy_version": str(manifest["policy_version"]), "label_disclosure": str(manifest["disclosure"]),
+        "config_sha256": cfg.config_sha256,
+        "lock_sha256": sha256_file(paths.lock_file) if paths.lock_file.exists() else "missing",
+        "source_commit": head or "unknown", "source_dirty": git_dirty(cfg.repo_root) if head else False,
+        "python_version": platform.python_version(), "sklearn_version": sklearn.__version__,
+        "numpy_version": np.__version__, "feature_policy_version": FEATURE_POLICY_VERSION,
+    }
+
+
+class MlflowSession:
+    """Local sqlite tracking at artefact_paths(cfg).mlflow_db (pack §6). MLflow is imported here, not at module import."""
+
+    def __init__(self, cfg, paths) -> None:
+        os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
+        import mlflow
+
+        self._mlflow = mlflow
+        paths.mlflow_db.parent.mkdir(parents=True, exist_ok=True)
+        paths.mlflow_artifacts.mkdir(parents=True, exist_ok=True)
+        self.tracking_uri = f"sqlite:///{paths.mlflow_db}"
+        mlflow.set_tracking_uri(self.tracking_uri)
+        name = cfg.section("mlflow")["experiment"]
+        exp = mlflow.get_experiment_by_name(name)
+        self.experiment_id = (exp.experiment_id if exp
+                              else mlflow.create_experiment(name, artifact_location=paths.mlflow_artifacts.as_uri()))
+
+    def log_run(self, name: str, *, params: dict, metrics: dict, tags: dict, artifacts=(), dicts: dict | None = None) -> str:
+        with self._mlflow.start_run(experiment_id=self.experiment_id, run_name=name) as run:
+            self._mlflow.log_params({k: str(v) for k, v in params.items()})
+            self._mlflow.log_metrics({k: float(v) for k, v in metrics.items() if v is not None})
+            self._mlflow.set_tags({k: str(v) for k, v in tags.items()})
+            for p in artifacts:
+                self._mlflow.log_artifact(str(p))
+            for fname, obj in (dicts or {}).items():
+                self._mlflow.log_dict(obj, fname)
+            return run.info.run_id
+
+
+def training_config(cfg) -> dict:
+    """The `training` section, checked against the protocol (§2, §6)."""
+    t = cfg.section("training")
+    if t["class_weight"] not in (None, "none"):
+        raise ValueError("training.class_weight must be null (context pack §6)")
+    if t["selection_metric"] != "weighted_average_precision":
+        raise ValueError("training.selection_metric must be weighted_average_precision (protocol §6)")
+    if t["weighting"] != TRAINING_WEIGHTING:
+        raise ValueError(f"training.weighting must be {TRAINING_WEIGHTING!r} (protocol §2: 1/inclusion_probability normalised, "
+                         f"mean 1 within each fit), got {t['weighting']!r}")
+    if t["candidate_variant"] not in VARIANTS:
+        raise ValueError(f"training.candidate_variant must be one of {VARIANTS}, got {t['candidate_variant']!r}")
+    return t
+
+
+def run_train(config_path: Path) -> dict:
+    """CLI `train`. Fits on TRAIN only and scores VALIDATION for the comparison rows; TEST is never scored."""
+    started = time.time()
+    cfg = load_config(config_path)
+    paths = artefact_paths(cfg)
+    tcfg = training_config(cfg)
+    prov = provenance(cfg, paths)
+    art_dir = cfg.repo_root / tcfg["artifacts_dir"]
+    art_dir.mkdir(parents=True, exist_ok=True)
+
+    inputs = read_plan_a_inputs(paths)
+    table = build_model_table(inputs.candidates, inputs.splits, inputs.labels)
+    check_stratum_alignment(table)
+    populations = split_populations(inputs.candidates, inputs.splits)
+    train_all = table[table.split == "train"].reset_index(drop=True)
+    # training_weights takes only the table: the weight is 1/inclusion_probability per row, the rate of the
+    # CELL it was drawn from. The populations argument belonged to the retired N_train_h/n_h form, which
+    # protocol section 2 records as wrong for TRAIN because the pilot and the screened main round draw one
+    # stratum at different rates. `populations` is still needed below for design_weights on VALIDATION.
+    train_all["sample_weight"] = training_weights(train_all).to_numpy()
+    train = resolved(train_all)
+    if train.y.nunique() < 2:
+        raise ValueError("TRAIN needs both classes after binary resolution")
+    val_all = table[table.split == "validation"].reset_index(drop=True)
+    w_val_all = design_weights(val_all, populations["validation"])
+    keep = val_all.y.notna().to_numpy()
+    val, w_val = val_all[keep].reset_index(drop=True), w_val_all[keep]
+
+    y_tr = train.y.to_numpy().astype(int); w_tr = train.sample_weight.to_numpy(); g_tr = train.group_id.to_numpy()
+    y_val = val.y.to_numpy().astype(int)
+    frame_tr, frame_val = build_feature_frame(train), build_feature_frame(val)
+    rules = {"train": weighted_metrics(y_tr, train.baseline_qualifies.to_numpy().astype(int), w_tr),
+             "validation": weighted_metrics(y_val, val.baseline_qualifies.to_numpy().astype(int), w_val)}
+
+    session = MlflowSession(cfg, paths)
+    base_params = {**prov, "seed": tcfg["seed"], "cv_folds": tcfg["cv_folds"], "weighting": tcfg["weighting"],
+                   "sample_weight_normalisation": SAMPLE_WEIGHT_NORMALISATION, "class_weight": "none",
+                   "selection_metric": tcfg["selection_metric"]}
+    folds = grouped_folds(y_tr, g_tr, int(tcfg["cv_folds"]), int(tcfg["seed"]))
+    grid = [float(c) for c in tcfg["c_grid"]]
+    variants_report: dict[str, dict] = {}
+    for variant in VARIANTS:
+        v0 = time.time()
+        results, best, oof, fold_ix = run_grid(frame_tr, y_tr, w_tr, g_tr, variant, grid, folds,
+                                               seed=int(tcfg["seed"]), max_iter=int(tcfg["max_iter"]))
+        for r in results:
+            session.log_run(f"cv-{variant}-C{r.C:g}", params={**base_params, "variant": variant, "C": r.C, "stage": "cv"},
+                            metrics={"cv_mean_weighted_ap": r.mean_weighted_ap, "cv_std_weighted_ap": r.std_weighted_ap,
+                                     "oof_weighted_ap": r.oof_weighted_ap, "oof_weighted_logloss": r.oof_weighted_logloss},
+                            tags={"stage": "cv", "variant": variant})
+        pipe = fit_full(frame_tr, y_tr, w_tr, variant, best.C, seed=int(tcfg["seed"]), max_iter=int(tcfg["max_iter"]))
+        val_raw = pipe.decision_function(frame_val)
+        val_ap = float(average_precision_score(y_val, val_raw, sample_weight=w_val)) if len(set(y_val.tolist())) == 2 else None
+        vdir = art_dir / variant
+        vdir.mkdir(parents=True, exist_ok=True)
+        joblib.dump(pipe, vdir / "pipeline.joblib")
+        pd.DataFrame({"case_id": train.case_id.to_numpy(), "group_id": g_tr, "stratum": train.stratum.to_numpy(),
+                      "region": train.region.to_numpy(), "labelling_round": train.labelling_round.to_numpy(), "y": y_tr,
+                      "sample_weight": w_tr, "raw_score": oof, "fold": fold_ix}).to_parquet(vdir / "oof.parquet", index=False)
+        cv_doc = {"variant": variant, "grid": [r.to_dict() for r in results], "best_C": best.C,
+                  "best_C_at_grid_boundary": best.C in (min(grid), max(grid)),
+                  "sample_weight_normalisation": SAMPLE_WEIGHT_NORMALISATION,
+                  "selection_metric": tcfg["selection_metric"], "folds": int(tcfg["cv_folds"]), "seed": int(tcfg["seed"])}
+        write_json(vdir / "cv.json", cv_doc)
+        run_id = session.log_run(f"refit-{variant}", params={**base_params, "variant": variant, "C": best.C, "stage": "refit"},
+                                 metrics={"cv_mean_weighted_ap": best.mean_weighted_ap, "oof_weighted_ap": best.oof_weighted_ap,
+                                          "validation_weighted_ap": val_ap, "n_features": len(feature_names(pipe))},
+                                 tags={"stage": "refit", "variant": variant},
+                                 artifacts=[vdir / "pipeline.joblib", vdir / "cv.json"], dicts={"rules.json": rules})
+        variants_report[variant] = {"best_C": best.C, "best_C_at_grid_boundary": cv_doc["best_C_at_grid_boundary"],
+                                    "cv": cv_doc["grid"], "n_features": int(len(feature_names(pipe))),
+                                    "intercept": float(pipe.named_steps["clf"].intercept_[0]),
+                                    "validation": {"weighted_average_precision": val_ap, "n": int(len(val)),
+                                                   "positives": int(y_val.sum())},
+                                    "mlflow_run_id": run_id, "seconds": round(time.time() - v0, 2)}
+
+    report = {"protocol": "ml/specs/evaluation_protocol_v1.md", "splits_used": ["train", "validation"],
+              "weighting": tcfg["weighting"], "sample_weight_normalisation": SAMPLE_WEIGHT_NORMALISATION,
+              "counts": {"train_labelled_rows": int(len(train_all)), "train_rows": int(len(train)),
+                         "train_positives": int(y_tr.sum()), "train_groups": int(pd.Series(g_tr).nunique()),
+                         "validation_labelled_rows": int(len(val_all)), "validation_rows": int(len(val)),
+                         "validation_positives": int(y_val.sum()), "test_rows_touched": 0},
+              "rules": rules, "variants": variants_report, "candidate_variant": tcfg["candidate_variant"],
+              "provenance": prov, "mlflow": {"tracking_uri": session.tracking_uri, "experiment_id": session.experiment_id},
+              "timings": {"seconds_total": round(time.time() - started, 2)}}
+    write_json(art_dir / TRAIN_REPORT_NAME, report)
+    return report
