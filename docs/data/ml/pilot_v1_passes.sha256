@@ -1,0 +1,8 @@
+c481f688384bd2ff2d47c721bff3d0ee30c4363458e2dbe3587ad4135bd2015e  labeller_output_pilot_v1_pass_a_part_001.csv
+45204e4b83acd645892917abc73977aabc73d06db7b01c8d8bf3b4a83eeaa657  labeller_output_pilot_v1_pass_b_part_001.csv
+86b52eacb98d50c7fcb5e66b6e4870770c8c7ffcc7e450838f270a2a4589193f  pass_a_pilot_v1.csv
+b6d686bde4fdf602181dd2189e8028688b1ec41c24651a7808ee385ebb6f66e0  pass_b_pilot_v1.csv
+# The pilot_v1 blind labeller outputs, frozen before the founder review (contract K14): two
+# independent tool-less Claude passes, one agent per queue chunk per pass; the orchestrator wrote each
+# raw CSV from the agent's structured output. The last two lines are the imported pass files.
+# Labels built from these passes are model-labelled, founder-adjudicated.

@@ -360,3 +360,99 @@ def labelling_status(rp: RoundPaths, parts: list[int]) -> dict[str, dict[str, li
     return {letter: {"present": [p for p in parts if rp.raw_output(letter, p).exists()],
                      "missing": [p for p in parts if not rp.raw_output(letter, p).exists()]}
             for letter in PASSES}
+
+
+# ============================================================================= Task 16
+# Import both blind passes: vocabulary checks, hidden-repeat de-aliasing, pass files, pass digests.
+from collections.abc import Mapping  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
+
+from ucc_ml.contracts import PASS_LABELLERS  # noqa: E402
+
+PASS_COLUMNS: tuple[str, ...] = (
+    "queue_case_id", "case_id", "is_repeat", "part", "label", "reason_code", "reason", "labeller_id",
+    "labelled_at", "sampling_stratum", "inclusion_probability", "labelling_round",
+)
+
+
+def file_mtime_iso(path: Path) -> str:
+    return datetime.fromtimestamp(Path(path).stat().st_mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def import_pass(key: pd.DataFrame, chunks: Mapping[int, pd.DataFrame], raw_outputs: Mapping[int, pd.DataFrame],
+                pass_letter: str, round_name: str, labelled_at: Mapping[int, str],
+                reason_max_chars: int) -> pd.DataFrame:
+    """One blind pass over a whole round as PASS_COLUMNS rows, every hidden repeat resolved to its case."""
+    if pass_letter not in PASSES:
+        raise ValueError(f"unknown pass {pass_letter!r}")
+    if round_name not in LABELLING_ROUNDS:
+        raise ValueError(f"unknown labelling round {round_name!r}")
+    parts = queue_parts(key)
+    missing = [p for p in parts if p not in raw_outputs]
+    if missing:
+        raise ValueError(f"{round_name} pass {pass_letter}: labeller output missing for part(s) {missing}")
+    extra = sorted(set(raw_outputs) - set(parts))
+    if extra:
+        raise ValueError(f"{round_name} pass {pass_letter}: labeller output for unknown part(s) {extra}")
+    frames = []
+    for part in parts:
+        queue_ids = key.loc[key.part == part, "queue_case_id"].tolist()
+        if part not in chunks or chunks[part].case_id.tolist() != queue_ids:
+            raise ValueError(f"{round_name} part {part:03d}: the queue chunk and the private key disagree")
+        problems = validate_labeller_rows(raw_outputs[part], queue_ids, reason_max_chars)
+        if problems:
+            raise ValueError(f"{round_name} pass {pass_letter} part {part:03d}: " + "; ".join(problems[:10]))
+        rows = raw_outputs[part][list(RAW_OUTPUT_COLUMNS)].rename(columns={"case_id": "queue_case_id"}).copy()
+        rows["part"] = part
+        rows["labelled_at"] = labelled_at[part]
+        frames.append(rows)
+    answers = pd.concat(frames, ignore_index=True)
+    design = key[["queue_case_id", "case_id", "is_repeat", "sampling_stratum", "inclusion_probability"]]
+    merged = answers.merge(design, on="queue_case_id", how="left", validate="one_to_one")
+    merged["labeller_id"] = PASS_LABELLERS[pass_letter]
+    merged["labelling_round"] = round_name
+    return merged[list(PASS_COLUMNS)]
+
+
+def read_pass_file(path: Path) -> pd.DataFrame:
+    path = Path(path)
+    df = read_exact_csv(path, PASS_COLUMNS)
+    for column in ("queue_case_id", "case_id"):
+        check_column(path, df, column, is_sha256_hex)
+    check_column(path, df, "labelling_round", lambda v: v in LABELLING_ROUNDS)
+    check_column(path, df, "labeller_id", lambda v: v in PASS_LABELLERS.values())
+    check_column(path, df, "label", lambda v: v in LABELS)
+    check_column(path, df, "part", lambda v: v.isdigit())
+    df["part"] = df.part.astype(int)
+    df["inclusion_probability"] = df.inclusion_probability.astype(float)
+    parse_bool_column(path, df, "is_repeat")
+    return df
+
+
+def import_round_passes(rp: RoundPaths, reason_max_chars: int) -> dict[str, pd.DataFrame]:
+    """Import both passes of a round from its key, its chunks and every raw labeller output."""
+    key = read_key(rp.key)
+    parts = queue_parts(key)
+    status = labelling_status(rp, parts)
+    missing = {letter: s["missing"] for letter, s in status.items() if s["missing"]}
+    if missing:
+        raise ValueError(f"{rp.round_name}: labeller output missing for {missing}")
+    chunks = {p: read_queue(rp.queue_part(p)) for p in parts}
+    passes = {}
+    for letter in PASSES:
+        raws = {p: read_raw_output(rp.raw_output(letter, p)) for p in parts}
+        stamps = {p: file_mtime_iso(rp.raw_output(letter, p)) for p in parts}
+        passes[letter] = import_pass(key, chunks, raws, letter, rp.round_name, stamps, reason_max_chars)
+    return passes
+
+
+def write_passes_digest(rp: RoundPaths, parts: list[int]) -> str:
+    files = [rp.raw_output(letter, p) for letter in PASSES for p in parts]
+    files += [rp.pass_file(letter) for letter in PASSES]
+    comments = [
+        f"The {rp.round_name} blind labeller outputs, frozen before the founder review (contract K14): two",
+        "independent tool-less Claude passes, one agent per queue chunk per pass; the orchestrator wrote each",
+        "raw CSV from the agent's structured output. The last two lines are the imported pass files.",
+        f"Labels built from these passes are {LABEL_DISCLOSURE}.",
+    ]
+    return write_digest_file(rp.passes_digest, files, comments)

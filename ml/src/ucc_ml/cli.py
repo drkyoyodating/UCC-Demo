@@ -66,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--part", required=True, type=int)
     sp.add_argument("--structured", required=True, type=Path, help="the agent's structured output, saved verbatim as JSON")
     sp.set_defaults(func=cmd_write_raw_labels)
+    sp = sub.add_parser("import-labels", help="validate and de-alias both blind passes of a round; freeze their digests")
+    _add_config_arg(sp)
+    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.set_defaults(func=cmd_import_labels)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -248,6 +252,27 @@ def cmd_write_raw_labels(ns: argparse.Namespace) -> int:
         print(f"REJECTED: {exc}")
         return 1
     print(f"wrote {target} rows={len(rows)} labels={rows.label.value_counts().sort_index().to_dict()} sha256={sha}")
+    return 0
+
+
+def cmd_import_labels(ns: argparse.Namespace) -> int:
+    from ucc_ml import labeling
+    from ucc_ml.config import load_config
+
+    cfg = load_config(ns.config)
+    rp = labeling.round_paths(cfg, ns.round)
+    try:
+        passes = labeling.import_round_passes(rp, cfg.labelling.reason_max_chars)
+    except ValueError as exc:
+        print(f"REFUSED: {exc}")
+        return 1
+    for letter, frame in passes.items():
+        sha = labeling.write_csv(frame, rp.pass_file(letter))
+        originals = frame[~frame.is_repeat]
+        print(f"pass {letter}: cases={len(originals)} repeats={int(frame.is_repeat.sum())} "
+              f"labels={originals.label.value_counts().sort_index().to_dict()} sha256={sha}")
+    labeling.write_passes_digest(rp, labeling.queue_parts(labeling.read_key(rp.key)))
+    print(f"wrote {rp.pass_file('a')}, {rp.pass_file('b')} and {rp.passes_digest}")
     return 0
 
 
