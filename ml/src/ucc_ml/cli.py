@@ -115,6 +115,16 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("train", help="grouped CV grid inside TRAIN, refit, out-of-fold scores, MLflow")
     _add_config_arg(sp)
     sp.set_defaults(func=cmd_train)
+    sp = sub.add_parser("export-public", help="write the public Lab documents under docs/data/ml from a release bundle")
+    _add_config_arg(sp)
+    sp.add_argument("--release-dir", type=Path, default=None,
+                    help="release directory (default: the only one under ml/artifacts/releases)")
+    sp.add_argument("--out", type=Path, default=None,
+                    help="write the documents here instead of the config's public data directory (previews only)")
+    sp.add_argument("--api-url", default=None, help="record this live API URL in the manifest entry")
+    sp.add_argument("--measure-latency", action="store_true",
+                    help="time the local inference path and publish the numbers, labelled local")
+    sp.set_defaults(func=cmd_export_public)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -594,6 +604,12 @@ def cmd_train(ns: argparse.Namespace) -> int:
     rules = report["rules"]["validation"]
     print(f"rules validation: wP={rules['weighted_precision']} wR={rules['weighted_recall']}")
     return 0
+
+
+def cmd_export_public(ns: argparse.Namespace) -> int:
+    from ucc_ml.exporting import cli_export_public
+
+    return cli_export_public(ns)
 
 
 # --- cmd_<name> functions are added above this line by later tasks; each imports its implementation lazily ---
