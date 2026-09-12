@@ -1,0 +1,90 @@
+/* UCC ML Lab (plan C Task 5). The palette values are copied from the map page's :root block in
+   docs/index.html so the two pages read as one site; ml/tests/test_lab_page.py fails if a shared
+   value drifts. Everything is scoped under .mll, so the stylesheet can later be loaded inside the
+   map page without touching any of its rules. Light only, like the map. */
+.mll{
+  --co:#6b3fa0; --ct:#c0392b;
+  --co-dim:#a37fc4; --ct-dim:#e0907f;
+  --ink:#1c1c1c; --mut:#6b6b6b; --line:#d2d2d2;
+  --bg:#ffffff;
+  --link:#0b4f96; --panel:#f7f7f8;
+  --warn-bg:#fff6e5; --warn-line:#b86e00; --warn-ink:#5c3700;
+  --err-ink:#902b20;
+  box-sizing:border-box;max-width:1100px;margin:0 auto;padding:16px 16px 40px;
+  color:var(--ink);background:var(--bg);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  font-variant-numeric:tabular-nums;
+}
+.mll *,.mll *::before,.mll *::after{box-sizing:inherit}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body.mll-page{margin:0;background:#ffffff;color:#1c1c1c}
+.mll-noscript{max-width:720px;margin:24px auto;padding:0 16px;
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+
+.mll h1{font-size:21px;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:#2e2e2e;margin:4px 0 0;line-height:1.25}
+.mll-sub{margin:6px 0 0;font-size:11.5px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:#595959}
+.mll h2{font-size:15px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#2f2f2f;margin:0 0 10px;line-height:1.3}
+.mll h3{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#3a3a3a;margin:18px 0 6px}
+.mll p{margin:0 0 10px;max-width:72ch}
+.mll a{color:var(--link);text-underline-offset:2px}
+.mll a:hover{color:#062f5c}
+
+.mll-section{margin-top:22px;padding:16px;border:1px solid rgba(15,15,20,.15);border-radius:6px;background:#fff;
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset,1px 2px 6px rgba(15,15,20,.09)}
+.mll-banner{margin:0 0 12px;padding:10px 12px;border:2px solid var(--ct);border-radius:5px;background:#fdecea;color:#6e1a12;
+  font-weight:750;letter-spacing:.05em;text-transform:uppercase}
+.mll-provenance{padding:8px 10px;border-left:3px solid var(--co);background:var(--panel)}
+.mll-note{color:#4a4a4a;font-size:13px}
+.mll-note[data-state="unavailable"]{padding:8px 10px;border-left:3px solid var(--mut);background:var(--panel);color:#333333}
+.mll-note[data-state="available"]{padding:8px 10px;border-left:3px solid #1d6b36;background:#eef7f0;color:#173d22}
+.mll-warn{padding:8px 10px;border-left:3px solid var(--warn-line);background:var(--warn-bg);color:var(--warn-ink)}
+.mll-error{color:var(--err-ink);font-weight:600}
+.mll-verdict{font-weight:700}
+
+.mll-scroll{overflow-x:auto;margin:8px 0 14px;-webkit-overflow-scrolling:touch;border:1px solid rgba(15,15,20,.10);border-radius:5px}
+.mll-table{border-collapse:collapse;width:100%;font-size:12.5px}
+.mll-table caption{text-align:left;padding:7px 10px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:#333333;background:linear-gradient(158deg,#f6f6f6,#e9e9e9)}
+.mll-table th,.mll-table td{padding:6px 10px;border-bottom:1px solid rgba(15,15,20,.07);text-align:left;vertical-align:top}
+.mll-table thead th{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#2a2a2a;background:#f1f1f1;white-space:nowrap}
+.mll-table tbody th{font-weight:600;color:#141414;min-width:12ch}
+.mll-table .num{text-align:right;white-space:nowrap}
+.mll-table tbody tr:nth-child(even){background:rgba(15,15,20,.03)}
+
+.mll-form fieldset{border:1px solid var(--line);border-radius:6px;padding:12px;margin:8px 0;min-width:0}
+.mll-form legend{padding:0 4px;font-weight:700}
+.mll-field{display:grid;grid-template-columns:1fr;gap:4px;margin:0 0 10px}
+.mll-field label{font-weight:600;font-size:13px}
+.mll-form input,.mll-form textarea,.mll-form select{width:100%;min-width:0;font:inherit;font-size:16px;padding:8px 10px;
+  border:1px solid rgba(15,15,20,.45);border-radius:5px;background:#fff;color:var(--ink)}
+.mll-form textarea{resize:vertical;min-height:4.5em}
+.mll button{font:inherit;font-size:13px;font-weight:650;letter-spacing:.04em;padding:9px 16px;border:1px solid rgba(15,15,20,.55);
+  border-radius:5px;color:#2e2e2e;background:linear-gradient(158deg,#ffffff,#f0f0f0);cursor:pointer}
+.mll button:hover:not(:disabled){background:#111;color:#fff}
+.mll button:disabled{opacity:.5;cursor:not-allowed}
+.mll button.mll-small{padding:5px 10px;font-size:12px;white-space:nowrap}
+.mll fieldset:disabled label{color:var(--mut)}
+.mll a:focus-visible,.mll button:focus-visible,.mll input:focus-visible,.mll textarea:focus-visible,
+.mll select:focus-visible,.mll-scroll:focus-visible{outline:2px solid #1c1c1c;outline-offset:2px}
+
+.mll-result{display:grid;grid-template-columns:1fr;gap:2px 16px;margin:0 0 10px}
+.mll-result dt{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#595959;margin-top:6px}
+.mll-result dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.mll-list{margin:0 0 10px;padding-left:20px}
+.mll-list li{margin:3px 0;max-width:72ch}
+.mll pre{margin:6px 0 10px;padding:10px 12px;overflow-x:auto;background:#f7f8fa;border:1px solid rgba(15,15,20,.10);border-radius:5px;
+  font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:#33404d}
+
+@media (min-width:720px){
+  .mll-field{grid-template-columns:minmax(160px,220px) 1fr;align-items:start}
+  .mll-field label{padding-top:9px}
+  .mll-form input,.mll-form textarea,.mll-form select{font-size:14px}
+  .mll-result{grid-template-columns:max-content 1fr}
+  .mll-result dt{margin-top:0;padding-top:2px}
+}
+@media (max-width:640px){
+  .mll{padding:12px 16px 32px}
+  .mll h1{font-size:18px;letter-spacing:.06em}
+  .mll-section{padding:12px}
+  .mll-table{font-size:12px}
+}
