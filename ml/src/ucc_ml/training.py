@@ -393,7 +393,15 @@ def provenance(cfg, paths) -> dict:
     return {
         "candidates_sha256": sha256_file(paths.candidates_parquet), "splits_sha256": sha256_file(paths.splits_parquet),
         "labels_sha256": sha256_file(paths.labels_csv), "labels_manifest_sha256": sha256_file(paths.labels_manifest),
+        # Both scalars are per-round quantities flattened to one value, and both reach PUBLIC documents:
+        # this dict feeds model-manifest.json, which is the FIRST of the four manifests hashed into
+        # release_id, and Plan C copies labels_policy_version and label_disclosure straight into the
+        # published model card. The scalar policy_version is the CONFIG DEFAULT (label_policy_v1) while
+        # 2,880 of 3,120 label rows are label_policy_v2, so shipping it alone bakes a false claim into a
+        # permanent identifier. The maps travel with the scalars; nothing downstream has to guess.
         "policy_version": str(manifest["policy_version"]), "label_disclosure": str(manifest["disclosure"]),
+        "policy_version_by_round": dict(manifest.get("policy_version_by_round", {})),
+        "label_disclosure_by_round": dict(manifest.get("disclosure_by_round", {})),
         "config_sha256": cfg.config_sha256,
         "lock_sha256": sha256_file(paths.lock_file) if paths.lock_file.exists() else "missing",
         "source_commit": head or "unknown", "source_dirty": git_dirty(cfg.repo_root) if head else False,

@@ -163,3 +163,37 @@ def test_provenance_survives_a_non_git_root(trained):
     assert p["source_commit"] == "unknown" and p["source_dirty"] is False
     assert p["policy_version"] == "label_policy_v1" and p["feature_policy_version"] == "features_v1"
     assert p["label_disclosure"] == "model-labelled, founder-adjudicated"
+
+
+def test_provenance_carries_the_per_round_maps_not_only_the_flattened_scalars(tmp_path):
+    """model-manifest.json is the FIRST of the four manifests hashed into release_id, and Plan C copies
+    these fields into the published model card. A scalar policy_version of label_policy_v1 is false of
+    2,880 of the 3,120 real label rows, so shipping it alone bakes that claim into a permanent id."""
+    import json
+
+    from ucc_ml.config import artefact_paths, load_config
+    from ucc_ml.synthetic import make_world, write_config, write_world
+    from ucc_ml.training import provenance
+
+    world = make_world(seed=5, groups_per_region=60)
+    root = tmp_path / "w"
+    write_config(root)
+    paths = write_world(world, root)
+    cfg = load_config(root / "ml" / "configs" / "v1.yaml")
+
+    manifest = json.loads(paths.labels_manifest.read_text(encoding="utf-8"))
+    manifest["policy_version_by_round"] = {"pilot_v1": "label_policy_v1", "main_v1": "label_policy_v2"}
+    manifest["disclosure_by_round"] = {"pilot_v1": "model-labelled, founder-adjudicated",
+                                       "main_v1": "model-labelled, two independent blind passes, "
+                                                  "disagreements retained as unresolved"}
+    paths.labels_manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+    prov = provenance(cfg, paths)
+    assert prov["policy_version_by_round"] == {"pilot_v1": "label_policy_v1", "main_v1": "label_policy_v2"}
+    assert set(prov["label_disclosure_by_round"]) == {"pilot_v1", "main_v1"}
+    assert prov["policy_version"] and prov["label_disclosure"]        # the scalars still travel too
+
+    del manifest["policy_version_by_round"], manifest["disclosure_by_round"]
+    paths.labels_manifest.write_text(json.dumps(manifest), encoding="utf-8")
+    bare = provenance(cfg, paths)
+    assert bare["policy_version_by_round"] == {} and bare["label_disclosure_by_round"] == {}
