@@ -78,6 +78,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_arg(sp)
     sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
     sp.set_defaults(func=cmd_import_founder_review)
+    sp = sub.add_parser("validate-labels", help="merge every validated round into labels.csv + labels_manifest.json (refuses undecided disagreements)")
+    _add_config_arg(sp)
+    sp.set_defaults(func=cmd_validate_labels)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -347,6 +350,57 @@ def cmd_import_founder_review(ns: argparse.Namespace) -> int:
         print(f"INCOMPLETE: {disagreements['undecided']} disagreement(s) still have no founder decision; "
               "validate-labels will refuse")
         return 1
+    return 0
+
+
+def cmd_validate_labels(ns: argparse.Namespace) -> int:
+    from ucc_ml import labeling
+    from ucc_ml.config import artefact_paths, load_config
+    from ucc_ml.provenance import git_head, sha256_file, utc_now_iso, write_json
+
+    cfg = load_config(ns.config)
+    paths = artefact_paths(cfg)
+    rounds = [r for r in ("pilot_v1", "main_v1")
+              if any(labeling.round_paths(cfg, r).pass_file(letter).exists() for letter in labeling.PASSES)]
+    if "pilot_v1" not in rounds:
+        print("REFUSED: the pilot_v1 passes have not been imported (run import-labels --round pilot_v1)")
+        return 1
+    frames, agreements, founder, inputs = {}, {}, {}, {}
+    for round_name in rounds:
+        rp = labeling.round_paths(cfg, round_name)
+        try:
+            frames[round_name], agreements[round_name], founder[round_name] = labeling.load_round_for_validation(
+                rp, cfg.version.label_policy_version)
+        except (labeling.UndecidedDisagreements, FileNotFoundError) as exc:
+            print(f"REFUSED: {exc}; labels.csv was not written")
+            return 1
+        for used in (rp.pass_file("a"), rp.pass_file("b"), rp.review_manifest, rp.founder_decisions):
+            inputs[str(used.relative_to(cfg.repo_root))] = sha256_file(used)
+    labels = labeling.build_labels(frames)
+    labels_sha = labeling.write_csv(labels, paths.labels_csv)
+    manifest = labeling.labels_manifest(
+        labels, labels_sha, agreements, founder, cfg.version.label_policy_version,
+        extra={"created_at": utc_now_iso(), "git_head": git_head(cfg.repo_root), "config_sha256": cfg.config_sha256,
+               "inputs_sha256": inputs})
+    write_json(paths.labels_manifest, manifest)
+    for round_name in rounds:
+        rp = labeling.round_paths(cfg, round_name)
+        report = labeling.round_report(labels, agreements[round_name], founder[round_name], round_name)
+        write_json(rp.report, report)
+        shares = {s: v["insufficient_share"] for s, v in report["labelability"].items()}
+        prevalence = {s: v["relevant_share"] for s, v in report["relevant_prevalence"].items()}
+        print(f"{round_name}: cases={report['cases']} counts_by_status={report['counts_by_status']}")
+        print(f"  INSUFFICIENT_EVIDENCE share by stratum={shares}")
+        print(f"  RELEVANT share by stratum={prevalence}")
+        print(f"  pass agreement={report['pass_agreement']['agreed']}/{report['pass_agreement']['n']} "
+              f"founder audit={report['founder_audit']['n_confirmed']}/{report['founder_audit']['n_audited']} "
+              f"repeat consistency a={report['repeat_consistency']['pass_a']['consistent']}/{report['repeat_consistency']['pass_a']['n']} "
+              f"b={report['repeat_consistency']['pass_b']['consistent']}/{report['repeat_consistency']['pass_b']['n']}")
+        print(f"  wrote {rp.report}")
+    digest = labeling.write_labels_digest(paths.public_data_dir, paths.labels_csv, paths.labels_manifest, manifest)
+    print(f"labels rows={manifest['rows']} counts_by_status={manifest['counts_by_status']} "
+          f"counts_by_round={manifest['counts_by_round']} ({manifest['disclosure']})")
+    print(f"wrote {paths.labels_csv}, {paths.labels_manifest} and {digest}")
     return 0
 
 

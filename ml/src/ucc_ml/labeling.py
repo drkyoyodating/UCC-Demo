@@ -816,3 +816,162 @@ def write_founder_digest(rp: RoundPaths, issued_sha256: str) -> str:
         f"written, so the adjudications behind these {LABEL_DISCLOSURE} labels cannot change silently.",
     ]
     return write_digest_file(rp.founder_digest, [rp.workbook, rp.review_manifest, rp.founder_decisions], comments)
+
+
+# ============================================================================= Task 19
+# labels.csv for all rounds, read_labels (contract K7), labels_manifest.json (K3), the round report (K13.1).
+from ucc_ml.contracts import ADJUDICATION_STATUSES  # noqa: E402
+from ucc_ml.provenance import read_json  # noqa: E402
+
+RESOLVED_LABELS: tuple[str, ...] = ("RELEVANT", "NOT_RELEVANT")
+
+
+def build_labels(round_frames: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
+    """Merge the rounds' K3 rows into one labels.csv frame (pilot_v1 first, then main_v1) and check it."""
+    unknown = sorted(set(round_frames) - set(LABELLING_ROUNDS))
+    if unknown:
+        raise ValueError(f"unknown labelling round(s) {unknown}")
+    if not round_frames:
+        raise ValueError("no labelling round to merge")
+    for round_name, frame in round_frames.items():
+        if set(frame.labelling_round) - {round_name}:
+            raise ValueError(f"the {round_name} rows carry labelling_round values {sorted(set(frame.labelling_round))}")
+    labels = pd.concat([round_frames[r] for r in LABELLING_ROUNDS if r in round_frames], ignore_index=True)
+    labels = labels[list(LABEL_COLUMNS)]
+    originals, repeats = labels[~labels.is_repeat], labels[labels.is_repeat]
+    twice = sorted(set(originals.case_id[originals.case_id.duplicated()]))
+    if twice:
+        raise ValueError(f"{len(twice)} case_id(s) labelled more than once across rounds, e.g. {twice[:3]}")
+    doubled = repeats[repeats.duplicated(["case_id", "labeller_id"])]
+    if len(doubled):
+        raise ValueError(f"a pass repeats a blind_repeat row for case_id(s) {sorted(set(doubled.case_id))[:3]}")
+    orphans = sorted(set(zip(repeats.case_id, repeats.labelling_round))
+                     - set(zip(originals.case_id, originals.labelling_round)))
+    if orphans:
+        raise ValueError(f"blind repeat(s) without an original row in the same round: {orphans[:3]}")
+    return labels.reset_index(drop=True)
+
+
+def _is_probability(text) -> bool:
+    try:
+        value = float(text)
+    except (TypeError, ValueError):
+        return False
+    return 0.0 < value <= 1.0
+
+
+def read_labels(path: Path) -> pd.DataFrame:
+    """The only reader of labels.csv (contract K7): exact LABEL_COLUMNS, every domain checked, typed.
+
+    is_repeat becomes bool and inclusion_probability float; every other column stays str. A failure raises
+    ValueError naming the file, the column and the offending values."""
+    path = Path(path)
+    df = read_exact_csv(path, LABEL_COLUMNS)
+    check_column(path, df, "case_id", is_sha256_hex)
+    check_column(path, df, "label", lambda v: v in LABELS)
+    check_column(path, df, "adjudication_status", lambda v: v in ADJUDICATION_STATUSES)
+    check_column(path, df, "labelling_round", lambda v: v in LABELLING_ROUNDS)
+    check_column(path, df, "sampling_stratum", lambda v: v in STRATA)
+    check_column(path, df, "reason", lambda v: bool(v.strip()))
+    check_column(path, df, "inclusion_probability", _is_probability)
+    parse_bool_column(path, df, "is_repeat")
+    df["inclusion_probability"] = df.inclusion_probability.astype(float)
+    mismatch = df[(df.adjudication_status == "blind_repeat") != df.is_repeat]
+    if len(mismatch):
+        raise ValueError(f"{path}: column 'is_repeat' disagrees with adjudication_status in {len(mismatch)} row(s), "
+                         f"e.g. {mismatch.case_id.tolist()[:3]}")
+    return df
+
+
+def labels_manifest(labels: pd.DataFrame, labels_sha256: str, agreements: Mapping[str, dict],
+                    founder: Mapping[str, dict], policy_version: str, extra: Mapping | None = None) -> dict:
+    """labels_manifest.json under contract K3 (Plan B reads it; Plan C publishes a whitelist of it)."""
+    rounds = [r for r in LABELLING_ROUNDS if r in agreements]
+    originals = labels[~labels.is_repeat]
+    pooled = {}
+    for letter in ("pass_a", "pass_b"):
+        n = sum(agreements[r]["repeat_consistency"][letter]["n"] for r in rounds)
+        consistent = sum(agreements[r]["repeat_consistency"][letter]["consistent"] for r in rounds)
+        pooled[letter] = {"n": int(n), "consistent": int(consistent), "rate": finite_or_none(consistent / n) if n else None}
+    manifest = {
+        "policy_version": policy_version,
+        "disclosure": LABEL_DISCLOSURE,
+        "labels_sha256": labels_sha256,
+        "rows": int(len(labels)),
+        "rounds": rounds,
+        "counts_by_status": {s: int((labels.adjudication_status == s).sum()) for s in ADJUDICATION_STATUSES},
+        "counts_by_round": {r: int((labels.labelling_round == r).sum()) for r in rounds},
+        "cases_by_round": {r: int((originals.labelling_round == r).sum()) for r in rounds},
+        "counts_by_label": {label: int((originals.label == label).sum()) for label in LABELS},
+        "counts_by_round_and_status": {r: {s: int(((labels.labelling_round == r) & (labels.adjudication_status == s)).sum())
+                                           for s in ADJUDICATION_STATUSES} for r in rounds},
+        "pass_agreement": {r: {k: agreements[r]["pass_agreement"][k] for k in ("n", "agreed", "rate")} for r in rounds},
+        "founder_audit": {r: dict(founder[r]["audit"]) for r in rounds},
+        "founder_disagreements": {r: dict(founder[r]["disagreements"]) for r in rounds},
+        "repeat_consistency": pooled,
+        "repeat_consistency_by_round": {r: agreements[r]["repeat_consistency"] for r in rounds},
+    }
+    manifest.update(extra or {})
+    return manifest
+
+
+def round_report(labels: pd.DataFrame, agreement: dict, founder: dict, round_name: str) -> dict:
+    """Contract K13.1: labelability and RELEVANT prevalence by stratum, pass agreement, founder audit
+    agreement and blind-repeat consistency for one round (unweighted within each stratum)."""
+    in_round = labels[labels.labelling_round == round_name]
+    cases = in_round[~in_round.is_repeat]
+    labelability, prevalence = {}, {}
+    for stratum in STRATA:
+        group = cases[cases.sampling_stratum == stratum]
+        n = int(len(group))
+        insufficient = int((group.label == "INSUFFICIENT_EVIDENCE").sum())
+        relevant = int((group.label == "RELEVANT").sum())
+        resolved = int(group.label.isin(RESOLVED_LABELS).sum())
+        labelability[stratum] = {"n": n, "insufficient": insufficient,
+                                 "insufficient_share": finite_or_none(insufficient / n) if n else None}
+        prevalence[stratum] = {"n": n, "relevant": relevant, "relevant_share": finite_or_none(relevant / n) if n else None,
+                               "resolved": resolved,
+                               "relevant_share_of_resolved": finite_or_none(relevant / resolved) if resolved else None}
+    return {
+        "round": round_name,
+        "disclosure": LABEL_DISCLOSURE,
+        "cases": int(len(cases)),
+        "counts_by_status": {s: int((in_round.adjudication_status == s).sum()) for s in ADJUDICATION_STATUSES},
+        "labelability": labelability,
+        "relevant_prevalence": prevalence,
+        "pass_agreement": agreement["pass_agreement"],
+        "founder_audit": founder["audit"],
+        "founder_disagreements": founder["disagreements"],
+        "repeat_consistency": agreement["repeat_consistency"],
+        "note": "shares are unweighted within each stratum; strata are sampled at different rates, so never pool "
+                "them without the design weights",
+    }
+
+
+def load_round_for_validation(rp: RoundPaths, policy_version: str) -> tuple[pd.DataFrame, dict, dict]:
+    """(K3 rows, agreement report, founder summary) for a round whose passes, review and decisions all exist.
+
+    Raises FileNotFoundError for a missing input and UndecidedDisagreements while a disagreement is blank."""
+    for required, what in ((rp.pass_file("a"), "pass a"), (rp.pass_file("b"), "pass b"),
+                           (rp.review_manifest, "the founder review manifest (run review-workbook)"),
+                           (rp.founder_decisions, "the founder decisions (run import-founder-review)")):
+        if not Path(required).exists():
+            raise FileNotFoundError(f"{rp.round_name}: {what} is missing: {required}")
+    pass_a, pass_b = read_pass_file(rp.pass_file("a")), read_pass_file(rp.pass_file("b"))
+    decisions = read_founder_decisions(rp.founder_decisions)
+    labels = assemble_round_labels(pass_a, pass_b, decisions, rp.round_name, policy_version)
+    return labels, agreement_report(pass_a, pass_b, rp.round_name), founder_summary(decisions, read_json(rp.review_manifest))
+
+
+def write_labels_digest(public_data_dir: Path, labels_csv: Path, manifest_path: Path, manifest: dict) -> Path:
+    path = Path(public_data_dir) / "labels_v1.sha256"
+    status = manifest["counts_by_status"]
+    comments = [
+        f"labels.csv and labels_manifest.json for rounds {', '.join(manifest['rounds'])}; labels are {LABEL_DISCLOSURE}.",
+        "counts_by_status " + ", ".join(f"{s}={status[s]}" for s in ADJUDICATION_STATUSES),
+        "pass_agreement " + ", ".join(f"{r}={v['agreed']}/{v['n']}" for r, v in manifest["pass_agreement"].items()),
+        "founder_audit " + ", ".join(f"{r}={v['n_confirmed']}/{v['n_audited']}" for r, v in manifest["founder_audit"].items()),
+        "repeat_consistency " + ", ".join(f"{p}={v['consistent']}/{v['n']}" for p, v in manifest["repeat_consistency"].items()),
+    ]
+    write_digest_file(path, [labels_csv, manifest_path], comments)
+    return path
