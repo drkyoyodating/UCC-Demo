@@ -1,0 +1,4 @@
+0e77a93b5e65ec6ec1051385290824c22831b2693b6d913fb15290ce9748ed09  ml/artifacts/frozen/v1/SHA256SUMS
+7cfb134630bb58890a9b4c5c258e7bf5b4e49d8bcd491c603b541f12f1d95856  ml/artifacts/frozen/v1/threshold.json
+# Committed BEFORE evaluate-final. Proves the model weights, the calibrator and the validation-chosen
+# threshold were fixed in advance of any TEST score (ml/specs/evaluation_protocol_v1.md §7).
