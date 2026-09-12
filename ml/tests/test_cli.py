@@ -55,3 +55,14 @@ def test_anchor_markers_are_present_exactly_once():
     assert text.count(SUBCOMMAND_MARKER) == 1
     assert text.count(CMD_MARKER) == 1
     assert text.index(SUBCOMMAND_MARKER) < text.index(CMD_MARKER) < text.index("def main(argv: list[str] | None = None) -> int:")
+
+
+def test_round_choices_match_the_contract():
+    """cli.ROUND_CHOICES is duplicated from contracts.LABELLING_ROUNDS so that building the parser
+    imports no pydantic. This pins the duplication: a round added to the contract and not to the CLI
+    is rejected at the command line while being valid everywhere else, which is how ablation_v1 was
+    first refused."""
+    from ucc_ml import cli
+    from ucc_ml.contracts import LABELLING_ROUNDS
+
+    assert cli.ROUND_CHOICES == LABELLING_ROUNDS

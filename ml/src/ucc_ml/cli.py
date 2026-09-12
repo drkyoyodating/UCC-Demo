@@ -21,6 +21,12 @@ from pathlib import Path
 
 from ucc_ml import __version__
 
+#: The labelling rounds every --round argument accepts. Spelled here rather than imported from
+#: ucc_ml.contracts because building the parser must not import pydantic (contract K11, pinned by
+#: test_building_the_parser_imports_nothing_heavy). test_round_choices_match_the_contract asserts
+#: this tuple equals contracts.LABELLING_ROUNDS, so the duplication cannot drift.
+ROUND_CHOICES: tuple[str, ...] = ("pilot_v1", "ablation_v1", "yield_probe_v1", "main_v1", "queue_v1")
+
 
 def _add_config_arg(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
@@ -47,36 +53,36 @@ def build_parser() -> argparse.ArgumentParser:
     sp.set_defaults(func=cmd_freeze_splits)
     sp = sub.add_parser("label-blind", help="emit a round's chunked blind queue, its private key and the pre-registration digest")
     _add_config_arg(sp)
-    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.add_argument("--round", required=True, choices=ROUND_CHOICES)
     sp.add_argument("--chunk-size", type=int, default=None, help="cases per chunk before repeats (default: labelling.chunk_size)")
     sp.set_defaults(func=cmd_label_blind)
     sp = sub.add_parser("labeller-brief", help="render one queue chunk's blind labeller brief (policy and chunk inline, K14)")
     _add_config_arg(sp)
-    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.add_argument("--round", required=True, choices=ROUND_CHOICES)
     sp.add_argument("--part", required=True, type=int)
     sp.set_defaults(func=cmd_labeller_brief)
     sp = sub.add_parser("labelling-status", help="which queue chunks each blind pass has returned")
     _add_config_arg(sp)
-    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.add_argument("--round", required=True, choices=ROUND_CHOICES)
     sp.set_defaults(func=cmd_labelling_status)
     sp = sub.add_parser("write-raw-labels", help="validate one labeller agent's structured output and write its raw CSV")
     _add_config_arg(sp)
-    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.add_argument("--round", required=True, choices=ROUND_CHOICES)
     sp.add_argument("--pass", dest="pass_letter", required=True, choices=("a", "b"))
     sp.add_argument("--part", required=True, type=int)
     sp.add_argument("--structured", required=True, type=Path, help="the agent's structured output, saved verbatim as JSON")
     sp.set_defaults(func=cmd_write_raw_labels)
     sp = sub.add_parser("import-labels", help="validate and de-alias both blind passes of a round; freeze their digests")
     _add_config_arg(sp)
-    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.add_argument("--round", required=True, choices=ROUND_CHOICES)
     sp.set_defaults(func=cmd_import_labels)
     sp = sub.add_parser("review-workbook", help="pass agreement, repeat consistency and the founder review workbook for a round")
     _add_config_arg(sp)
-    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.add_argument("--round", required=True, choices=ROUND_CHOICES)
     sp.set_defaults(func=cmd_review_workbook)
     sp = sub.add_parser("import-founder-review", help="import the founder's review workbook of a round; freeze its digest")
     _add_config_arg(sp)
-    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.add_argument("--round", required=True, choices=ROUND_CHOICES)
     sp.set_defaults(func=cmd_import_founder_review)
     sp = sub.add_parser("validate-labels", help="merge every validated round into labels.csv + labels_manifest.json (refuses undecided disagreements)")
     _add_config_arg(sp)
