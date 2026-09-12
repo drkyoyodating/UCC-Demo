@@ -90,6 +90,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("build-screen", help="fit the sampling screen and assign every case a cell")
     _add_config_arg(sp)
     sp.set_defaults(func=cmd_build_screen)
+    sp = sub.add_parser("make-main-round", help="draw the screened main round per (split, stratum, cell)")
+    _add_config_arg(sp)
+    sp.add_argument("--dry-run", action="store_true", help="print the allocation and draw nothing")
+    sp.set_defaults(func=cmd_make_main_round)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -424,6 +428,58 @@ def cmd_build_screen(ns: argparse.Namespace) -> int:
     print(f"fit on {m['fit_split']}: {m['fit_positives']:,} positive / {m['fit_negatives']:,} negative")
     print(f"rules words among the top 200 features: {m['rules_words_in_top_200_features']}")
     print(f"wrote {out['cells']} sha256={m['screen_cells_sha256']}")
+    return 0
+
+
+def cmd_make_main_round(ns: argparse.Namespace) -> int:
+    from ucc_ml.config import artefact_paths, load_config
+    from ucc_ml.dataset import read_candidates, read_frame
+    from ucc_ml.provenance import git_head, sha256_file, utc_now_iso, write_json
+    from ucc_ml.sampling import draw_main_round, propose_main_allocation, split_cell_populations
+    from ucc_ml.splitting import read_splits
+
+    cfg = load_config(ns.config)
+    paths = artefact_paths(cfg)
+    cases = read_candidates(paths.candidates_parquet)
+    splits = read_splits(paths.splits_parquet)
+    cells = read_frame(paths.screen_cells)
+    budget = cfg.section("budget")["main_round"]
+    totals = {k: int(budget[k]) for k in ("train", "validation", "test")}
+    floor = int(cfg.section("screening")["b4_floor_per_split"])
+    pops = split_cell_populations(cases, splits, cells)
+    alloc = propose_main_allocation(pops, totals, b4_floor_per_split=floor)
+
+    for split in ("train", "validation", "test"):
+        print(f"{split}: {sum(alloc[split].values())} cases over {len(alloc[split])} cells; "
+              f"unscreened floor {sum(n for (_, c), n in alloc[split].items() if c == 'B4_remainder')} >= {floor}")
+    if ns.dry_run:
+        return 0
+
+    pilot = read_frame(paths.pilot_cases).case_id.tolist()
+    drawn = draw_main_round(cases, splits, cells, alloc, seed=cfg.seed, exclude_case_ids=pilot)
+    paths.main_cases.parent.mkdir(parents=True, exist_ok=True)
+    drawn.to_parquet(paths.main_cases, index=False)
+    write_json(paths.main_manifest, {
+        "purpose": "main_v1",
+        "policy_version": cfg.labelling.policy_version_by_round.get("main_v1"),
+        "rows": int(len(drawn)),
+        "totals": totals,
+        "b4_floor_per_split": floor,
+        "allocation": {s: {f"{k[0]}|{k[1]}": v for k, v in a.items()} for s, a in alloc.items()},
+        "populations": {s: {f"{k[0]}|{k[1]}": v for k, v in a.items()} for s, a in pops.items()},
+        "by_split": {k: int(v) for k, v in drawn.split.value_counts().items()},
+        "by_cell": {k: int(v) for k, v in drawn.screen_cell.value_counts().items()},
+        "excluded_pilot_cases": len(pilot),
+        "seed": cfg.seed,
+        "candidates_sha256": sha256_file(paths.candidates_parquet),
+        "splits_sha256": sha256_file(paths.splits_parquet),
+        "screen_cells_sha256": sha256_file(paths.screen_cells),
+        "main_cases_sha256": sha256_file(paths.main_cases),
+        "created_at": utc_now_iso(), "git_head": git_head(cfg.repo_root),
+        "config_sha256": cfg.config_sha256,
+    })
+    print(f"wrote {paths.main_cases} rows={len(drawn)} sha256={sha256_file(paths.main_cases)}")
+    print(f"wrote {paths.main_manifest}")
     return 0
 
 
