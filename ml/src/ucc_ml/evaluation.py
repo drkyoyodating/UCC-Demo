@@ -1,9 +1,11 @@
 """Design-weighted evaluation for the UCC relevance screener (ml/specs/evaluation_protocol_v1.md).
 
 Weights (protocol §2): in a split S, stratum h has N_h candidates and n_h non-repeat labelled cases drawn,
-INSUFFICIENT_EVIDENCE included. Every labelled case gets w_h = N_h / n_h, which equals 1 / inclusion_probability
-because validation and test hold no pilot case (K12) and the main round draws within (split, stratum) (K13);
-`design_weights` checks that equality row by row. Rates use the RESOLVED cases with these weights, so they
+INSUFFICIENT_EVIDENCE included. Every labelled case gets `1 / inclusion_probability`, the rate of the CELL it was
+drawn from. `w_h = N_h / n_h` is the stratum's AVERAGE weight, reported for the reader and applied to nothing: the
+screened round draws within (split, stratum, cell), so one stratum carries up to four rates and no single value is
+the weight of every row in it. `design_weights` checks that the weights RECONSTRUCT N_h. Rates use the RESOLVED
+cases with these weights, so they
 estimate performance on the resolvable population of S. Dividing N_h by the RESOLVED count instead would impute
 every INSUFFICIENT_EVIDENCE case with the resolved cases' outcome mix and re-weight strata by their unresolved
 share, which is biased whenever that share differs across strata. Nothing pools the enriched sample unweighted.
@@ -136,3 +138,167 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float | None, float | None]
     centre = (p + z * z / (2 * n)) / (1 + z * z / n)
     half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
     return max(0.0, centre - half), min(1.0, centre + half)
+
+
+# ---------------------------------------------------------------------------
+# Uncertainty (protocol §5): stratified cluster Bayesian bootstrap with Jeffreys pseudo-counts
+# ---------------------------------------------------------------------------
+BOOTSTRAP_METHOD = "stratified cluster Bayesian bootstrap with Jeffreys pseudo-counts (prior 0.5)"
+REPORT_KEYS: tuple[str, ...] = ("n", "positives", "negatives", "weights", "model", "rules", "delta_model_minus_rules",
+                                "unresolved_share", "unresolved_share_among_model_positive", "review_queue", "per_region",
+                                "per_stratum", "bootstrap")
+
+
+@dataclass(frozen=True)
+class BootstrapResult:
+    estimate: float | None
+    lower: float | None
+    upper: float | None
+    n_resamples: int
+    n_failed: int
+
+    def to_dict(self) -> dict:
+        return {"estimate": self.estimate, "lower": self.lower, "upper": self.upper,
+                "n_resamples": self.n_resamples, "n_failed": self.n_failed}
+
+
+def _percentile_result(estimate, replicates, level: float) -> BootstrapResult:
+    replicates = np.asarray(replicates, dtype=float)
+    n_failed = int(np.isnan(replicates).sum())
+    if n_failed == len(replicates):
+        return BootstrapResult(finite_or_none(estimate), None, None, len(replicates), n_failed)
+    alpha = (1.0 - level) / 2.0
+    lo, hi = np.nanpercentile(replicates, [100 * alpha, 100 * (1 - alpha)])
+    return BootstrapResult(finite_or_none(estimate), float(lo), float(hi), len(replicates), n_failed)
+
+
+def jeffreys_cluster_draws(y, pred_model, pred_rules, strata, groups, N_h, weights, *, n_resamples: int = 2000,
+                           seed: int = 0, prior: float = 0.5) -> dict:
+    """Stratified cluster Bayesian bootstrap with Jeffreys pseudo-counts. y: 1 / 0 / -1 (INSUFFICIENT_EVIDENCE) for EVERY
+    non-repeat labelled case of the split. Returns {stratum: (n_resamples, 9) estimated population cell totals};
+    cell = (1-y)*4 + (1-model)*2 + (1-rules) for resolved cases, 8 = unresolved.
+
+    A row contributes its DESIGN WEIGHT, not 1.0. Counting rows and rescaling the resulting shares to N_h makes the
+    expected cell share the unweighted sample share, which is algebraically w_h = N_h / n_h -- the retired estimator,
+    rediscovered. Under the screen that is not a near-miss: the boundary cells are ~19% of the sample and ~6%, ~2%
+    and ~1% of the population, and they are enriched in RELEVANT cases, so both the centre and the interval move
+    upward. Measured on the real test split before this was fixed, the review-queue precision interval
+    [0.0763, 0.3517] did not contain the design-correct value 0.0358.
+
+    The pseudo-mass scales with the stratum's mean weight PER CLUSTER. Jeffreys smoothing was calibrated against
+    totals on the SAMPLE scale (n_h ~ 200); weighted totals sit on the POPULATION scale (N_h ~ 10^5), where a fixed
+    0.5 is negligible and the property that keeps a stratum with no sampled false positive uncertain silently
+    vanishes -- measured, that stratum's precision lower bound goes from 0.477 to 0.999, i.e. no uncertainty at all.
+    The scale is N_h / (number of clusters), not N_h / (number of rows), because the cluster is the unit of evidence
+    being resampled: repeating one borrower's rows five times must not change the smoothing, and dividing by rows
+    would cut it fivefold. Measured width ratio under that duplication: 1.000 by clusters, 0.969-1.022 by rows."""
+    y = np.asarray(y, dtype=int); pm = _as_int_array(pred_model); pr = _as_int_array(pred_rules)
+    w = np.asarray(weights, dtype=float)
+    strata = np.asarray(strata).astype(str); groups = np.asarray(groups).astype(str)
+    missing = sorted(set(strata.tolist()) - set(N_h))
+    if missing:
+        raise ValueError(f"strata {missing} have labelled rows but no population count N_h")
+    rng = np.random.default_rng(seed)
+    cell = np.where(y < 0, 8, (1 - np.clip(y, 0, 1)) * 4 + (1 - pm) * 2 + (1 - pr))
+    out = {}
+    for h in sorted(set(strata.tolist())):
+        m = strata == h
+        allowed = np.zeros(9, dtype=bool); allowed[8] = True
+        for yy in (1, 0):
+            for mm in (1, 0):
+                for rr in set(pr[m].tolist()):
+                    allowed[(1 - yy) * 4 + (1 - mm) * 2 + (1 - rr)] = True
+        codes, uniq = pd.factorize(pd.Series(groups[m]))
+        counts = np.zeros((len(uniq), 9)); np.add.at(counts, (codes, cell[m]), w[m])
+        totals = rng.gamma(1.0, 1.0, size=(n_resamples, len(uniq))) @ counts
+        unit = float(N_h[h]) / max(len(uniq), 1)             # mean weight per CLUSTER: invariant to duplication
+        totals[:, allowed] += rng.gamma(prior, unit, size=(n_resamples, int(allowed.sum())))
+        out[h] = float(N_h[h]) * totals / totals.sum(axis=1, keepdims=True)
+    return out
+
+
+def _cell(yy: int, mm: int, rr: int) -> int:
+    return (1 - yy) * 4 + (1 - mm) * 2 + (1 - rr)
+
+
+def draws_to_rates(draws: dict, subset) -> dict:
+    S = sum(draws[h] for h in subset if h in draws)
+    m_tp = S[:, _cell(1, 1, 1)] + S[:, _cell(1, 1, 0)]; m_fp = S[:, _cell(0, 1, 1)] + S[:, _cell(0, 1, 0)]
+    m_fn = S[:, _cell(1, 0, 1)] + S[:, _cell(1, 0, 0)]
+    r_tp = S[:, _cell(1, 1, 1)] + S[:, _cell(1, 0, 1)]; r_fp = S[:, _cell(0, 1, 1)] + S[:, _cell(0, 0, 1)]
+    r_fn = S[:, _cell(1, 1, 0)] + S[:, _cell(1, 0, 0)]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        mp, mr = m_tp / (m_tp + m_fp), m_tp / (m_tp + m_fn)
+        rp, rr = r_tp / (r_tp + r_fp), r_tp / (r_tp + r_fn)
+        mf, rf = 2 * mp * mr / (mp + mr), 2 * rp * rr / (rp + rr)
+        unresolved = S[:, 8] / S.sum(axis=1)
+    return {"model": {"weighted_precision": mp, "weighted_recall": mr, "weighted_f1": mf},
+            "rules": {"weighted_precision": rp, "weighted_recall": rr, "weighted_f1": rf},
+            "delta": {"delta_weighted_precision": mp - rp, "delta_weighted_recall": mr - rr, "delta_weighted_f1": mf - rf},
+            "unresolved_share": unresolved}
+
+
+def evaluate_split(y_all, pred_model_all, pred_rules_all, strata_all, groups_all, regions_all, N_h, weights, *,
+                   n_resamples: int, seed: int, level: float) -> dict:
+    """Report block for one split. y_all: 1/0/-1 for EVERY non-repeat labelled case (INSUFFICIENT_EVIDENCE included).
+
+    `weights` is the caller's design weight per row -- `design_weights(split_rows, N_h)`, i.e. the rate of the CELL
+    each row was drawn from. It is passed in rather than derived here because it cannot be derived here: N_h and a
+    stratum count give only the stratum AVERAGE, which the protocol forbids applying to any row. Both callers
+    already compute it. One array feeds the point estimates and the bootstrap, so the estimate can never sit
+    outside its own interval."""
+    y_all = np.asarray(y_all, dtype=int); pm = _as_int_array(pred_model_all); pr = _as_int_array(pred_rules_all)
+    strata_all = np.asarray(strata_all).astype(str); groups_all = np.asarray(groups_all).astype(str)
+    regions_all = np.asarray(regions_all).astype(str)
+    n_h = pd.Series(strata_all).value_counts().to_dict()
+    missing = sorted(set(n_h) - set(N_h))
+    if missing:
+        raise ValueError(f"strata {missing} have labelled rows but no population count N_h")
+    undrawn = sorted(h for h, n in N_h.items() if n > 0 and h not in n_h)
+    if undrawn:
+        raise ValueError(f"strata {undrawn} have population but no labelled row")
+    rq = sorted(h for h in n_h if h.endswith(":rejected"))
+    if not rq:
+        raise ValueError("no labelled case in a rules-rejected stratum: the review queue cannot be estimated")
+    w_all = np.asarray(weights, dtype=float)
+    if len(w_all) != len(y_all):
+        raise ValueError(f"weights has {len(w_all)} entries for {len(y_all)} labelled rows")
+    for h in sorted(n_h):
+        total = float(w_all[strata_all == h].sum())
+        if not np.isclose(total, float(N_h[h]), rtol=1e-6):
+            raise ValueError(f"the design weights of stratum {h!r} sum to {total:.2f}, which does not reconstruct "
+                             f"its population N_h={N_h[h]}")
+    draws = jeffreys_cluster_draws(y_all, pm, pr, strata_all, groups_all, N_h, w_all,
+                                   n_resamples=n_resamples, seed=seed)
+
+    def block(mask: np.ndarray, subset: list) -> dict:
+        r = mask & (y_all >= 0)
+        rates = draws_to_rates(draws, subset)
+        model = weighted_metrics(y_all[r], pm[r], w_all[r]); rules = weighted_metrics(y_all[r], pr[r], w_all[r])
+        model["ci"] = {k: _percentile_result(model[k], v, level).to_dict() for k, v in rates["model"].items()}
+        rules["ci"] = {k: _percentile_result(rules[k], v, level).to_dict() for k, v in rates["rules"].items()}
+        delta = {}
+        for k, v in rates["delta"].items():
+            base = k.replace("delta_", "")
+            est = None if model[base] is None or rules[base] is None else model[base] - rules[base]
+            delta[k] = _percentile_result(est, v, level).to_dict()
+        pp = mask & (pm == 1)
+        return {"n": int(r.sum()), "positives": int((y_all[r] == 1).sum()), "model": model, "rules": rules, "delta": delta,
+                "unresolved_share": _percentile_result(float((w_all * (mask & (y_all < 0))).sum() / w_all[mask].sum()),
+                                                       rates["unresolved_share"], level).to_dict(),
+                "unresolved_share_among_model_positive": (float((w_all * (pp & (y_all < 0))).sum() / (w_all * pp).sum())
+                                                          if pp.any() else None)}
+
+    top = block(np.ones(len(y_all), dtype=bool), sorted(n_h))
+    clusters = pd.DataFrame({"stratum": strata_all, "group_id": groups_all}).drop_duplicates()
+    return {"n": top["n"], "positives": top["positives"], "negatives": int((y_all == 0).sum()),
+            "weights": weights_table(N_h, strata_all), "model": top["model"], "rules": top["rules"],
+            "delta_model_minus_rules": top["delta"], "unresolved_share": top["unresolved_share"],
+            "unresolved_share_among_model_positive": top["unresolved_share_among_model_positive"],
+            "review_queue": block(np.isin(strata_all, rq), rq),
+            "per_region": [{"region": g, **block(regions_all == g, sorted(h for h in n_h if h.startswith(g + ":")))}
+                           for g in sorted(set(regions_all.tolist()))],
+            "per_stratum": [{"stratum": h, **block(strata_all == h, [h])} for h in sorted(n_h)],
+            "bootstrap": {"method": BOOTSTRAP_METHOD, "n_resamples": n_resamples, "seed": seed, "level": level,
+                          "n_clusters": int(len(clusters)),
+                          "straddling_groups": int((clusters.groupby("group_id").size() > 1).sum())}}
