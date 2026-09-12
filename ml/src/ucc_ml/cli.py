@@ -42,6 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("make-pilot", help="draw the 200-case development pilot (per_stratum x 4 strata)")
     _add_config_arg(sp)
     sp.set_defaults(func=cmd_make_pilot)
+    sp = sub.add_parser("freeze-splits", help="grouped 65/15/20 splits by group_id; every pilot group in train")
+    _add_config_arg(sp)
+    sp.set_defaults(func=cmd_freeze_splits)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -94,6 +97,40 @@ def cmd_make_pilot(ns: argparse.Namespace) -> int:
     write_json(paths.pilot_manifest, manifest)
     print(f"pilot rows={len(pilot)} by_region={manifest['by_region']} strata={ {k: v['n_h'] for k, v in strata.items()} }")
     print(f"wrote {paths.pilot_cases} sha256={sha}")
+    return 0
+
+
+def cmd_freeze_splits(ns: argparse.Namespace) -> int:
+    from ucc_ml import dataset, splitting
+    from ucc_ml.config import artefact_paths, load_config
+    from ucc_ml.provenance import git_head, sha256_file, write_json
+
+    cfg = load_config(ns.config)
+    paths = artefact_paths(cfg)
+    cases = dataset.read_candidates(paths.candidates_parquet)
+    pilot = dataset.read_frame(paths.pilot_cases)
+    ratios = {"train": cfg.splits.train, "validation": cfg.splits.validation, "test": cfg.splits.test}
+    splits, manifest = splitting.freeze_splits(cases, pilot.case_id, ratios, cfg.seed,
+                                               cfg.version.label_policy_version, sha256_file(paths.candidates_parquet))
+    parquet_sha = dataset.write_frame(splits, paths.splits_parquet)
+    manifest.update({"splits_parquet_sha256": parquet_sha, "git_head": git_head(cfg.repo_root),
+                     "config_sha256": cfg.config_sha256})
+    write_json(paths.split_manifest, manifest)
+    digest_path = paths.public_data_dir / "splits_v1.sha256"
+    digest_path.parent.mkdir(parents=True, exist_ok=True)
+    digest_path.write_text(
+        f"{parquet_sha}  splits.parquet\n"
+        f"{manifest['digest']}  splits.digest (sha256 over sorted 'case_id,group_id,split' lines)\n"
+        "# Committed when the splits were frozen, before any label exists. Groups are region-scoped borrower\n"
+        "# names; every group containing a pilot case is in train (contract K12).\n"
+    )
+    g, c, a = manifest["groups"], manifest["cases"], manifest["audit"]
+    print(f"groups={g['total']} by_split={g['by_split']} pilot_groups={g['pilot']}")
+    print(f"cases={c['total']} by_split={c['by_split']} pilot_by_split={c['pilot_by_split']}")
+    print(f"audit: group_overlap={a['group_overlap']} case_overlap={a['case_overlap']} "
+          f"pilot_cases_in_test={a['pilot_cases_in_test']} pilot_cases_not_in_train={a['pilot_cases_not_in_train']} "
+          f"digest={manifest['digest']}")
+    print(f"wrote {paths.splits_parquet} and {digest_path}")
     return 0
 
 
