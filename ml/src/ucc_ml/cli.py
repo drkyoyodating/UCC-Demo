@@ -50,6 +50,22 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
     sp.add_argument("--chunk-size", type=int, default=None, help="cases per chunk before repeats (default: labelling.chunk_size)")
     sp.set_defaults(func=cmd_label_blind)
+    sp = sub.add_parser("labeller-brief", help="render one queue chunk's blind labeller brief (policy and chunk inline, K14)")
+    _add_config_arg(sp)
+    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.add_argument("--part", required=True, type=int)
+    sp.set_defaults(func=cmd_labeller_brief)
+    sp = sub.add_parser("labelling-status", help="which queue chunks each blind pass has returned")
+    _add_config_arg(sp)
+    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.set_defaults(func=cmd_labelling_status)
+    sp = sub.add_parser("write-raw-labels", help="validate one labeller agent's structured output and write its raw CSV")
+    _add_config_arg(sp)
+    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.add_argument("--pass", dest="pass_letter", required=True, choices=("a", "b"))
+    sp.add_argument("--part", required=True, type=int)
+    sp.add_argument("--structured", required=True, type=Path, help="the agent's structured output, saved verbatim as JSON")
+    sp.set_defaults(func=cmd_write_raw_labels)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -167,6 +183,71 @@ def cmd_label_blind(ns: argparse.Namespace) -> int:
         print(f"wrote {path}")
     print(f"wrote {rp.key} sha256={key_sha} (private)")
     print(f"wrote {rp.preregistration}")
+    return 0
+
+
+def cmd_labeller_brief(ns: argparse.Namespace) -> int:
+    from ucc_ml import labeling
+    from ucc_ml.config import load_config
+    from ucc_ml.provenance import write_json
+
+    cfg = load_config(ns.config)
+    rp = labeling.round_paths(cfg, ns.round)
+    specs = cfg.path("specs_dir")
+    policy_text = (specs / f"{cfg.version.label_policy_version}.md").read_text(encoding="utf-8")
+    if not labeling.policy_is_frozen(policy_text):
+        print(f"REFUSED: {cfg.version.label_policy_version}.md is not 'status: FROZEN' (the Task 12 founder gate)")
+        return 1
+    parts = labeling.queue_parts(labeling.read_key(rp.key))
+    if ns.part not in parts:
+        print(f"REFUSED: {ns.round} has parts {parts}, not {ns.part}")
+        return 1
+    prompt_text = (specs / "labeller_prompt_v1.md").read_text(encoding="utf-8")
+    chunk = labeling.read_queue(rp.queue_part(ns.part))
+    brief_path = rp.brief(ns.part)
+    brief_path.parent.mkdir(parents=True, exist_ok=True)
+    rp.structured_dir.mkdir(parents=True, exist_ok=True)
+    brief_path.write_text(labeling.render_labeller_brief(prompt_text, policy_text, chunk), encoding="utf-8")
+    schema_path = rp.briefs_dir / "labeller_output_schema_v1.json"
+    write_json(schema_path, labeling.LABELLER_OUTPUT_SCHEMA)
+    print(f"brief {brief_path} rows={len(chunk)} part={ns.part} of {len(parts)}")
+    print(f"schema {schema_path}")
+    print("give the brief verbatim to one fresh tool-less subagent for pass a and to another for pass b")
+    return 0
+
+
+def cmd_labelling_status(ns: argparse.Namespace) -> int:
+    from ucc_ml import labeling
+    from ucc_ml.config import load_config
+
+    cfg = load_config(ns.config)
+    rp = labeling.round_paths(cfg, ns.round)
+    parts = labeling.queue_parts(labeling.read_key(rp.key))
+    status = labeling.labelling_status(rp, parts)
+    for letter in labeling.PASSES:
+        print(f"pass {letter}: {len(status[letter]['present'])}/{len(parts)} parts present; missing {status[letter]['missing']}")
+    complete = not any(status[letter]["missing"] for letter in labeling.PASSES)
+    print("COMPLETE" if complete else "INCOMPLETE")
+    return 0 if complete else 1
+
+
+def cmd_write_raw_labels(ns: argparse.Namespace) -> int:
+    import json
+
+    from ucc_ml import labeling
+    from ucc_ml.config import load_config
+
+    cfg = load_config(ns.config)
+    rp = labeling.round_paths(cfg, ns.round)
+    chunk = labeling.read_queue(rp.queue_part(ns.part))
+    target = rp.raw_output(ns.pass_letter, ns.part)
+    try:
+        rows = labeling.rows_from_structured_output(json.loads(Path(ns.structured).read_text(encoding="utf-8")))
+        sha = labeling.write_raw_output(rows, target, chunk.case_id.tolist(), cfg.labelling.reason_max_chars)
+    except (ValueError, FileExistsError) as exc:
+        print(f"REJECTED: {exc}")
+        return 1
+    print(f"wrote {target} rows={len(rows)} labels={rows.label.value_counts().sort_index().to_dict()} sha256={sha}")
     return 0
 
 

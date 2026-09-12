@@ -235,3 +235,128 @@ def write_preregistration(rp: RoundPaths, part_paths: list[Path]) -> str:
         f"Labels for this round will be {LABEL_DISCLOSURE}.",
     ]
     return write_digest_file(rp.preregistration, [rp.cases, rp.manifest, rp.key, *part_paths], comments)
+
+
+# ============================================================================= Task 15
+# Labeller briefs (contract K14), structured-output validation, raw labeller CSVs, labelling status.
+import io  # noqa: E402
+import re  # noqa: E402
+from collections import Counter  # noqa: E402
+
+from ucc_ml.contracts import LABELS, REASON_CODES  # noqa: E402
+
+BRIEF_MARKER = "\n=== BRIEF ===\n"
+RAW_OUTPUT_COLUMNS: tuple[str, ...] = ("case_id", "label", "reason_code", "reason")
+LABELLER_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["rows"],
+    "properties": {
+        "rows": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": list(RAW_OUTPUT_COLUMNS),
+                "properties": {
+                    "case_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                    "label": {"type": "string", "enum": list(LABELS)},
+                    "reason_code": {"type": "string",
+                                    "enum": [code for label in LABELS for code in REASON_CODES[label]]},
+                    "reason": {"type": "string", "minLength": 1, "maxLength": 300},
+                },
+            },
+        },
+    },
+}
+_URL = re.compile(r"(https?://|www\.)", re.IGNORECASE)
+
+
+def policy_is_frozen(policy_text: str) -> bool:
+    return any(line.strip() == "status: FROZEN" for line in policy_text.splitlines())
+
+
+def render_labeller_brief(prompt_text: str, policy_text: str, chunk: pd.DataFrame) -> str:
+    """The whole prompt of one blind labeller agent: the brief, the policy verbatim, the chunk as CSV.
+
+    Pass A and pass B receive byte-identical briefs for the same chunk; nothing tells an agent which
+    pass it is, which round it is in, or anything about the sample design."""
+    if prompt_text.count(BRIEF_MARKER) != 1:
+        raise ValueError("the labeller prompt must contain exactly one '=== BRIEF ===' line")
+    if list(chunk.columns) != list(QUEUE_COLUMNS):
+        raise ValueError(f"a queue chunk has exactly the columns {list(QUEUE_COLUMNS)}")
+    brief = prompt_text.split(BRIEF_MARKER, 1)[1].strip("\n")
+    buffer = io.StringIO()
+    chunk.to_csv(buffer, index=False, lineterminator="\n", quoting=csv.QUOTE_MINIMAL)
+    return (f"{brief}\n\n---\n\n# The label policy\n\n{policy_text.strip()}\n\n---\n\n"
+            f"# Your queue chunk ({len(chunk)} rows)\n\n```csv\n{buffer.getvalue()}```\n")
+
+
+def rows_from_structured_output(obj) -> pd.DataFrame:
+    """The labeller's structured output ({"rows": [...]}) as RAW_OUTPUT_COLUMNS; anything else is refused."""
+    if not isinstance(obj, dict) or set(obj) != {"rows"} or not isinstance(obj["rows"], list):
+        raise ValueError('structured output must be an object with exactly one key, "rows", holding a list')
+    for i, row in enumerate(obj["rows"], start=1):
+        if not isinstance(row, dict) or set(row) != set(RAW_OUTPUT_COLUMNS):
+            raise ValueError(f"row {i}: keys must be exactly {list(RAW_OUTPUT_COLUMNS)}")
+        if not all(isinstance(row[k], str) for k in RAW_OUTPUT_COLUMNS):
+            raise ValueError(f"row {i}: every value must be a string")
+    return pd.DataFrame([[row[k] for k in RAW_OUTPUT_COLUMNS] for row in obj["rows"]],
+                        columns=list(RAW_OUTPUT_COLUMNS), dtype=object)
+
+
+def validate_labeller_rows(rows: pd.DataFrame, expected_case_ids: list[str], reason_max_chars: int) -> list[str]:
+    """Every problem with one pass's rows for one chunk; an empty list means the rows are acceptable."""
+    if list(rows.columns) != list(RAW_OUTPUT_COLUMNS):
+        return [f"columns {list(rows.columns)} != {list(RAW_OUTPUT_COLUMNS)}"]
+    problems: list[str] = []
+    got = [v if isinstance(v, str) else "" for v in rows.case_id]
+    expected = list(expected_case_ids)
+    if got != expected:
+        missing = [c for c in expected if c not in set(got)]
+        unexpected = [c for c in got if c not in set(expected)]
+        duplicated = sorted(c for c, n in Counter(got).items() if n > 1)
+        problems.append(f"case_id sequence differs from the queue chunk ({len(got)} rows, {len(expected)} expected; "
+                        f"missing {missing[:3]}, unexpected {unexpected[:3]}, duplicated {duplicated[:3]})")
+    for i, (label, code, reason) in enumerate(zip(rows.label, rows.reason_code, rows.reason), start=1):
+        label = label if isinstance(label, str) else ""
+        code = code if isinstance(code, str) else ""
+        reason = reason if isinstance(reason, str) else ""
+        if label not in LABELS:
+            problems.append(f"row {i}: label {label!r} is not one of {list(LABELS)}")
+        elif code not in REASON_CODES[label]:
+            problems.append(f"row {i}: reason_code {code!r} is not valid for {label}")
+        if not reason.strip():
+            problems.append(f"row {i}: reason is blank")
+        if len(reason) > reason_max_chars:
+            problems.append(f"row {i}: reason has {len(reason)} characters (max {reason_max_chars})")
+        if "\n" in reason or "\r" in reason:
+            problems.append(f"row {i}: reason contains a line break")
+        if _URL.search(reason):
+            problems.append(f"row {i}: reason contains a URL")
+    return problems
+
+
+def write_raw_output(rows: pd.DataFrame, path: Path, expected_case_ids: list[str], reason_max_chars: int) -> str:
+    """Write one pass's answer for one chunk. Refuses invalid rows; never overwrites an existing file."""
+    path = Path(path)
+    if path.exists():
+        raise FileExistsError(f"{path} already exists; raw labeller output is never overwritten")
+    problems = validate_labeller_rows(rows, expected_case_ids, reason_max_chars)
+    if problems:
+        raise ValueError(f"{path.name}: " + "; ".join(problems[:10]))
+    return write_csv(rows[list(RAW_OUTPUT_COLUMNS)], path)
+
+
+def read_raw_output(path: Path) -> pd.DataFrame:
+    return read_exact_csv(path, RAW_OUTPUT_COLUMNS)
+
+
+def queue_parts(key: pd.DataFrame) -> list[int]:
+    return sorted({int(p) for p in key.part})
+
+
+def labelling_status(rp: RoundPaths, parts: list[int]) -> dict[str, dict[str, list[int]]]:
+    return {letter: {"present": [p for p in parts if rp.raw_output(letter, p).exists()],
+                     "missing": [p for p in parts if not rp.raw_output(letter, p).exists()]}
+            for letter in PASSES}

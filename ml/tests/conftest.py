@@ -192,3 +192,84 @@ def balanced_case_rows(per_stratum: int) -> list[dict]:
             rows.append(make_case_row(region, f"{region}A{i:04d}", f"ACME EXCAVATION {i} LLC", ["FIRST BANK"]))
             rows.append(make_case_row(region, f"{region}R{i:04d}", f"SMITH LAW OFFICE {i} PC", ["FIRST BANK"]))
     return rows
+
+
+# --- synthetic labelling rounds (Tasks 15-21): fake blind passes and a tmp repository with a queued pilot ---
+from collections.abc import Iterable  # noqa: E402
+
+FLIPPED_ANSWER = {"label": "INSUFFICIENT_EVIDENCE", "reason_code": "I_AMBIGUOUS_WORD",
+                  "reason": "reads as a generic firm name"}
+
+
+def fake_answer(borrower_name: str) -> dict:
+    """A deterministic stand-in for one blind labeller decision."""
+    name = borrower_name.upper()
+    if "EXCAVATION" in name:
+        return {"label": "RELEVANT", "reason_code": "R_BORROWER_EQUIPMENT_WORD", "reason": "EXCAVATION in the borrower name"}
+    if "LAW OFFICE" in name:
+        return {"label": "NOT_RELEVANT", "reason_code": "N_OTHER_INDUSTRY_EXPLICIT",
+                "reason": "LAW OFFICE states a different activity"}
+    return {"label": "INSUFFICIENT_EVIDENCE", "reason_code": "I_GENERIC_NAME", "reason": "the name could be anything"}
+
+
+def fake_structured_output(chunk: pd.DataFrame, flips: Iterable[str] = ()) -> dict:
+    """{"rows": [...]} for one queue chunk; a row whose queue case_id or borrower name is in `flips`
+    gets FLIPPED_ANSWER instead of fake_answer."""
+    flips = set(flips)
+    rows = []
+    for case_id, name in zip(chunk.case_id, chunk.borrower_name_raw):
+        answer = FLIPPED_ANSWER if (case_id in flips or name in flips) else fake_answer(name)
+        rows.append({"case_id": case_id, **answer})
+    return {"rows": rows}
+
+
+def labelling_repo(tmp_path: Path, per_stratum: int = 10, chunk_size: int = 15, repeat_fraction: float = 0.10,
+                   audit_per_split_stratum: int = 2, extra_per_stratum: int = 20) -> Path:
+    """A tmp repository with config, candidates, a pilot, frozen splits, FROZEN specs and the queued pilot round.
+
+    Runs the real make-pilot, freeze-splits and label-blind commands and returns the config path."""
+    import shutil
+
+    from test_config import MINIMAL
+    from ucc_ml.cli import main
+
+    cfg = tmp_path / "ml/configs/v1.yaml"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    cfg.write_text(MINIMAL.replace("pilot_per_stratum: 50", f"pilot_per_stratum: {per_stratum}")
+                   .replace("chunk_size: 200", f"chunk_size: {chunk_size}")
+                   .replace("repeat_fraction: 0.10", f"repeat_fraction: {repeat_fraction}")
+                   .replace("founder_audit_per_split_stratum: 10",
+                            f"founder_audit_per_split_stratum: {audit_per_split_stratum}"))
+    cand = tmp_path / "ml/data/candidates/v1/candidates.parquet"
+    cand.parent.mkdir(parents=True, exist_ok=True)
+    write_candidates_fixture(cand, balanced_case_rows(per_stratum + extra_per_stratum))
+    specs = tmp_path / "ml/specs"
+    specs.mkdir(parents=True, exist_ok=True)
+    real_specs = Path(__file__).resolve().parents[1] / "specs"
+    policy = (real_specs / "label_policy_v1.md").read_text(encoding="utf-8")
+    policy = "\n".join("status: FROZEN" if line.startswith("status:") else line for line in policy.splitlines())
+    (specs / "label_policy_v1.md").write_text(policy + "\n", encoding="utf-8")
+    shutil.copy(real_specs / "labeller_prompt_v1.md", specs / "labeller_prompt_v1.md")
+    for command in (["make-pilot"], ["freeze-splits"], ["label-blind", "--round", "pilot_v1"]):
+        assert main([command[0], "--config", str(cfg), *command[1:]]) == 0, command
+    return cfg
+
+
+def run_blind_passes(cfg: Path, round_name: str, flips_in_pass_b: Iterable[str] = ()) -> None:
+    """Both fake passes for every chunk of a round, through the real write-raw-labels command."""
+    import json
+
+    from ucc_ml.cli import main
+    from ucc_ml.config import load_config
+    from ucc_ml.labeling import queue_parts, read_key, read_queue, round_paths
+
+    rp = round_paths(load_config(cfg), round_name)
+    flips_in_pass_b = list(flips_in_pass_b)
+    for part in queue_parts(read_key(rp.key)):
+        chunk = read_queue(rp.queue_part(part))
+        for letter, flips in (("a", ()), ("b", flips_in_pass_b)):
+            path = rp.structured_output(letter, part)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(fake_structured_output(chunk, flips)), encoding="utf-8")
+            assert main(["write-raw-labels", "--config", str(cfg), "--round", round_name, "--pass", letter,
+                         "--part", str(part), "--structured", str(path)]) == 0
