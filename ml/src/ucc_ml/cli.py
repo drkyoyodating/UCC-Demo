@@ -45,6 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("freeze-splits", help="grouped 65/15/20 splits by group_id; every pilot group in train")
     _add_config_arg(sp)
     sp.set_defaults(func=cmd_freeze_splits)
+    sp = sub.add_parser("label-blind", help="emit a round's chunked blind queue, its private key and the pre-registration digest")
+    _add_config_arg(sp)
+    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.add_argument("--chunk-size", type=int, default=None, help="cases per chunk before repeats (default: labelling.chunk_size)")
+    sp.set_defaults(func=cmd_label_blind)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -131,6 +136,37 @@ def cmd_freeze_splits(ns: argparse.Namespace) -> int:
           f"pilot_cases_in_test={a['pilot_cases_in_test']} pilot_cases_not_in_train={a['pilot_cases_not_in_train']} "
           f"digest={manifest['digest']}")
     print(f"wrote {paths.splits_parquet} and {digest_path}")
+    return 0
+
+
+def cmd_label_blind(ns: argparse.Namespace) -> int:
+    from ucc_ml import dataset, labeling
+    from ucc_ml.config import load_config
+
+    cfg = load_config(ns.config)
+    rp = labeling.round_paths(cfg, ns.round)
+    if labeling.labels_exist(rp):
+        print(f"REFUSED: {ns.round} already has labeller output under {rp.raw_dir}; its queue is frozen")
+        return 1
+    chunk_size = ns.chunk_size or cfg.labelling.chunk_size
+    round_cases = dataset.read_frame(rp.cases)
+    chunks, key = labeling.build_blind_queue(round_cases, ns.round, cfg.sampling.repeat_fraction, cfg.seed, chunk_size)
+    for stale in sorted(rp.queue_dir.glob(f"queue_{ns.round}_part_*.csv")):
+        stale.unlink()
+    part_paths = []
+    for part, chunk in enumerate(chunks, start=1):
+        labeling.write_csv(chunk, rp.queue_part(part))
+        part_paths.append(rp.queue_part(part))
+    key_sha = labeling.write_csv(key, rp.key)
+    labeling.write_preregistration(rp, part_paths)
+    originals = key[~key.is_repeat]
+    print(f"round={ns.round} cases={len(originals)} repeats={int(key.is_repeat.sum())} parts={len(chunks)} "
+          f"chunk_size={chunk_size}")
+    print(f"strata={originals.sampling_stratum.value_counts().sort_index().to_dict()}")
+    for path in part_paths:
+        print(f"wrote {path}")
+    print(f"wrote {rp.key} sha256={key_sha} (private)")
+    print(f"wrote {rp.preregistration}")
     return 0
 
 
