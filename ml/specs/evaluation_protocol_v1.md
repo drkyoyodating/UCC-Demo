@@ -1,13 +1,20 @@
 # Evaluation protocol v1 — pre-registered before any model is trained
 
-Status: FROZEN on commit. Amended twice before any candidate was frozen, to name the
-`blind_unresolved` status added after this document was written (section 3), and to replace the
+Status: FROZEN on commit. Amended three times before any candidate was frozen: to name the
+`blind_unresolved` status added after this document was written (section 3); to replace the
 section 2 weighting claim that a stratum carries one sampling rate, which the screened round made
-false for every held-out row. Both amendments were made with no model trained and no candidate
-frozen. The second one CHANGES THE APPLIED WEIGHT: rows now carry their own cell's rate rather
-than a stratum average, which is the unbiased weight for the design that was actually drawn. Changing anything below after `freeze-candidate` has run
-requires a new protocol version and a fresh, untouched test set. Labels are
-model-labelled, founder-adjudicated, and every report says so.
+false for every held-out row; and to correct four sentences the built system falsified -- the label
+provenance in this paragraph, the section 5 prior and what the bootstrap accumulates, and the
+section 2 statement of how far the TRAIN weights overshoot. All three amendments were made with no
+model trained and no candidate frozen. The second one CHANGES THE APPLIED WEIGHT: rows now carry
+their own cell's rate rather than a stratum average, which is the unbiased weight for the design
+that was actually drawn. Changing anything below after `freeze-candidate` has run
+requires a new protocol version and a fresh, untouched test set. Label provenance is PER ROUND:
+`pilot_v1` was founder-adjudicated, `main_v1` retains its 83 pass disagreements as
+`blind_unresolved` and nobody adjudicated it, so no one phrase is true of both rounds. Every report
+carries `disclosure_by_round`, and the single pooled sentence printed beside it is built from that
+map by `ucc_ml.labeling.pooled_disclosure`, never by naming one round's arrangement for the whole
+file.
 
 ## 1. What is being measured
 A screener over UCC borrower/lender names for heavy-construction-equipment
@@ -40,7 +47,7 @@ rules-accepted ones. It never replaces the frozen rules.
   stratum's cells to `N_h`, because K12 puts every pilot case in TRAIN and leaves `pool_h == N_h`
   in the held-out splits. This replaces the row-equality check, which assumed one rate per
   stratum and was false for every held-out row once the screen existed.
-- Training weight per labelled TRAIN case: `1 / inclusion_probability`, normalised to mean 1 over fitted rows. Each row carries the rate of the cell it was actually drawn from, so a pilot row and a main row in the same stratum keep their own rates. `N_train_h / n_h` is wrong here and only looked right while every stratum had a single cell at a single rate. The validation and test reconstruction guard is applied to those two splits ONLY: in TRAIN the pilot is excluded from the main round's frame, so the weights sum to about 1.5x the population by construction, and silently so.
+- Training weight per labelled TRAIN case: `1 / inclusion_probability`, normalised to mean 1 over fitted rows. Each row carries the rate of the cell it was actually drawn from, so a pilot row and a main row in the same stratum keep their own rates. `N_train_h / n_h` is wrong here and only looked right while every stratum had a single cell at a single rate. The validation and test reconstruction guard is applied to those two splits ONLY: in TRAIN the pilot is excluded from the main round's frame, so the weights overshoot the population by construction, and silently so -- measured on the 2026-09-12 artefacts they sum to 2.53x `N_train_h` (per stratum 2.53, 2.53, 2.38, 2.54).
 
 ## 3. Label resolution
 Only rows whose `adjudication_status` is `model_agreed`, `founder_confirmed` or
@@ -61,10 +68,15 @@ ever presented as population performance; the total unresolved share is N_h-weig
 
 ## 5. Uncertainty
 Stratified cluster Bayesian bootstrap with Jeffreys pseudo-counts: within each stratum h,
-every (stratum, group_id) cluster gets a Gamma(1,1) weight and each structurally possible
-(label, model decision, rules decision) cell plus the INSUFFICIENT_EVIDENCE cell gets
-Gamma(0.5,1) pseudo-mass; cell shares are scaled to N_h; P/R/F1, the model − rules
-deltas, the review-queue rates and the unresolved share are recomputed from the same
+every (stratum, group_id) cluster gets a Gamma(1,1) weight, and a row contributes its design
+weight `1 / inclusion_probability` to its cluster's cell total, never 1.0 -- counting rows and
+rescaling the resulting shares to `N_h` is algebraically `w_h = N_h / n_h`, the retired estimator
+rediscovered. Each structurally possible (label, model decision, rules decision) cell plus the
+INSUFFICIENT_EVIDENCE cell gets `Gamma(0.5, N_h / number of clusters)` pseudo-mass, scaled that way
+because weighted totals sit on the POPULATION scale: a fixed 0.5 is negligible there, and the
+uncertainty the pseudo-mass exists for silently vanishes (measured, a stratum's precision lower
+bound goes from 0.477 to 0.999). The weighted cell totals are rescaled to `N_h`; P/R/F1, the
+model − rules deltas, the review-queue rates and the unresolved share are recomputed from the same
 2,000 draws; percentile 95% interval around the design-weighted point estimate. The
 pseudo-mass keeps a zero false-positive cell in a heavily weighted stratum uncertain.
 Validated by Monte Carlo (300 samples) on a population with rare, heavily weighted false

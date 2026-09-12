@@ -50,7 +50,14 @@ def test_protocol_pre_registers_the_design_the_code_implements():
     text = _words(PROTOCOL)
     for phrase in (
         "Status: FROZEN on commit",
-        "model-labelled, founder-adjudicated",
+        # Third amendment. Provenance is PER ROUND: 2400 of the 2600 non-repeat cases are main_v1, which
+        # nobody adjudicated, so the old single phrase was false of 92% of the file. The document now names
+        # each round and points at the function that builds the pooled sentence from disclosure_by_round.
+        "Amended three times before any candidate was frozen",
+        "All three amendments were made with no model trained and no candidate frozen",
+        "Label provenance is PER ROUND",
+        "Every report carries `disclosure_by_round`",
+        "`ucc_ml.labeling.pooled_disclosure`",
         "`CO:accepted`, `CO:rejected`, `CT:accepted`, `CT:rejected`",
         # The sample-count definition is unchanged and still load-bearing; the weighting claim that used
         # to be bundled into the same sentence was retired by the section 2 amendment, and is forbidden
@@ -63,10 +70,17 @@ def test_protocol_pre_registers_the_design_the_code_implements():
         "RESOLVABLE population of S",
         "`1 / inclusion_probability`",
         "normalised to mean 1 over fitted rows",
+        "measured on the 2026-09-12 artefacts they sum to 2.53x `N_train_h`",
         "`model_agreed`, `founder_confirmed` or `founder_adjudicated`",
         "`blind_repeat` rows",
         "Stratified cluster Bayesian bootstrap with Jeffreys pseudo-counts",
-        "Gamma(0.5,1) pseudo-mass",
+        # The prior scales with the stratum's mean weight PER CLUSTER. Weighted totals sit on the
+        # population scale (N_h ~ 1e5), where a fixed 0.5 smooths nothing: measured, a stratum's precision
+        # lower bound went from 0.477 to 0.999, i.e. the uncertainty the method exists for disappeared.
+        "`Gamma(0.5, N_h / number of clusters)` pseudo-mass",
+        # And the resampled table accumulates DESIGN WEIGHTS. Counting rows and rescaling the shares to
+        # N_h is algebraically w_h = N_h / n_h -- the retired estimator, rediscovered inside the bootstrap.
+        "a row contributes its design weight `1 / inclusion_probability` to its cluster's cell total, never 1.0",
         "Kish effective number of out-of-fold positives",
         "the weighted ECE among scores ≥ 0.3 (≥ 20 cases) ≤ 0.15",
         "counted as the Kish effective number (sum w)^2 / sum w^2 of predicted positives",
@@ -78,9 +92,14 @@ def test_protocol_pre_registers_the_design_the_code_implements():
     ):
         assert phrase in text, phrase
     # A pinning test that only tracks the current text is weaker than one that also refuses the design
-    # it replaced: the stratum-level weight and its false equality must not come back unnoticed.
+    # it replaced: the stratum-level weight and its false equality must not come back unnoticed. The last
+    # five entries are the third amendment's: the universal adjudication claim (two fragments, because the
+    # sentence and its "every report says so" clause were separately false), the sample-scale prior, the
+    # row-counting bootstrap and the guessed 1.5x. Each was false of the code by the time it was read.
     for retired in ("Stratified group bootstrap", "conditional on label resolution", "1 / inclusion_probability`.",
                     "(≥ 200 OOF positives)", "CO|accepted",
                     "which equals 1/inclusion_probability because validation and test contain no pilot case",
-                    "The run stops if `N_h / n_h` disagrees with 1/inclusion_probability"):
+                    "The run stops if `N_h / n_h` disagrees with 1/inclusion_probability",
+                    "Labels are model-labelled, founder-adjudicated", "and every report says so",
+                    "Gamma(0.5,1)", "cell shares are scaled to N_h", "sum to about 1.5x the population"):
         assert retired not in text, retired
