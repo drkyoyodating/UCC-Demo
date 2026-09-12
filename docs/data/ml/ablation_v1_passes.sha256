@@ -1,0 +1,8 @@
+7fdbb989abc1a83cbc8b3a13d07239677e0f929e75a3d64a14259a9379e67673  labeller_output_ablation_v1_pass_a_part_001.csv
+c89460150c64acc9b9611c0cf18774c1c1758c9c7a3196286cc7007372d1d3c0  labeller_output_ablation_v1_pass_b_part_001.csv
+7c04e1b8118140aaa8a9652ea8e87511004c0729ed10f9b1f7729b5def2d4b87  pass_a_ablation_v1.csv
+8c372465f1e93387ee47db736937f823c678bd556ec1c8f18b1d551fc1cd1f86  pass_b_ablation_v1.csv
+# The ablation_v1 blind labeller outputs, frozen before the founder review (contract K14): two
+# independent tool-less Claude passes, one agent per queue chunk per pass; the orchestrator wrote each
+# raw CSV from the agent's structured output. The last two lines are the imported pass files.
+# Labels built from these passes are model-labelled, founder-adjudicated.
