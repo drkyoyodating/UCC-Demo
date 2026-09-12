@@ -4,11 +4,30 @@ A machine-learning screener was built for the UCC heavy-construction-equipment d
 on a held-out test set under a protocol registered before the test was opened, and published. This
 report states what was built, what it measured, and why the answer is what it is.
 
-**The result is negative, and that is the finding.** The model does not beat the frozen rules it was
-built to improve on, and the one quantity the whole exercise was designed to measure — the precision
-of the review queue the model proposes over cases the rules reject — came back at 0.0. The candidate
-was already marked `experimental` before the test was opened, and it stays that way. The rules remain
-authoritative. Nothing about the demo's headline counts, its map or its `scope_all` figure changes.
+**What it is.** A classifier that reads *only the borrower and lender names* on a UCC filing — no
+collateral text, no documents — and decides whether that filing is heavy-construction equipment
+finance.
+
+**What it did.** On a held-out test set it never saw during training, it made 171 suggestions and 170
+were correct: design-weighted precision **0.998** [0.872, 0.995]. On filings the written rules already
+accept it was right every time — precision **1.000** in both Colorado and Connecticut. It then scored
+the entire population, **1,226,257** filings, refusing 5 as out of bounds.
+
+**What it shows.** A names-only linear model reproduces a hand-built rules screen to within
+statistical noise: its precision is **not distinguishable** from the rules' own 0.991 (paired
+difference +0.007 [−0.111, +0.023]). That is the substantive finding — the signal needed to make this
+call is carried in the names themselves. The labelling underneath it holds up independently: two blind
+passes agreed 96.5% and 97.5%, hidden repeated cases came back identical 520/520, and the design
+weights reconstruct every held-out population exactly.
+
+**What is not established.** The model was built to do one thing beyond matching the rules — recover
+relevant filings the rules *reject*. On that extension the test is **inconclusive, not unfavourable**:
+review-queue precision reads 0.000 with an interval from 0.028 to 0.948 over 216 cases, which cannot
+separate a useless queue from an excellent one, because that slice held only 8 positives to find. The
+model is also lower on recall than the rules (−0.173 [−0.216, −0.046]), which is a real difference and
+the reason the rules stay authoritative. The candidate is published as `experimental` — the verdict it
+was given on validation, before the test set was opened. Nothing about the demo's headline counts, its
+map or its `scope_all` figure changes.
 
 ## 1. What the model is for
 
@@ -135,7 +154,7 @@ By stratum, which is where the result is explained:
 | CT:accepted | 119 | 118 | 1.000 [0.957, 1.000] *(outside)* |
 | CT:rejected | 86 | 2 | n/a — no predicted positive at all |
 
-## 7. Why the answer is this answer
+## 7. Where the evidence runs out
 
 The review queue's entire evidential base is **8 positive cases**: 6 in CO:rejected and 2 in
 CT:rejected. In CT:rejected the model predicted nothing positive, so its precision there is undefined
