@@ -1,0 +1,83 @@
+{
+  "generated_at": "2026-09-12T12:04:21Z",
+  "label_provenance": "mixed by round -- main_v1: model-labelled, two independent blind passes, disagreements retained as unresolved; pilot_v1: model-labelled, founder-adjudicated",
+  "label_provenance_by_round": {
+    "main_v1": "model-labelled, two independent blind passes, disagreements retained as unresolved",
+    "pilot_v1": "model-labelled, founder-adjudicated"
+  },
+  "metadata": {
+    "C": 10.0,
+    "best_C_at_grid_boundary": true,
+    "c_grid": [
+      0.1,
+      1.0,
+      10.0
+    ],
+    "calibration_method": "sigmoid",
+    "candidates_sha256": "0d508c2b85a7ac2b00f5ccb90049477b9df606e5f805590941ea9dbc21d1191d",
+    "class_weight": "none",
+    "config_sha256": "4eaf3e2b61580e262246c4da4c443ed8b98cf25ff182206ae1beca571689d5c4",
+    "cv_folds": 5,
+    "feature_policy_version": "features_v1",
+    "label_disclosure": "mixed by round -- main_v1: model-labelled, two independent blind passes, disagreements retained as unresolved; pilot_v1: model-labelled, founder-adjudicated",
+    "labels_policy_version": "mixed by round -- main_v1: label_policy_v2; pilot_v1: label_policy_v1",
+    "labels_sha256": "ca7d4aba82094b9f816c7c39252d1e80570a62fae855f937715b1f9341556574",
+    "lock_sha256": "e4b90cc93642ed55663defe685c440155b8a7e820828bf9e09a873cc6881c967",
+    "model_version": "v1",
+    "n_features": 20873,
+    "numpy_version": "2.5.3",
+    "oof_effective_positives": 135.3864844590343,
+    "oof_positives": 507,
+    "oof_raw_score_sd": 3.4008890973540318,
+    "pipeline_sha256": "7d32f52a0b41673e6ad1a810dc6f3d66068da5321bed686209dbb585112e5491",
+    "python_version": "3.14.7",
+    "refit_train_raw_score_sd": 3.6313307625577074,
+    "sample_weight_normalisation": "mean 1 within each fit",
+    "seed": 20260912,
+    "selection_metric": "weighted_average_precision",
+    "sklearn_version": "1.9.1",
+    "source_commit": "6c204059b43634aef35a127c1c368a150fe5ef45",
+    "source_dirty": false,
+    "splits_sha256": "f68ad5269de3b56d9e2c9008d781ef3295300d03a3ada368698e0083e7c288fa",
+    "train_groups": 730,
+    "train_positives": 507,
+    "train_rows": 820,
+    "variant": "borrower_lender",
+    "weighting": "inverse_inclusion_probability_normalised"
+  },
+  "release_id": "80b952a3e9a8",
+  "schema_version": 1,
+  "score_type": "calibrated_probability",
+  "sections": [
+    {
+      "heading": "What it is",
+      "text": "A scikit-learn TF-IDF + logistic-regression screener over UCC borrower and lender NAMES (word 1–2-grams on the normalised name, character 3–5-grams on the raw name, separate borrower and lender blocks). It is a **review queue over rules-rejected cases plus a second opinion on rules-accepted ones**. It never replaces the frozen rules, never changes `scope_all`, the headline counts or the existing map. A score indicates evidence of relevance under the written screening policy; it does not establish collateral, equipment ownership, loan amount, active debt or creditworthiness."
+    },
+    {
+      "heading": "Data and labels",
+      "text": "- Candidates: 1,226,257 filing-borrower cases (dataset `v1`, sha256 `0d508c2b85a7…`), by region {'CO': 905197, 'CT': 321060}.\n- Labels: policy `mixed by round -- main_v1: label_policy_v2; pilot_v1: label_policy_v1`; **mixed by round -- main_v1: model-labelled, two independent blind passes, disagreements retained as unresolved; pilot_v1: model-labelled, founder-adjudicated** — two independent blind Claude passes labelled every case under the written policy; nothing was labelled by looking anything up. The rounds were NOT labelled under one arrangement, so each is stated separately:\n  - `pilot_v1` (240 rows, policy `label_policy_v1`): model-labelled, founder-adjudicated; the founder decided all 5 of the 5 pass disagreements; 0 of the 40 rows selected for the founder audit were audited.\n  - `main_v1` (2,880 rows, policy `label_policy_v2`): model-labelled, two independent blind passes, disagreements retained as unresolved; all 83 pass disagreements were retained as unresolved (INSUFFICIENT_EVIDENCE, counted in n_h) and none was adjudicated; 0 of the 120 rows selected for the founder audit were audited.\n- Label statistics: by status {'blind_repeat': 520, 'blind_unresolved': 83, 'founder_adjudicated': 5, 'founder_confirmed': 0, 'model_agreed': 2512}; by round {'main_v1': 2880, 'pilot_v1': 240}; pass agreement {'main_v1': {'agreed': 2317, 'n': 2400, 'rate': 0.9654166666666667}, 'pilot_v1': {'agreed': 195, 'n': 200, 'rate': 0.975}}; founder audit {'main_v1': {'agreement_rate': None, 'n_audited': 0, 'n_confirmed': 0, 'n_overturned': 0, 'n_selected': 120}, 'pilot_v1': {'agreement_rate': None, 'n_audited': 0, 'n_confirmed': 0, 'n_overturned': 0, 'n_selected': 40}}; blind-repeat consistency {'pass_a': {'consistent': 260, 'n': 260, 'rate': 1.0}, 'pass_b': {'consistent': 260, 'n': 260, 'rate': 1.0}}.\n- Labelled cases by split {'train': 1400, 'validation': 400, 'test': 800}, of which resolved (RELEVANT / NOT_RELEVANT) {'train': 820, 'validation': 207, 'test': 453}.\n- Groups are region-scoped borrower groups; splits {'test': 240980, 'train': 801607, 'validation': 183670} rows / {'test': 100069, 'train': 325224, 'validation': 75052} groups."
+    },
+    {
+      "heading": "Training",
+      "text": "- Variant `borrower_lender`, C = 10.0 (grid [0.1, 1.0, 10.0], **at a grid boundary: widening the grid is a founder decision**), class_weight none, sample weight 1/inclusion_probability per row (mean 1 within each fit), seed 20260912, StratifiedGroupKFold(5) inside TRAIN, selected by weighted_average_precision.\n- Calibration `sigmoid` on group-separated out-of-fold TRAIN scores (135.4 Kish effective positives); validation weighted ECE 0.032, decision-region (score ≥ 0.3) weighted ECE 0.057 → score_type `calibrated_probability`.\n- Out-of-fold raw-score SD 3.401 vs refit TRAIN raw-score SD 3.631 (ratio 1.068): the calibrator learned the fold models' score scale, so a ratio above 1 makes the refit's probabilities slightly overconfident.\n- 20,873 features; feature policy `features_v1`; scikit-learn 1.9.1, Python 3.14.7."
+    },
+    {
+      "heading": "Threshold (chosen on VALIDATION, before TEST)",
+      "text": "- Objective: max weighted recall s.t. weighted precision ≥ 0.95 with ≥ 30 predicted positives counted as the Kish effective number, and a one-sided 95% lower bound of weighted precision at or above the same floor.\n- Threshold 0.8612 → status **experimental** (fallback: precision_lower_bound_or_effective_support_below_floor; the rules remain authoritative).\n- Validation: wP 1.000 (one-sided 95% lower bound 0.816), wR 0.646, Kish effective predicted positives 30.1, 51 predicted positives of n = 207 (selection-biased upward: the threshold was chosen on this sample; the TEST rows below are the unbiased estimate).\n- Validation was looked at 1 time(s) before this release."
+    },
+    {
+      "heading": "Test result (one run, held-out borrower groups, design-weighted, 95% Jeffreys cluster-bootstrap intervals)",
+      "text": "- Primary (pre-registered): review-queue weighted precision (model suggestions among rules-rejected cases) 0.000 [0.028, 0.948] (estimate outside interval) over 216 resolved rules-rejected cases.\n- n = 453 resolved cases (243 positive); design-weighted unresolved share 0.477 [0.417, 0.533]; unresolved share among model suggestions 0.028.\n\n| | weighted precision | weighted recall | weighted F1 | TP/FP/FN/TN |\n|---|---|---|---|---|\n| model | 0.998 [0.872, 0.995] (estimate outside interval) | 0.795 [0.689, 0.842] | 0.885 [0.795, 0.902] | 170/1/73/209 |\n| frozen rules | 0.991 [0.952, 0.996] | 0.969 [0.821, 0.968] (estimate outside interval) | 0.980 [0.892, 0.978] (estimate outside interval) | 235/2/8/208 |\n\n- Secondary: paired delta (model − rules) precision 0.007 [-0.111, 0.023] (not distinguishable), recall -0.173 [-0.216, -0.046] (lower); two comparisons, not multiplicity-adjusted.\n- Per region:\n  - CO: n=248, model wP 0.998 [0.875, 0.998], wR 0.817 [0.712, 0.871]; rules wP 0.991 [0.949, 0.998], wR 0.968 [0.833, 0.978]\n  - CT: n=205, model wP 1.000 [0.523, 0.998] (estimate outside interval), wR 0.584 [0.391, 0.728]; rules wP 0.992 [0.950, 0.998], wR 0.973 [0.519, 0.975]"
+    },
+    {
+      "heading": "Limitations",
+      "text": "- A figure marked `(estimate outside interval)` is not a contradiction to reconcile: the point estimate is the design-weighted plug-in, while the interval is smoothed by a Jeffreys prior that keeps a cell with no observed error uncertain, so at the boundary the smoothed interval ends below an unsmoothed 1.000. Read the interval, not the point, wherever the mark appears.\n- Inputs are names only: no collateral text (CO's field is a 124-value category list, CT has none), no documents.\n- Rates estimate performance on the RESOLVABLE population (cases a screener could label RELEVANT or NOT_RELEVANT), design-weighted by 1 / inclusion_probability — the sampling rate of the (split, stratum, screen cell) each case was actually drawn from, since the boundary screen puts several rates inside one stratum. N_h / n_h is reported per stratum as that stratum's AVERAGE weight and is applied to no row. The INSUFFICIENT_EVIDENCE share of the population and of the model's suggestions is reported above with its interval.\n- The split is by borrower group within this snapshot; it is not a chronological forecast and not a transfer claim to other states.\n- Linear feature contributions describe the model's calculation, not independent evidence about the business.\n- Cross-register (CO↔CT) entity linking, entity resolution and active-loan status are out of scope (v1 screens historical observations)."
+    },
+    {
+      "heading": "Reproducibility",
+      "text": "- Protocol `ml/specs/evaluation_protocol_v1.md`; source commit `6c204059b43634aef35a127c1c368a150fe5ef45` (dirty: False); config sha256 `4eaf3e2b6158…`; lock sha256 `e4b90cc93642…`.\n- Digests: candidates `0d508c2b85a7…`, splits `f68ad5269de3…`, labels `ca7d4aba8209…`, pipeline `7d32f52a0b41…`.\n- Verify: `shasum -a 256 -c SHA256SUMS` in this directory; `cat model-manifest.json threshold.json dataset-manifest.json split-manifest.json | shasum -a 256 | cut -c1-12` reproduces the release id."
+    }
+  ],
+  "threshold": 0.8612124616682861,
+  "threshold_status": "experimental"
+}

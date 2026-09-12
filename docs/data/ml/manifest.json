@@ -1,0 +1,15 @@
+{
+  "current": "80b952a3e9a8",
+  "generated_at": "2026-09-12T12:04:21Z",
+  "releases": [
+    {
+      "api_url": null,
+      "examples_url": "releases/80b952a3e9a8/examples.json",
+      "metrics_url": "releases/80b952a3e9a8/metrics.json",
+      "model_card_url": "releases/80b952a3e9a8/model-card.json",
+      "published_at": "2026-09-12T12:04:21Z",
+      "release_id": "80b952a3e9a8"
+    }
+  ],
+  "schema_version": 1
+}
