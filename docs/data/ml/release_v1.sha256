@@ -1,0 +1,12 @@
+release_id=80b952a3e9a8
+f859b6663fdc2a49457d0c5ae72350d4d699cc580861da1fece8559b73551cfb  ml/artifacts/releases/80b952a3e9a8/SHA256SUMS
+# Immutable release bundle built from the pre-registered frozen candidate
+# (docs/data/ml/frozen_candidate_v1.sha256) after its single TEST run. Plan C exports public metrics,
+# examples and the model card for exactly this release_id.
+# labels: mixed by round -- main_v1: model-labelled, two independent blind passes, disagreements retained as unresolved; pilot_v1: model-labelled, founder-adjudicated; counts_by_status {'blind_repeat': 520, 'blind_unresolved': 83, 'founder_adjudicated': 5, 'founder_confirmed': 0, 'model_agreed': 2512}; counts_by_round {'main_v1': 2880, 'pilot_v1': 240}
+# TEST n=453 resolved (243 positive); design-weighted unresolved share 0.4765522705060172 [0.41653691712917607, 0.5328140794979069]; among model suggestions 0.02765966045720785
+# primary: review-queue weighted precision 0.0 [0.028030246615799732, 0.9483300659991353] over n=216
+# model  wP 0.997771843283837 [0.8715528505642136, 0.9948277516876445]  wR 0.7952772022901712 [0.6893543597611057, 0.8424643082730016]
+# rules  wP 0.9907791162714715 [0.9516773100507512, 0.9964591510971503]  wR 0.968749741178475 [0.8213325812018316, 0.9681845995728823]
+# delta recall -0.17347253888830383 [-0.21559356359847734, -0.0463779921825064] -> lower; delta precision 0.006992727012365418 [-0.11110345596962114, 0.02317274894081184] -> not distinguishable
+# threshold 0.8612124616682861 status experimental score_type calibrated_probability
