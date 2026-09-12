@@ -35,7 +35,7 @@ BaselineRoute = Literal["lender", "borrower", "both", "neither"]
 SplitName = Literal["train", "validation", "test"]
 LabelValue = Literal["RELEVANT", "NOT_RELEVANT", "INSUFFICIENT_EVIDENCE"]
 AdjudicationStatus = Literal["model_agreed", "founder_confirmed", "founder_adjudicated", "blind_repeat"]
-LabellingRound = Literal["pilot_v1", "main_v1"]
+LabellingRound = Literal["pilot_v1", "ablation_v1", "yield_probe_v1", "main_v1", "queue_v1"]
 
 REGIONS: tuple[str, ...] = ("CO", "CT")
 BASELINE_ROUTES: tuple[str, ...] = ("lender", "borrower", "both", "neither")
@@ -44,7 +44,7 @@ SPLITS: tuple[str, ...] = ("train", "validation", "test")
 STRATA: tuple[str, ...] = ("CO:accepted", "CO:rejected", "CT:accepted", "CT:rejected")
 ADJUDICATION_STATUSES: tuple[str, ...] = ("model_agreed", "founder_confirmed", "founder_adjudicated", "blind_repeat")
 RESOLVED_ADJUDICATION_STATUSES: tuple[str, ...] = ("model_agreed", "founder_confirmed", "founder_adjudicated")
-LABELLING_ROUNDS: tuple[str, ...] = ("pilot_v1", "main_v1")
+LABELLING_ROUNDS: tuple[str, ...] = ("pilot_v1", "ablation_v1", "yield_probe_v1", "main_v1", "queue_v1")
 
 LABELLER_PASS_A = "claude_blind_pass_a"
 LABELLER_PASS_B = "claude_blind_pass_b"

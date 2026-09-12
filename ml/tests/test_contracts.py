@@ -61,7 +61,8 @@ def test_label_vocabulary_is_the_k3_contract():
     assert typing.get_args(c.AdjudicationStatus) == c.ADJUDICATION_STATUSES == (
         "model_agreed", "founder_confirmed", "founder_adjudicated", "blind_repeat")
     assert c.RESOLVED_ADJUDICATION_STATUSES == ("model_agreed", "founder_confirmed", "founder_adjudicated")
-    assert typing.get_args(c.LabellingRound) == c.LABELLING_ROUNDS == ("pilot_v1", "main_v1")
+    assert typing.get_args(c.LabellingRound) == c.LABELLING_ROUNDS == (
+        "pilot_v1", "ablation_v1", "yield_probe_v1", "main_v1", "queue_v1")
     assert c.LABELLER_PASS_A == "claude_blind_pass_a" and c.LABELLER_PASS_B == "claude_blind_pass_b"
     assert c.LABELLER_AGREED == "claude_blind_pass_a+claude_blind_pass_b" and c.LABELLER_FOUNDER == "founder"
     assert c.PASS_LABELLERS == {"a": "claude_blind_pass_a", "b": "claude_blind_pass_b"}

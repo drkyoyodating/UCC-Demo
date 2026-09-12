@@ -81,6 +81,15 @@ class RoundPaths:
         return self.passes_dir / f"pass_{pass_letter}_{self.round_name}.csv"
 
 
+def policy_version_for_round(cfg: RunConfig, round_name: str) -> str:
+    """The policy a round was labelled under. A round absent from the map uses the config default.
+
+    Stamping one global version onto every round would put label_policy_v2 on the 240 rows the v1
+    brief produced -- a provenance lie in a published field.
+    """
+    return cfg.labelling.policy_version_by_round.get(round_name, cfg.version.label_policy_version)
+
+
 def round_paths(cfg: RunConfig, round_name: str) -> RoundPaths:
     if round_name not in LABELLING_ROUNDS:
         raise ValueError(f"unknown labelling round {round_name!r}; expected one of {LABELLING_ROUNDS}")
@@ -88,6 +97,9 @@ def round_paths(cfg: RunConfig, round_name: str) -> RoundPaths:
     if round_name == "pilot_v1":
         cases, manifest, queue_dir = paths.pilot_cases, paths.pilot_manifest, cfg.path("pilot_dir")
         report = queue_dir / "pilot_report.json"
+    elif round_name == "ablation_v1":
+        cases, manifest, queue_dir = paths.ablation_cases, paths.ablation_manifest, cfg.path("ablation_dir")
+        report = queue_dir / "ablation_report.json"
     else:
         cases, manifest, queue_dir = paths.main_cases, paths.main_manifest, cfg.path("main_round_dir")
         report = queue_dir / "main_report.json"

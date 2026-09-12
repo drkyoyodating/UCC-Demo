@@ -18,6 +18,7 @@ paths:                                   # relative to the repository root
   candidates_dir: ml/data/candidates/v1
   pilot_dir: ml/data/pilot/v1
   main_round_dir: ml/data/main/v1
+  ablation_dir: ml/data/ablation/v1
   splits_dir: ml/data/splits/v1
   labels_dir: ml/data/labels/v1
   predictions_dir: ml/data/predictions
@@ -48,6 +49,12 @@ labelling:
   disclosure: "model-labelled, founder-adjudicated"
   chunk_size: 200                        # one blind labeller agent per chunk per pass (K14)
   founder_audit_per_split_stratum: 10    # agreed rows the founder re-reads per (split, stratum), plus every disagreement
+  policy_version_by_round:               # each round is stamped with the policy it was LABELLED under
+    pilot_v1: label_policy_v1            # the 240 committed rows; v1 is frozen and never re-stamped
+    ablation_v1: label_policy_v2
+    yield_probe_v1: label_policy_v2
+    main_v1: label_policy_v2
+    queue_v1: label_policy_v2
 
 budget:                                  # main labelling round (K13.2): the default proposal shown at the Task 20 founder gate
   main_round: {train: 1200, validation: 400, test: 800}   # per split, evenly across the four strata, capped by each pool;

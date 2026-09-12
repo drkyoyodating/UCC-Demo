@@ -209,9 +209,10 @@ def cmd_labeller_brief(ns: argparse.Namespace) -> int:
     cfg = load_config(ns.config)
     rp = labeling.round_paths(cfg, ns.round)
     specs = cfg.path("specs_dir")
-    policy_text = (specs / f"{cfg.version.label_policy_version}.md").read_text(encoding="utf-8")
+    policy_version = labeling.policy_version_for_round(cfg, ns.round)
+    policy_text = (specs / f"{policy_version}.md").read_text(encoding="utf-8")
     if not labeling.policy_is_frozen(policy_text):
-        print(f"REFUSED: {cfg.version.label_policy_version}.md is not 'status: FROZEN' (the Task 12 founder gate)")
+        print(f"REFUSED: {policy_version}.md is not 'status: FROZEN' (the Task 12 founder gate)")
         return 1
     parts = labeling.queue_parts(labeling.read_key(rp.key))
     if ns.part not in parts:
@@ -225,7 +226,7 @@ def cmd_labeller_brief(ns: argparse.Namespace) -> int:
     brief_path.write_text(labeling.render_labeller_brief(prompt_text, policy_text, chunk), encoding="utf-8")
     schema_path = rp.briefs_dir / "labeller_output_schema_v1.json"
     write_json(schema_path, labeling.LABELLER_OUTPUT_SCHEMA)
-    print(f"brief {brief_path} rows={len(chunk)} part={ns.part} of {len(parts)}")
+    print(f"brief {brief_path} rows={len(chunk)} part={ns.part} of {len(parts)} policy={policy_version}")
     print(f"schema {schema_path}")
     print("give the brief verbatim to one fresh tool-less subagent for pass a and to another for pass b")
     return 0
@@ -360,7 +361,7 @@ def cmd_validate_labels(ns: argparse.Namespace) -> int:
 
     cfg = load_config(ns.config)
     paths = artefact_paths(cfg)
-    rounds = [r for r in ("pilot_v1", "main_v1")
+    rounds = [r for r in labeling.LABELLING_ROUNDS
               if any(labeling.round_paths(cfg, r).pass_file(letter).exists() for letter in labeling.PASSES)]
     if "pilot_v1" not in rounds:
         print("REFUSED: the pilot_v1 passes have not been imported (run import-labels --round pilot_v1)")
@@ -370,7 +371,7 @@ def cmd_validate_labels(ns: argparse.Namespace) -> int:
         rp = labeling.round_paths(cfg, round_name)
         try:
             frames[round_name], agreements[round_name], founder[round_name] = labeling.load_round_for_validation(
-                rp, cfg.version.label_policy_version)
+                rp, labeling.policy_version_for_round(cfg, round_name))
         except (labeling.UndecidedDisagreements, FileNotFoundError) as exc:
             print(f"REFUSED: {exc}; labels.csv was not written")
             return 1
@@ -381,7 +382,8 @@ def cmd_validate_labels(ns: argparse.Namespace) -> int:
     manifest = labeling.labels_manifest(
         labels, labels_sha, agreements, founder, cfg.version.label_policy_version,
         extra={"created_at": utc_now_iso(), "git_head": git_head(cfg.repo_root), "config_sha256": cfg.config_sha256,
-               "inputs_sha256": inputs})
+               "inputs_sha256": inputs,
+               "policy_version_by_round": {r: labeling.policy_version_for_round(cfg, r) for r in rounds}})
     write_json(paths.labels_manifest, manifest)
     for round_name in rounds:
         rp = labeling.round_paths(cfg, round_name)

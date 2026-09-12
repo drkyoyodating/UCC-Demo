@@ -35,6 +35,7 @@ class Paths(BaseModel):
     candidates_dir: Path
     pilot_dir: Path
     main_round_dir: Path = Path("ml/data/main/v1")
+    ablation_dir: Path = Path("ml/data/ablation/v1")
     splits_dir: Path
     labels_dir: Path
     predictions_dir: Path = Path("ml/data/predictions")
@@ -93,6 +94,9 @@ class Labelling(BaseModel):
     disclosure: str
     chunk_size: int = 200
     founder_audit_per_split_stratum: int = 10
+    #: policy each round was labelled under; rounds absent here use version.label_policy_version.
+    #: Rows of different policy versions are NEVER pooled in a reported statistic.
+    policy_version_by_round: dict[str, str] = {}
 
     @field_validator("disclosure")
     @classmethod
@@ -180,6 +184,8 @@ class ArtefactPaths:
     pilot_manifest: Path
     main_cases: Path
     main_manifest: Path
+    ablation_cases: Path
+    ablation_manifest: Path
     splits_parquet: Path
     split_manifest: Path
     labels_csv: Path
@@ -207,6 +213,8 @@ def artefact_paths(cfg: RunConfig) -> ArtefactPaths:
         pilot_manifest=cfg.path("pilot_dir") / "pilot_manifest.json",
         main_cases=cfg.path("main_round_dir") / "main_cases.parquet",
         main_manifest=cfg.path("main_round_dir") / "main_manifest.json",
+        ablation_cases=cfg.path("ablation_dir") / "ablation_cases.parquet",
+        ablation_manifest=cfg.path("ablation_dir") / "ablation_manifest.json",
         splits_parquet=cfg.path("splits_dir") / "splits.parquet",
         split_manifest=cfg.path("splits_dir") / "split_manifest.json",
         labels_csv=cfg.path("labels_dir") / "labels.csv",
