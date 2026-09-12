@@ -623,3 +623,196 @@ def build_founder_workbook(review: pd.DataFrame, pass_a: pd.DataFrame, pass_b: p
     path.parent.mkdir(parents=True, exist_ok=True)
     workbook.save(path)
     return sha256_file(path)
+
+
+# ============================================================================= Task 18
+# Founder review import and the K3 assembly of one round's labels.
+from ucc_ml.contracts import FOUNDER_REASON_CODE, LABEL_COLUMNS, LABELLER_AGREED, LABELLER_FOUNDER, Label  # noqa: E402
+
+FOUNDER_DECISION_COLUMNS: tuple[str, ...] = (
+    "case_id", "review_type", "founder_label", "founder_note", "decision", "reviewed_at",
+)
+FOUNDER_DECISIONS: tuple[str, ...] = ("adjudicated", "confirmed", "overturned")
+
+
+class UndecidedDisagreements(ValueError):
+    """A round still has disagreements between the two blind passes that the founder has not decided."""
+
+    def __init__(self, round_name: str, case_ids: list[str]):
+        self.round_name = round_name
+        self.case_ids = sorted(case_ids)
+        super().__init__(f"{round_name}: {len(self.case_ids)} disagreement(s) have no founder decision, "
+                         f"e.g. {self.case_ids[:3]}")
+
+
+def read_founder_workbook(path: Path) -> pd.DataFrame:
+    """The REVIEW THESE sheet as strings ('' for an empty cell); refuses a missing sheet or a changed header."""
+    from openpyxl import load_workbook
+
+    path = Path(path)
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    try:
+        if WORKBOOK_SHEET not in workbook.sheetnames:
+            raise ValueError(f"{path}: no sheet named {WORKBOOK_SHEET!r}")
+        rows = list(workbook[WORKBOOK_SHEET].iter_rows(values_only=True))
+    finally:
+        workbook.close()
+    width = len(WORKBOOK_COLUMNS)
+    header = tuple("" if v is None else str(v).strip() for v in (list(rows[0]) if rows else []) + [None] * width)[:width]
+    if header != WORKBOOK_COLUMNS:
+        raise ValueError(f"{path}: header {list(header)} != {list(WORKBOOK_COLUMNS)}")
+    records = []
+    for values in rows[1:]:
+        cells = ["" if v is None else str(v).strip() for v in (list(values) + [None] * width)[:width]]
+        if any(cells):
+            records.append(cells)
+    return pd.DataFrame(records, columns=list(WORKBOOK_COLUMNS), dtype=object)
+
+
+def founder_summary(decisions: pd.DataFrame, review_manifest: dict) -> dict:
+    kinds = Counter(decisions.decision)
+    n_disagreements = len(review_manifest["disagreements"])
+    audited = kinds["confirmed"] + kinds["overturned"]
+    return {
+        "disagreements": {"n": n_disagreements, "decided": int(kinds["adjudicated"]),
+                          "undecided": int(n_disagreements - kinds["adjudicated"])},
+        "audit": {"n_selected": len(review_manifest["audit"]), "n_audited": int(audited),
+                  "n_confirmed": int(kinds["confirmed"]), "n_overturned": int(kinds["overturned"]),
+                  "agreement_rate": finite_or_none(kinds["confirmed"] / audited) if audited else None},
+    }
+
+
+def import_founder_review(workbook_rows: pd.DataFrame, review_manifest: dict, pass_a: pd.DataFrame,
+                          pass_b: pd.DataFrame, reviewed_at: str) -> tuple[pd.DataFrame, dict]:
+    """The founder's answers as FOUNDER_DECISION_COLUMNS rows, plus founder_summary.
+
+    disagreement row, label + note          -> adjudicated
+    audit row, the agreed label             -> confirmed (note optional)
+    audit row, a different label + note     -> overturned
+    blank founder_label                     -> no decision (an undecided disagreement or an unreviewed audit row)"""
+    disagreements, audit = set(review_manifest["disagreements"]), set(review_manifest["audit"])
+    if disagreements & audit:
+        raise ValueError("the review manifest lists a case both as a disagreement and as an audit row")
+    ids = workbook_rows.case_id.tolist()
+    duplicated = sorted(c for c, n in Counter(ids).items() if n > 1)
+    if duplicated:
+        raise ValueError(f"the founder workbook repeats case_id(s) {duplicated[:3]}")
+    issued = disagreements | audit
+    missing, unexpected = sorted(issued - set(ids)), sorted(set(ids) - issued)
+    if missing or unexpected:
+        raise ValueError(f"the founder workbook's rows differ from the issued review: "
+                         f"missing {missing[:3]}, unexpected {unexpected[:3]}")
+    a, b = _originals(pass_a), _originals(pass_b)
+    decisions, problems = [], []
+    for row in workbook_rows.itertuples(index=False):
+        label = row.founder_label.strip().upper()
+        note = " ".join(row.founder_note.split())
+        if not label:
+            continue
+        if label not in LABELS:
+            problems.append(f"row {row.row}: founder_label {row.founder_label!r} is not one of {list(LABELS)}")
+            continue
+        passes_agree = a.at[row.case_id, "label"] == b.at[row.case_id, "label"]
+        if row.case_id in disagreements:
+            review_type, decision = "disagreement", "adjudicated"
+            if passes_agree:
+                problems.append(f"row {row.row}: listed as a disagreement but the passes agree")
+            if not note:
+                problems.append(f"row {row.row}: a disagreement decision needs a founder_note")
+        else:
+            review_type = "audit"
+            agreed_label = a.at[row.case_id, "label"]
+            if not passes_agree:
+                problems.append(f"row {row.row}: listed as an audit row but the passes disagree")
+            decision = "confirmed" if label == agreed_label else "overturned"
+            if decision == "overturned" and not note:
+                problems.append(f"row {row.row}: overturning the agreed label {agreed_label} needs a founder_note")
+        decisions.append({"case_id": row.case_id, "review_type": review_type, "founder_label": label,
+                          "founder_note": note, "decision": decision, "reviewed_at": reviewed_at})
+    if problems:
+        raise ValueError("; ".join(problems[:20]))
+    frame = pd.DataFrame(decisions, columns=list(FOUNDER_DECISION_COLUMNS))
+    return frame, founder_summary(frame, review_manifest)
+
+
+def read_founder_decisions(path: Path) -> pd.DataFrame:
+    path = Path(path)
+    df = read_exact_csv(path, FOUNDER_DECISION_COLUMNS)
+    check_column(path, df, "case_id", is_sha256_hex)
+    check_column(path, df, "review_type", lambda v: v in ("disagreement", "audit"))
+    check_column(path, df, "founder_label", lambda v: v in LABELS)
+    check_column(path, df, "decision", lambda v: v in FOUNDER_DECISIONS)
+    return df
+
+
+def assemble_round_labels(pass_a: pd.DataFrame, pass_b: pd.DataFrame, decisions: pd.DataFrame, round_name: str,
+                          policy_version: str) -> pd.DataFrame:
+    """One round's labels.csv rows under contract K3, each validated with contracts.Label.
+
+    passes agree, no founder decision         -> model_agreed (pass A's reason, claude_blind_pass_a+claude_blind_pass_b)
+    passes agree, founder confirmed           -> founder_confirmed (pass A's reason, founder)
+    passes agree, founder overturned          -> founder_adjudicated (ADJUDICATED, the founder's note)
+    passes disagree, founder adjudicated      -> founder_adjudicated (ADJUDICATED, the founder's note)
+    passes disagree, no founder decision      -> UndecidedDisagreements; nothing is returned
+    every hidden repeat, in each pass         -> blind_repeat (that pass's answer and labeller id)"""
+    a, b = _originals(pass_a), _originals(pass_b)
+    if set(a.index) != set(b.index):
+        raise ValueError(f"{round_name}: pass a and pass b cover different cases")
+    by_case = decisions.set_index("case_id")
+    if not by_case.index.is_unique:
+        raise ValueError(f"{round_name}: the founder decisions list a case more than once")
+    outside = sorted(set(by_case.index) - set(a.index))
+    if outside:
+        raise ValueError(f"{round_name}: founder decisions for case(s) outside the round, e.g. {outside[:3]}")
+    rows, undecided = [], []
+    for case_id in sorted(a.index):
+        answer_a, answer_b = a.loc[case_id], b.loc[case_id]
+        decision = by_case.loc[case_id] if case_id in by_case.index else None
+        base = {"case_id": case_id, "policy_version": policy_version, "sampling_stratum": answer_a.sampling_stratum,
+                "inclusion_probability": float(answer_a.inclusion_probability), "is_repeat": False,
+                "labelling_round": round_name}
+        founder_row = None if decision is None else {
+            "label": decision.founder_label, "reason_code": FOUNDER_REASON_CODE, "reason": decision.founder_note,
+            "labeller_id": LABELLER_FOUNDER, "labelled_at": decision.reviewed_at,
+            "adjudication_status": "founder_adjudicated"}
+        if answer_a.label != answer_b.label:
+            if decision is None or decision.decision != "adjudicated":
+                undecided.append(case_id)
+                continue
+            rows.append({**base, **founder_row})
+        elif decision is None:
+            rows.append({**base, "label": answer_a.label, "reason_code": answer_a.reason_code, "reason": answer_a.reason,
+                         "labeller_id": LABELLER_AGREED, "labelled_at": max(answer_a.labelled_at, answer_b.labelled_at),
+                         "adjudication_status": "model_agreed"})
+        elif decision.decision == "confirmed":
+            rows.append({**base, "label": answer_a.label, "reason_code": answer_a.reason_code, "reason": answer_a.reason,
+                         "labeller_id": LABELLER_FOUNDER, "labelled_at": decision.reviewed_at,
+                         "adjudication_status": "founder_confirmed"})
+        elif decision.decision == "overturned":
+            rows.append({**base, **founder_row})
+        else:
+            raise ValueError(f"{round_name}: case {case_id} has decision {decision.decision!r} but the passes agree")
+    if undecided:
+        raise UndecidedDisagreements(round_name, undecided)
+    for frame in (pass_a, pass_b):
+        for r in frame[frame.is_repeat].sort_values("case_id", kind="mergesort").itertuples(index=False):
+            rows.append({"case_id": r.case_id, "label": r.label, "reason_code": r.reason_code, "reason": r.reason,
+                         "labeller_id": r.labeller_id, "labelled_at": r.labelled_at, "policy_version": policy_version,
+                         "sampling_stratum": r.sampling_stratum, "inclusion_probability": float(r.inclusion_probability),
+                         "adjudication_status": "blind_repeat", "is_repeat": True, "labelling_round": round_name})
+    labels = pd.DataFrame(rows, columns=list(LABEL_COLUMNS))
+    for i, record in enumerate(labels.to_dict("records")):
+        try:
+            Label.model_validate(record)
+        except Exception as exc:  # pydantic.ValidationError, re-raised with the row
+            raise ValueError(f"{round_name}: assembled label row {i} ({record['case_id']}) is invalid: {exc}") from exc
+    return labels
+
+
+def write_founder_digest(rp: RoundPaths, issued_sha256: str) -> str:
+    comments = [
+        f"The founder's {rp.round_name} review: the returned workbook, the review manifest (the workbook was issued",
+        f"with sha256 {issued_sha256}) and the normalised founder decisions. Committed before labels.csv is",
+        f"written, so the adjudications behind these {LABEL_DISCLOSURE} labels cannot change silently.",
+    ]
+    return write_digest_file(rp.founder_digest, [rp.workbook, rp.review_manifest, rp.founder_decisions], comments)

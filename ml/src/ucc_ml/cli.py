@@ -74,6 +74,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_arg(sp)
     sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
     sp.set_defaults(func=cmd_review_workbook)
+    sp = sub.add_parser("import-founder-review", help="import the founder's review workbook of a round; freeze its digest")
+    _add_config_arg(sp)
+    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.set_defaults(func=cmd_import_founder_review)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -313,6 +317,36 @@ def cmd_review_workbook(ns: argparse.Namespace) -> int:
           f"pass_b {consistency['pass_b']['consistent']}/{consistency['pass_b']['n']}")
     print(f"founder review rows={len(review)} disagreements={len(report['disagreements'])} audit={len(audit)}")
     print(f"wrote {rp.agreement}, {rp.workbook} and {rp.review_manifest}")
+    return 0
+
+
+def cmd_import_founder_review(ns: argparse.Namespace) -> int:
+    from ucc_ml import labeling
+    from ucc_ml.config import load_config
+    from ucc_ml.provenance import read_json
+
+    cfg = load_config(ns.config)
+    rp = labeling.round_paths(cfg, ns.round)
+    manifest = read_json(rp.review_manifest)
+    pass_a, pass_b = labeling.read_pass_file(rp.pass_file("a")), labeling.read_pass_file(rp.pass_file("b"))
+    try:
+        rows = labeling.read_founder_workbook(rp.workbook)
+        decisions, summary = labeling.import_founder_review(rows, manifest, pass_a, pass_b,
+                                                            labeling.file_mtime_iso(rp.workbook))
+    except ValueError as exc:
+        print(f"REJECTED: {exc}")
+        return 1
+    labeling.write_csv(decisions, rp.founder_decisions)
+    labeling.write_founder_digest(rp, manifest["workbook_sha256_issued"])
+    disagreements, audit = summary["disagreements"], summary["audit"]
+    print(f"disagreements: {disagreements['decided']}/{disagreements['n']} decided")
+    print(f"audit: {audit['n_audited']}/{audit['n_selected']} reviewed, confirmed={audit['n_confirmed']} "
+          f"overturned={audit['n_overturned']} agreement_rate={audit['agreement_rate']}")
+    print(f"wrote {rp.founder_decisions} and {rp.founder_digest}")
+    if disagreements["undecided"]:
+        print(f"INCOMPLETE: {disagreements['undecided']} disagreement(s) still have no founder decision; "
+              "validate-labels will refuse")
+        return 1
     return 0
 
 

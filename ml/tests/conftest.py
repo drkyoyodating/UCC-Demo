@@ -289,3 +289,58 @@ def imported_pilot_repo(tmp_path: Path, n_disagreements: int = 3, **repo_kwargs)
     run_blind_passes(cfg, "pilot_v1", flips_in_pass_b=flips)
     assert main(["import-labels", "--config", str(cfg), "--round", "pilot_v1"]) == 0
     return cfg, flips
+
+
+def fill_founder_workbook(path: Path, answers: dict) -> None:
+    """Write founder_label / founder_note into the REVIEW THESE sheet for the case_ids in `answers`."""
+    from openpyxl import load_workbook
+
+    from ucc_ml.labeling import WORKBOOK_COLUMNS, WORKBOOK_SHEET
+
+    workbook = load_workbook(path)
+    sheet = workbook[WORKBOOK_SHEET]
+    label_column = WORKBOOK_COLUMNS.index("founder_label") + 1
+    note_column = WORKBOOK_COLUMNS.index("founder_note") + 1
+    for row in range(2, sheet.max_row + 1):
+        case_id = sheet.cell(row=row, column=WORKBOOK_COLUMNS.index("case_id") + 1).value
+        if case_id in answers:
+            label, note = answers[case_id]
+            sheet.cell(row=row, column=label_column, value=label)
+            sheet.cell(row=row, column=note_column, value=note or None)
+    workbook.save(path)
+
+
+def founder_answers(cfg: Path, round_name: str, decide_all: bool = True) -> dict:
+    """Answers for a round's issued review: every disagreement decided (all but the first when not
+    decide_all), the first audit row confirmed and the second overturned."""
+    import json
+
+    from ucc_ml.config import load_config
+    from ucc_ml.labeling import read_pass_file, round_paths
+
+    rp = round_paths(load_config(cfg), round_name)
+    manifest = json.loads(rp.review_manifest.read_text())
+    pass_a = read_pass_file(rp.pass_file("a"))
+    agreed = pass_a[~pass_a.is_repeat].set_index("case_id").label
+    decided = manifest["disagreements"] if decide_all else manifest["disagreements"][1:]
+    answers = {case_id: ("NOT_RELEVANT", "founder: the name states a different activity") for case_id in decided}
+    audit = manifest["audit"]
+    if audit:
+        answers[audit[0]] = (agreed[audit[0]], "")
+    if len(audit) > 1:
+        other = "INSUFFICIENT_EVIDENCE" if agreed[audit[1]] != "INSUFFICIENT_EVIDENCE" else "RELEVANT"
+        answers[audit[1]] = (other, "founder: the name alone does not settle it")
+    return answers
+
+
+def reviewed_pilot_repo(tmp_path: Path, decide_all: bool = True, **kwargs) -> Path:
+    """imported_pilot_repo + review-workbook + founder answers + import-founder-review; returns the config path."""
+    from ucc_ml.cli import main
+    from ucc_ml.config import load_config
+    from ucc_ml.labeling import round_paths
+
+    cfg, _ = imported_pilot_repo(tmp_path, **kwargs)
+    assert main(["review-workbook", "--config", str(cfg), "--round", "pilot_v1"]) == 0
+    fill_founder_workbook(round_paths(load_config(cfg), "pilot_v1").workbook, founder_answers(cfg, "pilot_v1", decide_all))
+    assert main(["import-founder-review", "--config", str(cfg), "--round", "pilot_v1"]) == (0 if decide_all else 1)
+    return cfg

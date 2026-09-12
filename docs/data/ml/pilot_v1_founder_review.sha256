@@ -1,0 +1,6 @@
+0f5a1afe5f1beaf4df61853025f1ea2b4d2e4819d123a3e8d1706f67ddd5ada6  founder_review_pilot_v1.xlsx
+fa81171293b2e7f95c540f2e7895d51895fe0eee1b5d4dc989bf0f4d92f2e01e  founder_review_pilot_v1.json
+7e8b551a57b0b419839046d58fcc5f12f02efebc96f36bada0de902118a705b6  founder_decisions_pilot_v1.csv
+# The founder's pilot_v1 review: the returned workbook, the review manifest (the workbook was issued
+# with sha256 d6efb799dbc685bd3e492c2aefc33ad6cfd7d9b5b041fa8a066e880407a90a6d) and the normalised founder decisions. Committed before labels.csv is
+# written, so the adjudications behind these model-labelled, founder-adjudicated labels cannot change silently.
