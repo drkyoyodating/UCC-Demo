@@ -19,13 +19,28 @@ No status or filing-type filter; heavy_row is never an eligibility test.
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
+from datetime import date
 from pathlib import Path
 
 import duckdb
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
-from ucc_ml.contracts import make_borrower_key, make_case_id
+from ucc_ml import legacy
+from ucc_ml.contracts import (
+    BASELINE_ROUTES,
+    CASE_COLUMNS,
+    REGIONS,
+    Case,
+    check_column,
+    is_sha256_hex,
+    make_borrower_key,
+    make_case_id,
+    make_group_id,
+)
+from ucc_ml.provenance import sha256_file
 
 SNAPSHOT_TABLES: tuple[str, ...] = ("co_filings", "co_debtors", "co_secured_parties", "ct_filings", "scope_all")
 
@@ -271,3 +286,158 @@ def extract_region(con: duckdb.DuckDBPyConnection, region: str, year_min: str,
     exclusions["case_insensitive_merges"] = int(stage1_rows - len(obs))
     exclusions["join_expansion_rows"] = int((obs.source_row_count * obs.lender_row_count.clip(lower=1)).sum())
     return obs, exclusions
+# ----------------------------------------------------------------------------- stage 4
+
+def canonical_lender_set(values: Iterable | None) -> list[str]:
+    """Sorted unique trimmed non-blank lender strings. None / NaN / '' are dropped (pack §3)."""
+    out: set[str] = set()
+    for v in values or []:
+        if isinstance(v, str):
+            s = v.strip()
+            if s:
+                out.add(s)
+    return sorted(out)
+
+
+def parse_iso_date(value) -> date | None:
+    if not isinstance(value, str) or len(value) < 10:
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
+_NULLABLE_STRING_COLUMNS = ("lineage_id", "borrower_name_clean", "borrower_suffix", "borrower_city",
+                            "borrower_state", "borrower_zip", "source_filing_type", "source_status")
+_DATE_COLUMNS = ("earliest_observed_date", "latest_observed_date")
+
+
+def _nullable_to_object(df: pd.DataFrame) -> pd.DataFrame:
+    """pandas 3 stores None in its default `str` dtype as NaN; keep nullable columns as object with None."""
+    for c in _NULLABLE_STRING_COLUMNS + _DATE_COLUMNS:
+        df[c] = pd.Series([v if isinstance(v, (str, date)) else None for v in df[c]], index=df.index, dtype=object)
+    return df
+
+
+def finalize_cases(obs: pd.DataFrame, dataset_version: str) -> pd.DataFrame:
+    """Stage 4: name normalisation, canonical lender sets, region-scoped group_id, frozen baseline."""
+    clean_cache: dict[str, tuple[str | None, str | None]] = {}
+
+    def clean(raw: str) -> tuple[str | None, str | None]:
+        hit = clean_cache.get(raw)
+        if hit is None:
+            hit = legacy.normalize_name(raw)
+            clean_cache[raw] = hit
+        return hit
+
+    rows: list[dict] = []
+    for r in obs.itertuples(index=False):
+        lenders = canonical_lender_set(r.lender_names_all)
+        name_clean, suffix = clean(r.borrower_name_raw)
+        lenders_clean = sorted({nc for nc in (clean(l)[0] for l in lenders) if nc})
+        rows.append({
+            "case_id": r.case_id,
+            "dataset_version": dataset_version,
+            "region": r.region,
+            "file_id": r.file_id,
+            "lineage_id": r.lineage_id if isinstance(r.lineage_id, str) else None,
+            "borrower_key": r.borrower_key,
+            "borrower_name_raw": r.borrower_name_raw,
+            "borrower_name_clean": name_clean,
+            "borrower_suffix": suffix,
+            "lender_names_raw": lenders,
+            "lender_names_clean": lenders_clean,
+            "earliest_observed_date": parse_iso_date(r.earliest_observed_date),
+            "latest_observed_date": parse_iso_date(r.latest_observed_date),
+            "borrower_city": r.borrower_city if isinstance(r.borrower_city, str) else None,
+            "borrower_state": r.borrower_state if isinstance(r.borrower_state, str) else None,
+            "borrower_zip": r.borrower_zip if isinstance(r.borrower_zip, str) else None,
+            "source_row_count": int(r.source_row_count),
+            "source_filing_type": r.source_filing_type if isinstance(r.source_filing_type, str) else None,
+            "source_status": r.source_status if isinstance(r.source_status, str) else None,
+            "baseline_qualifies": legacy.baseline_qualifies(r.borrower_name_raw, lenders),
+            "baseline_route": legacy.baseline_route(r.borrower_name_raw, lenders),
+            "group_id": make_group_id(r.region, name_clean, r.borrower_name_raw),
+        })
+    df = _nullable_to_object(pd.DataFrame(rows, columns=list(CASE_COLUMNS)))
+    return df.sort_values("case_id", kind="mergesort").reset_index(drop=True)
+
+
+def validate_cases(df: pd.DataFrame) -> int:
+    if list(df.columns) != list(CASE_COLUMNS):
+        raise ValueError(f"columns {list(df.columns)} != CASE_COLUMNS")
+    for i, row in enumerate(df.to_dict("records")):
+        try:
+            Case.model_validate(row)
+        except Exception as exc:  # pydantic.ValidationError, re-raised with the row index
+            raise ValueError(f"row {i}: {exc}") from exc
+    return len(df)
+
+
+CANDIDATE_SCHEMA = pa.schema([
+    ("case_id", pa.string()), ("dataset_version", pa.string()), ("region", pa.string()),
+    ("file_id", pa.string()), ("lineage_id", pa.string()), ("borrower_key", pa.string()),
+    ("borrower_name_raw", pa.string()), ("borrower_name_clean", pa.string()), ("borrower_suffix", pa.string()),
+    ("lender_names_raw", pa.list_(pa.string())), ("lender_names_clean", pa.list_(pa.string())),
+    ("earliest_observed_date", pa.date32()), ("latest_observed_date", pa.date32()),
+    ("borrower_city", pa.string()), ("borrower_state", pa.string()), ("borrower_zip", pa.string()),
+    ("source_row_count", pa.int64()), ("source_filing_type", pa.string()), ("source_status", pa.string()),
+    ("baseline_qualifies", pa.bool_()), ("baseline_route", pa.string()), ("group_id", pa.string()),
+])
+assert tuple(CANDIDATE_SCHEMA.names) == CASE_COLUMNS
+
+_LIST_COLUMNS = ("lender_names_raw", "lender_names_clean")
+
+
+def _column_values(df: pd.DataFrame, name: str) -> list:
+    if name in _LIST_COLUMNS:
+        return [list(v) for v in df[name]]
+    if name in _DATE_COLUMNS:
+        return [v if isinstance(v, date) else None for v in df[name]]
+    if name == "source_row_count":
+        return [int(v) for v in df[name]]
+    if name == "baseline_qualifies":
+        return [bool(v) for v in df[name]]
+    return [v if isinstance(v, str) else None for v in df[name]]
+
+
+def write_candidates(df: pd.DataFrame, path: Path) -> str:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    table = pa.Table.from_pydict({c: _column_values(df, c) for c in CASE_COLUMNS}, schema=CANDIDATE_SCHEMA)
+    pq.write_table(table, path, compression="zstd")
+    return sha256_file(path)
+
+
+def _is_string_list(value) -> bool:
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def read_candidates(path: Path) -> pd.DataFrame:
+    """The only reader of candidates.parquet (contract K7).
+
+    Checks the exact column order, that both lender columns are list<string> with no null lists, that
+    case_id / borrower_key / group_id are sha256 hex, region is CO|CT, baseline_route is one of four
+    values, baseline_qualifies is a real boolean and case_id is unique. Any failure raises ValueError
+    naming the file, the column and the offending values.
+    """
+    path = Path(path)
+    table = pq.read_table(path)
+    if tuple(table.schema.names) != CASE_COLUMNS:
+        raise ValueError(f"{path}: columns {table.schema.names} != CASE_COLUMNS")
+    for name in _LIST_COLUMNS:
+        if not pa.types.is_list(table.schema.field(name).type):
+            raise ValueError(f"{path}: column {name!r} must be list<string>, got {table.schema.field(name).type}")
+    df = pd.DataFrame({c: table.column(c).to_pylist() for c in CASE_COLUMNS}, columns=list(CASE_COLUMNS))
+    for name in ("case_id", "borrower_key", "group_id"):
+        check_column(path, df, name, is_sha256_hex)
+    check_column(path, df, "region", lambda v: v in REGIONS)
+    check_column(path, df, "baseline_route", lambda v: v in BASELINE_ROUTES)
+    check_column(path, df, "baseline_qualifies", lambda v: isinstance(v, bool))
+    for name in _LIST_COLUMNS:
+        check_column(path, df, name, _is_string_list)
+    if not df.case_id.is_unique:
+        dupes = sorted(set(df.case_id[df.case_id.duplicated()]))
+        raise ValueError(f"{path}: column 'case_id' has {len(dupes)} duplicate value(s): {dupes[:5]}")
+    return _nullable_to_object(df)
