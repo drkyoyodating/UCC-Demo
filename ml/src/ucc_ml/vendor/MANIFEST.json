@@ -1,0 +1,20 @@
+{
+  "baseline_version": "heavy_filter_v1",
+  "files": {
+    "heavy_filter_v1.py": {
+      "bytes": 22787,
+      "lines": 399,
+      "origin": "src/heavy_filter.py",
+      "sha256": "954c3aae5d207c9c0b75d532efd45f5938481900908e8daf7e1eef8f87cb4232"
+    },
+    "normalize_v1.py": {
+      "bytes": 17926,
+      "lines": 398,
+      "origin": "src/normalize.py",
+      "sha256": "a2c12a9671f47e4a8a05028fe0860a94db642260d825d9feb5512cb975a1ce67"
+    }
+  },
+  "note": "Verbatim copies of src/ at origin_git_head. A rule change creates heavy_filter_v2; these files are never edited.",
+  "origin_git_head": "ea9388937982976f925d59abeb2828abade5e34f",
+  "vendored_at": "2026-09-12"
+}
