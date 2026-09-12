@@ -1,0 +1,9 @@
+bd29e0efd2d449b0d720df20a367cb29b18f47e8287e65892518511e71f4901d  screen_cells.parquet
+8d26d4a73fc0d9ca1f1b9e5f478199e65e405ad46b97525834cecea1d9eeaaeb  screening_manifest.json
+# Committed BEFORE any screened round is drawn. The screen partitions the 1,150,983 rules-rejected
+# cases into four disjoint sampling cells and sets a known inclusion rate for each, including the
+# unscreened remainder. It sets SAMPLING RATES ONLY: it is never a model feature, never evidence,
+# and never shown to a labeller. Because B4_remainder is always sampled, every population estimate
+# is design-unbiased whether or not the screen is any good; a worse screen would only widen the
+# intervals. The declared word list is published verbatim in screening_manifest.json so no reader
+# mistakes one cell of four for the sampling frame.
