@@ -159,7 +159,17 @@ class BootstrapResult:
 
     def to_dict(self) -> dict:
         return {"estimate": self.estimate, "lower": self.lower, "upper": self.upper,
-                "n_resamples": self.n_resamples, "n_failed": self.n_failed}
+                "n_resamples": self.n_resamples, "n_failed": self.n_failed,
+                # The point estimate is the design-weighted plug-in; the interval is SMOOTHED by the
+                # Jeffreys pseudo-mass, which deliberately keeps a cell with no observed false positive
+                # uncertain. Near the boundary the two disagree: measured on the real validation split,
+                # a precision plug-in of 0.9974 (one false positive in 207 rows) against an interval
+                # ending at 0.9937. That is the prior working, not a weighting error -- at prior 0 the
+                # estimate falls inside every time, and a mid-range model is inside under both priors.
+                # It is flagged rather than hidden, so no reader is shown an incoherent pair in silence.
+                "estimate_outside_interval": bool(
+                    self.estimate is not None and self.lower is not None and self.upper is not None
+                    and not (self.lower <= self.estimate <= self.upper))}
 
 
 def _percentile_result(estimate, replicates, level: float) -> BootstrapResult:

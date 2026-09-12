@@ -260,3 +260,26 @@ def test_interval_covers_the_truth_when_one_stratum_is_drawn_at_two_very_differe
         ci = report["model"]["ci"]["weighted_recall"]
         covered += int(ci["lower"] <= truth["weighted_recall"] <= ci["upper"])
     assert covered / reps >= 0.85, covered / reps
+
+
+def test_an_estimate_outside_its_own_interval_is_flagged_not_hidden():
+    """The plug-in estimate is unsmoothed; the interval is smoothed by the Jeffreys pseudo-mass, so near
+    the boundary the interval can sit below the estimate. Measured on the real validation split: precision
+    0.9974 from one false positive in 207 rows, against an interval ending at 0.9937. At prior 0 the
+    estimate is inside every time, so this is the prior working rather than a weighting error. Publishing
+    that pair without saying so would be incoherent to a reader, so every interval carries the flag."""
+    from ucc_ml.evaluation import _percentile_result
+
+    outside = _percentile_result(0.99, np.linspace(0.10, 0.80, 400), 0.95).to_dict()
+    assert outside["estimate_outside_interval"] is True
+    inside = _percentile_result(0.50, np.linspace(0.10, 0.80, 400), 0.95).to_dict()
+    assert inside["estimate_outside_interval"] is False
+    none_est = _percentile_result(None, np.full(10, np.nan), 0.95).to_dict()
+    assert none_est["estimate_outside_interval"] is False      # nothing to contradict
+
+    df = _sample()
+    report = _report(df)
+    for block in [report, report["review_queue"], *report["per_region"], *report["per_stratum"]]:
+        for side in ("model", "rules"):
+            for ci in block[side]["ci"].values():
+                assert "estimate_outside_interval" in ci
