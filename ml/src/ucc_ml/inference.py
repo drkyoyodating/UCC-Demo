@@ -467,3 +467,110 @@ def predict_cases(cases: list[CaseInput], bundle: ReleaseBundle) -> list[Predict
             top_feature_contributions=[(str(n), float(w)) for n, w in contrib],
         ))
     return out
+
+
+# ---------------------------------------------------------------------------
+# Part 3 — score-batch: every candidate through predict_cases (contract K8: the only batch scorer)
+# ---------------------------------------------------------------------------
+import math  # noqa: E402
+import re  # noqa: E402
+
+import pyarrow as pa  # noqa: E402
+import pyarrow.parquet as pq  # noqa: E402
+from pydantic import ValidationError  # noqa: E402
+
+from ucc_ml.features import as_str_list  # noqa: E402
+
+PREDICTIONS_SCHEMA = pa.schema([
+    ("case_id", pa.string()), ("region", pa.string()), ("release_id", pa.string()), ("score", pa.float64()),
+    ("score_type", pa.string()), ("decision", pa.string()), ("threshold", pa.float64()),
+    ("baseline_qualifies", pa.bool_()), ("baseline_route", pa.string()), ("input_hash", pa.string()),
+    ("top_feature_contributions", pa.string()), ("validation_error", pa.string()), ("scored_at", pa.string()),
+])
+RELEASE_DIR_NAME = re.compile(r"[0-9a-f]{12}")
+
+
+def _clean_or_none(value) -> str | None:
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return None
+    return str(value)
+
+
+def score_batch(bundle: ReleaseBundle, candidates_path: Path, out_dir: Path, *, chunk_rows: int = 20000) -> Path:
+    """Write <out_dir>/<release_id>.parquet (PREDICTIONS_SCHEMA, one row per candidate) and <release_id>.summary.json.
+
+    Chunked AT THE READ: iter_candidates pulls record batches of at most chunk_rows straight from the Parquet
+    file, so neither the whole table nor a parent frame the chunks would be slices of is ever held.
+    """
+    from ucc_ml.dataset import iter_candidates    # Plan A's streaming reader (K7); duckdb stays out of the serving path
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{bundle.release_id}.parquet"
+    scored_at = utc_now_iso()
+    counts: dict[tuple[str, str, bool], int] = {}
+    n_rows = n_invalid = 0
+    writer = pq.ParquetWriter(out_path, PREDICTIONS_SCHEMA, compression="zstd")
+    try:
+        for chunk in iter_candidates(candidates_path, chunk_rows=int(chunk_rows)):
+            cases: list[CaseInput] = []
+            rows: list[dict] = []
+            for r in chunk.itertuples(index=False):
+                lenders = as_str_list(r.lender_names_raw)
+                try:
+                    cases.append(CaseInput(borrower_name=str(r.borrower_name_raw), lender_names=lenders, region=str(r.region),
+                                           case_id=str(r.case_id), borrower_name_clean=_clean_or_none(r.borrower_name_clean),
+                                           lender_names_clean=as_str_list(r.lender_names_clean)))
+                except ValidationError as err:
+                    n_invalid += 1
+                    first = err.errors()[0]
+                    rows.append({"case_id": str(r.case_id), "region": str(r.region), "release_id": bundle.release_id,
+                                 "score": None, "score_type": bundle.score_type, "decision": "review_needed",
+                                 "threshold": float(bundle.threshold), "baseline_qualifies": bool(r.baseline_qualifies),
+                                 "baseline_route": str(r.baseline_route),
+                                 "input_hash": input_hash_for(str(r.borrower_name_raw), lenders, str(r.region)),
+                                 "top_feature_contributions": "[]",
+                                 "validation_error": f"{'.'.join(str(x) for x in first['loc'])}: {first['msg']}",
+                                 "scored_at": scored_at})
+            region_of = {c.case_id: c.region for c in cases}
+            for p in predict_cases(cases, bundle):
+                rows.append({"case_id": p.case_id, "region": region_of[p.case_id], "release_id": p.release_id,
+                             "score": p.score, "score_type": p.score_type, "decision": p.decision, "threshold": p.threshold,
+                             "baseline_qualifies": p.baseline_qualifies, "baseline_route": p.baseline_route,
+                             "input_hash": p.input_hash, "top_feature_contributions": json.dumps(p.top_feature_contributions),
+                             "validation_error": None, "scored_at": scored_at})
+            for row in rows:
+                key = (row["region"], row["decision"], bool(row["baseline_qualifies"]))
+                counts[key] = counts.get(key, 0) + 1
+            n_rows += len(rows)
+            writer.write_table(pa.Table.from_pylist(rows, schema=PREDICTIONS_SCHEMA))
+    finally:
+        writer.close()
+    summary = {"release_id": bundle.release_id, "scored_at": scored_at, "rows": int(n_rows), "invalid_rows": int(n_invalid),
+               "by_region_decision_baseline": [{"region": k[0], "decision": k[1], "baseline_qualifies": k[2], "n": int(v)}
+                                               for k, v in sorted(counts.items())],
+               "review_queue_rules_rejected_suggested": int(sum(v for k, v in counts.items()
+                                                                if k[1] == "suggest_relevant" and not k[2]))}
+    write_json(out_dir / f"{bundle.release_id}.summary.json", summary)
+    return out_path
+
+
+def run_score_batch(config_path: Path, release_dir: Path | None = None) -> Path:
+    """CLI `score-batch`: every candidate at artefact_paths(cfg).candidates_parquet scored with the release into
+    artefact_paths(cfg).predictions_dir. release_dir None means the only release under artefact_paths(cfg).releases_dir."""
+    from ucc_ml.config import artefact_paths, load_config
+
+    cfg = load_config(config_path)
+    paths = artefact_paths(cfg)
+    rcfg = cfg.section("release")
+    if release_dir is None:
+        found = (sorted(p for p in paths.releases_dir.iterdir() if p.is_dir() and RELEASE_DIR_NAME.fullmatch(p.name))
+                 if paths.releases_dir.is_dir() else [])
+        if len(found) != 1:
+            raise FileNotFoundError(f"{paths.releases_dir} holds {len(found)} release(s); pass the release directory explicitly")
+        release_dir = found[0]
+    release_dir = Path(release_dir)
+    if not release_dir.is_dir():
+        raise FileNotFoundError(f"release directory {release_dir} does not exist")
+    bundle = load_release_bundle(release_dir, top_k=int(rcfg["top_k_contributions"]))
+    return score_batch(bundle, paths.candidates_parquet, paths.predictions_dir, chunk_rows=int(rcfg["batch_chunk_rows"]))
