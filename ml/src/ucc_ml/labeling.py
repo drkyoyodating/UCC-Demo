@@ -456,3 +456,170 @@ def write_passes_digest(rp: RoundPaths, parts: list[int]) -> str:
         f"Labels built from these passes are {LABEL_DISCLOSURE}.",
     ]
     return write_digest_file(rp.passes_digest, files, comments)
+
+
+# ============================================================================= Task 17
+# Pass agreement, blind-repeat consistency, the founder review selection and the founder workbook.
+from ucc_ml.contracts import STRATA  # noqa: E402
+from ucc_ml.provenance import finite_or_none  # noqa: E402
+
+REVIEW_COLUMNS: tuple[str, ...] = ("case_id", "review_type", "split", "sampling_stratum", "review_rank")
+WORKBOOK_SHEET = "REVIEW THESE"
+GUIDE_SHEET = "HOW TO REVIEW"
+WORKBOOK_COLUMNS: tuple[str, ...] = (
+    "row", "case_id", "borrower_name_raw", "lender_names_raw", "city", "state",
+    "pass_a_label", "pass_a_reason_code", "pass_a_reason",
+    "pass_b_label", "pass_b_reason_code", "pass_b_reason",
+    "founder_label", "founder_note",
+)
+FOUNDER_GUIDE: tuple[str, ...] = (
+    "Founder review of blind Claude labels -- label_policy_v1 (ml/specs/label_policy_v1.md)",
+    "",
+    "Each row is one case: the borrower name, its lender names, city and state, and what two independent",
+    "blind Claude passes decided. Rows where the passes disagree are mixed with a random audit sample of rows",
+    "where they agree. Nothing else is shown on purpose: no rule result, no sample design, no model output.",
+    "",
+    "For every row choose founder_label: RELEVANT, NOT_RELEVANT or INSUFFICIENT_EVIDENCE.",
+    "  - The passes disagree: your label decides the case. founder_note is required (one sentence: why).",
+    "  - The passes agree and so do you: choose the same label. founder_note is optional.",
+    "  - The passes agree and you do not: choose your label. founder_note is required (why they were wrong).",
+    "A blank founder_label means not reviewed. Labels are not written while any disagreement is blank.",
+    "",
+    "Do not look anything up: no Google, no Secretary of State. Decide from the names and city/state shown.",
+    "Only fill founder_label and founder_note. Do not add, delete or re-type rows or other columns.",
+)
+
+
+def _originals(pass_frame: pd.DataFrame) -> pd.DataFrame:
+    originals = pass_frame[~pass_frame.is_repeat].set_index("case_id")
+    if not originals.index.is_unique:
+        raise ValueError("a pass lists the same original case more than once")
+    return originals
+
+
+def _agreement(n: int, agreed: int) -> dict:
+    return {"n": int(n), "agreed": int(agreed), "rate": finite_or_none(agreed / n) if n else None}
+
+
+def repeat_consistency(pass_frame: pd.DataFrame) -> dict:
+    """Share of one pass's hidden repeats that got the same label as that pass gave the original case."""
+    originals = _originals(pass_frame).label
+    repeats = pass_frame[pass_frame.is_repeat]
+    consistent = sum(1 for case_id, label in zip(repeats.case_id, repeats.label) if originals.get(case_id) == label)
+    n = len(repeats)
+    return {"n": int(n), "consistent": int(consistent), "rate": finite_or_none(consistent / n) if n else None}
+
+
+def _insufficient_share(frame: pd.DataFrame) -> dict:
+    shares = {}
+    for stratum in STRATA:
+        mask = frame.sampling_stratum == stratum
+        if mask.any():
+            shares[stratum] = finite_or_none(float((frame.label[mask] == "INSUFFICIENT_EVIDENCE").mean()))
+    return shares
+
+
+def agreement_report(pass_a: pd.DataFrame, pass_b: pd.DataFrame, round_name: str) -> dict:
+    """Pass agreement overall and by stratum, label counts, confusion, repeat consistency, disagreements."""
+    a, b = _originals(pass_a), _originals(pass_b)
+    if set(a.index) != set(b.index):
+        raise ValueError(f"{round_name}: pass a and pass b cover different cases")
+    b = b.loc[a.index]
+    agreed = a.label == b.label
+    by_stratum = {s: _agreement(int((a.sampling_stratum == s).sum()), int((agreed & (a.sampling_stratum == s)).sum()))
+                  for s in STRATA if (a.sampling_stratum == s).any()}
+    return {
+        "round": round_name,
+        "disclosure": LABEL_DISCLOSURE,
+        "pass_agreement": {**_agreement(len(a), int(agreed.sum())), "by_stratum": by_stratum},
+        "label_counts": {f"pass_{x}": {label: int((frame.label == label).sum()) for label in LABELS}
+                         for x, frame in (("a", a), ("b", b))},
+        "insufficient_share_by_stratum": {"pass_a": _insufficient_share(a), "pass_b": _insufficient_share(b)},
+        "confusion": dict(sorted(Counter(f"{x}->{y}" for x, y in zip(a.label, b.label)).items())),
+        "repeat_consistency": {"pass_a": repeat_consistency(pass_a), "pass_b": repeat_consistency(pass_b)},
+        "disagreements": sorted(a.index[~agreed]),
+    }
+
+
+def select_founder_review(pass_a: pd.DataFrame, pass_b: pd.DataFrame, splits: pd.DataFrame, per_split_stratum: int,
+                          seed: int, round_name: str) -> pd.DataFrame:
+    """Every disagreement plus, in each (split, stratum), the `per_split_stratum` agreed cases with the
+    smallest seeded rank; ordered by a seeded rank so audits and disagreements are interleaved."""
+    a, b = _originals(pass_a), _originals(pass_b)
+    if set(a.index) != set(b.index):
+        raise ValueError(f"{round_name}: pass a and pass b cover different cases")
+    split_of = splits.set_index("case_id").split
+    unknown = sorted(set(a.index) - set(split_of.index))
+    if unknown:
+        raise ValueError(f"{round_name}: {len(unknown)} labelled case(s) have no split, e.g. {unknown[:3]}")
+    frame = pd.DataFrame({
+        "case_id": list(a.index),
+        "split": [split_of[c] for c in a.index],
+        "sampling_stratum": a.sampling_stratum.tolist(),
+        "agreed": (a.label == b.loc[a.index].label).tolist(),
+    })
+    chosen = [(c, "disagreement") for c in frame.case_id[~frame.agreed]]
+    for _, group in frame[frame.agreed].groupby(["split", "sampling_stratum"], sort=True):
+        ranked = sorted(group.case_id, key=lambda c: draw_rank(seed, f"{round_name}_founder_audit", c))
+        chosen += [(c, "audit") for c in ranked[:per_split_stratum]]
+    rows = frame.set_index("case_id")
+    review = pd.DataFrame({
+        "case_id": [c for c, _ in chosen],
+        "review_type": [t for _, t in chosen],
+        "split": [rows.at[c, "split"] for c, _ in chosen],
+        "sampling_stratum": [rows.at[c, "sampling_stratum"] for c, _ in chosen],
+        "review_rank": [sha256_hex(canonical_json(["founder_review", round_name, seed, c])) for c, _ in chosen],
+    }, columns=list(REVIEW_COLUMNS))
+    return review.sort_values("review_rank", kind="mergesort").reset_index(drop=True)
+
+
+def build_founder_workbook(review: pd.DataFrame, pass_a: pd.DataFrame, pass_b: pd.DataFrame,
+                           round_cases: pd.DataFrame, path: Path) -> str:
+    """Write the founder's review workbook and return its sha256 as issued.
+
+    Columns are WORKBOOK_COLUMNS: names, city/state, both passes' label, reason code and reason, and the
+    empty founder_label / founder_note columns. No baseline flag, stratum, split, score or review type."""
+    from openpyxl import Workbook
+    from openpyxl.formatting.rule import FormulaRule
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    a, b = _originals(pass_a), _originals(pass_b)
+    cases = round_cases.set_index("case_id")
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = WORKBOOK_SHEET
+    sheet.append(list(WORKBOOK_COLUMNS))
+    for cell in sheet[1]:
+        cell.fill = PatternFill("solid", fgColor="1F3864")
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for number, case_id in enumerate(review.case_id, start=1):
+        case, answer_a, answer_b = cases.loc[case_id], a.loc[case_id], b.loc[case_id]
+        sheet.append([number, case_id, case.borrower_name_raw, LENDER_JOIN.join(case.lender_names_raw),
+                      _text(case.borrower_city), _text(case.borrower_state),
+                      answer_a.label, answer_a.reason_code, answer_a.reason,
+                      answer_b.label, answer_b.reason_code, answer_b.reason, None, None])
+    last_row = len(review) + 1
+    label_letter = sheet.cell(row=1, column=WORKBOOK_COLUMNS.index("founder_label") + 1).column_letter
+    note_letter = sheet.cell(row=1, column=WORKBOOK_COLUMNS.index("founder_note") + 1).column_letter
+    validation = DataValidation(type="list", formula1='"' + ",".join(LABELS) + '"', allow_blank=True)
+    validation.error = "founder_label must be RELEVANT, NOT_RELEVANT or INSUFFICIENT_EVIDENCE"
+    sheet.add_data_validation(validation)
+    if last_row >= 2:
+        validation.add(f"{label_letter}2:{label_letter}{last_row}")
+        sheet.conditional_formatting.add(
+            f"A2:{note_letter}{last_row}",
+            FormulaRule(formula=[f'${label_letter}2=""'], fill=PatternFill("solid", fgColor="FFF3CD")))
+    for column, width in enumerate([6, 18, 34, 40, 14, 6, 22, 26, 40, 22, 26, 40, 24, 40], start=1):
+        sheet.column_dimensions[sheet.cell(row=1, column=column).column_letter].width = width
+    sheet.freeze_panes = "C2"
+    guide = workbook.create_sheet(GUIDE_SHEET, 0)
+    for line in FOUNDER_GUIDE:
+        guide.append([line])
+    guide.column_dimensions["A"].width = 110
+    workbook.active = 1
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    workbook.save(path)
+    return sha256_file(path)

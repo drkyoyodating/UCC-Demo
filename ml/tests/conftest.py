@@ -273,3 +273,19 @@ def run_blind_passes(cfg: Path, round_name: str, flips_in_pass_b: Iterable[str] 
             path.write_text(json.dumps(fake_structured_output(chunk, flips)), encoding="utf-8")
             assert main(["write-raw-labels", "--config", str(cfg), "--round", round_name, "--pass", letter,
                          "--part", str(part), "--structured", str(path)]) == 0
+
+
+def imported_pilot_repo(tmp_path: Path, n_disagreements: int = 3, **repo_kwargs) -> tuple[Path, list[str]]:
+    """labelling_repo + both fake passes (pass B flips the first n original cases of part 1) + import-labels.
+
+    Returns the config path and the case_ids on which the two passes disagree."""
+    from ucc_ml.cli import main
+    from ucc_ml.config import load_config
+    from ucc_ml.labeling import read_key, round_paths
+
+    cfg = labelling_repo(tmp_path, **repo_kwargs)
+    key = read_key(round_paths(load_config(cfg), "pilot_v1").key)
+    flips = key[(key.part == 1) & ~key.is_repeat].queue_case_id.tolist()[:n_disagreements]
+    run_blind_passes(cfg, "pilot_v1", flips_in_pass_b=flips)
+    assert main(["import-labels", "--config", str(cfg), "--round", "pilot_v1"]) == 0
+    return cfg, flips

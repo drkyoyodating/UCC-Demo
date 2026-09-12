@@ -70,6 +70,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_arg(sp)
     sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
     sp.set_defaults(func=cmd_import_labels)
+    sp = sub.add_parser("review-workbook", help="pass agreement, repeat consistency and the founder review workbook for a round")
+    _add_config_arg(sp)
+    sp.add_argument("--round", required=True, choices=("pilot_v1", "main_v1"))
+    sp.set_defaults(func=cmd_review_workbook)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -273,6 +277,42 @@ def cmd_import_labels(ns: argparse.Namespace) -> int:
               f"labels={originals.label.value_counts().sort_index().to_dict()} sha256={sha}")
     labeling.write_passes_digest(rp, labeling.queue_parts(labeling.read_key(rp.key)))
     print(f"wrote {rp.pass_file('a')}, {rp.pass_file('b')} and {rp.passes_digest}")
+    return 0
+
+
+def cmd_review_workbook(ns: argparse.Namespace) -> int:
+    from ucc_ml import dataset, labeling
+    from ucc_ml.config import artefact_paths, load_config
+    from ucc_ml.provenance import utc_now_iso, write_json
+    from ucc_ml.splitting import read_splits
+
+    cfg = load_config(ns.config)
+    rp = labeling.round_paths(cfg, ns.round)
+    if rp.workbook.exists():
+        print(f"REFUSED: {rp.workbook} already exists; it may hold founder decisions and is never regenerated")
+        return 1
+    pass_a, pass_b = labeling.read_pass_file(rp.pass_file("a")), labeling.read_pass_file(rp.pass_file("b"))
+    report = labeling.agreement_report(pass_a, pass_b, ns.round)
+    write_json(rp.agreement, report)
+    splits = read_splits(artefact_paths(cfg).splits_parquet)
+    per_cell = cfg.labelling.founder_audit_per_split_stratum
+    review = labeling.select_founder_review(pass_a, pass_b, splits, per_cell, cfg.seed, ns.round)
+    sha = labeling.build_founder_workbook(review, pass_a, pass_b, dataset.read_frame(rp.cases), rp.workbook)
+    audit = review[review.review_type == "audit"]
+    write_json(rp.review_manifest, {
+        "round": ns.round, "workbook": rp.workbook.name, "workbook_sha256_issued": sha, "created_at": utc_now_iso(),
+        "seed": cfg.seed, "founder_audit_per_split_stratum": per_cell, "rows": int(len(review)),
+        "disagreements": sorted(review.case_id[review.review_type == "disagreement"]),
+        "audit": sorted(audit.case_id),
+        "audit_by_split_stratum": {split: {stratum: int(n) for stratum, n in group.sampling_stratum.value_counts().sort_index().items()}
+                                   for split, group in audit.groupby("split", sort=True)},
+    })
+    agreement, consistency = report["pass_agreement"], report["repeat_consistency"]
+    print(f"pass agreement: {agreement['agreed']}/{agreement['n']} rate={agreement['rate']}")
+    print(f"repeat consistency: pass_a {consistency['pass_a']['consistent']}/{consistency['pass_a']['n']}, "
+          f"pass_b {consistency['pass_b']['consistent']}/{consistency['pass_b']['n']}")
+    print(f"founder review rows={len(review)} disagreements={len(report['disagreements'])} audit={len(audit)}")
+    print(f"wrote {rp.agreement}, {rp.workbook} and {rp.review_manifest}")
     return 0
 
 
