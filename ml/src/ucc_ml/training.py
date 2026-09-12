@@ -533,3 +533,167 @@ def run_train(config_path: Path) -> dict:
               "timings": {"seconds_total": round(time.time() - started, 2)}}
     write_json(art_dir / TRAIN_REPORT_NAME, report)
     return report
+
+
+# ---------------------------------------------------------------------------
+# Part 4 — freeze-candidate: calibrate on OOF, threshold on VALIDATION, freeze
+# ---------------------------------------------------------------------------
+from ucc_ml.evaluation import (  # noqa: E402
+    decide_from_scores,
+    evaluate_split,
+    precision_lower_bound,
+    probability_gate,
+    select_threshold,
+    unresolved_prevalence,
+    weighted_ece,
+)
+from ucc_ml.provenance import write_sha256sums  # noqa: E402
+
+FROZEN_FILES = ("pipeline.joblib", "threshold.json", "model-manifest.json", "validation-metrics.json")
+GUARD_FILE_NAME = "TEST_EVALUATED.json"
+VALIDATION_LOOKS_NAME = "VALIDATION_LOOKS.json"
+PROTOCOL_PATH = "ml/specs/evaluation_protocol_v1.md"
+SELECTION_BIAS_NOTE = "optimistic: the threshold was chosen on this sample; only TEST is unbiased"
+GATE_FALLBACK = "precision_lower_bound_or_effective_support_below_floor"
+
+
+def run_freeze_candidate(config_path: Path, *, force: bool = False) -> dict:
+    """CLI `freeze-candidate`. Uses TRAIN out-of-fold scores and VALIDATION only."""
+    cfg = load_config(config_path)
+    paths = artefact_paths(cfg)
+    tcfg, ccfg = training_config(cfg), cfg.section("calibration")
+    thcfg, ecfg = cfg.section("threshold"), cfg.section("evaluation")
+    guard = paths.final_eval_dir / GUARD_FILE_NAME
+    if guard.exists() and not force:
+        raise RuntimeError(f"{guard} exists: TEST has been evaluated against the current frozen candidate. "
+                           "Re-freezing would silently invalidate that result. Pass --force-refreeze only if you "
+                           "intend to start a NEW candidate that will need a fresh benchmark.")
+    variant = tcfg["candidate_variant"]
+    art_dir = cfg.repo_root / tcfg["artifacts_dir"]
+    vdir = art_dir / variant
+    train_report = read_json(art_dir / TRAIN_REPORT_NAME)
+    pipe = joblib.load(vdir / "pipeline.joblib")          # written by `train` in this checkout
+    oof = pd.read_parquet(vdir / "oof.parquet")
+    cv_doc = read_json(vdir / "cv.json")
+
+    method, n_eff_pos_oof = choose_calibration_method(ccfg["method"], oof.y.to_numpy(), oof.sample_weight.to_numpy(),
+                                                      int(ccfg["isotonic_min_effective_positives"]))
+    calibrator = fit_calibrator(method, oof.raw_score.to_numpy(), oof.y.to_numpy(), oof.sample_weight.to_numpy())
+    model = CalibratedModel(pipeline=pipe, calibrator=calibrator, variant=variant, calibration_method=method)
+
+    inputs = read_plan_a_inputs(paths)
+    table = build_model_table(inputs.candidates, inputs.splits, inputs.labels)
+    check_stratum_alignment(table)
+    N_h = split_populations(inputs.candidates, inputs.splits)["validation"]
+    val_all = table[table.split == "validation"].reset_index(drop=True)
+    w_all = design_weights(val_all, N_h)
+    keep = val_all.y.notna().to_numpy()
+    val, w_val = val_all[keep].reset_index(drop=True), w_all[keep]
+    y_val = val.y.to_numpy().astype(int)
+    scores_all = model.scores(build_feature_frame(val_all))
+    scores = scores_all[keep]
+    floor, min_pp = float(thcfg["min_weighted_precision"]), int(thcfg["min_predicted_positives"])
+    sel = select_threshold(scores, y_val, w_val, min_weighted_precision=floor, min_predicted_positives=min_pp)
+    y_all = val_all.y.fillna(-1).to_numpy().astype(int)
+    pred_all = decide_from_scores(scores_all, sel.threshold)
+    rules_all = val_all.baseline_qualifies.to_numpy().astype(int)
+    lcb = precision_lower_bound(y_all, pred_all, rules_all, val_all.stratum.to_numpy(), val_all.group_id.to_numpy(), N_h,
+                                w_all, n_resamples=int(ecfg["bootstrap_resamples"]), seed=int(ecfg["bootstrap_seed"]))
+    pp = pred_all[keep] == 1
+    kish_pp = kish_effective_n(w_val[pp]) if pp.any() else 0.0
+    if sel.status == "production" and (lcb is None or lcb < floor or kish_pp < min_pp):
+        sel.status, sel.fallback = "experimental", GATE_FALLBACK
+    ece = weighted_ece(y_val, scores, w_val, n_bins=int(ccfg["n_bins"]))
+    gate = probability_gate(y_val, scores, w_val, n_bins=int(ccfg["n_bins"]),
+                            max_ece=float(ccfg["max_weighted_ece_for_probability"]),
+                            decision_score=float(ccfg["decision_region_min_score"]),
+                            max_decision_ece=float(ccfg["max_decision_region_ece"]),
+                            min_decision_cases=int(ccfg["decision_region_min_cases"]))
+    score_type = gate["score_type"]
+    report = evaluate_split(y_all, pred_all, rules_all, val_all.stratum.to_numpy(), val_all.group_id.to_numpy(),
+                            val_all.region.to_numpy(), N_h, w_all, n_resamples=int(ecfg["bootstrap_resamples"]),
+                            seed=int(ecfg["bootstrap_seed"]), level=float(ecfg["ci_level"]))
+
+    fdir = paths.frozen_dir
+    fdir.mkdir(parents=True, exist_ok=True)
+    for stale in fdir.iterdir():
+        stale.unlink()
+    joblib.dump(model, fdir / "pipeline.joblib")
+    prov = train_report["provenance"]
+    threshold_doc = {
+        "threshold": float(sel.threshold), "status": sel.status, "score_type": score_type, "objective": sel.objective,
+        "production_gate": {"precision_lower_bound_95_one_sided_at_least": floor,
+                            "kish_effective_predicted_positives_at_least": min_pp},
+        "fallback": sel.fallback,
+        "validation": {"weighted_precision": sel.weighted_precision, "weighted_recall": sel.weighted_recall,
+                       "weighted_f1": sel.weighted_f1, "predicted_positives": sel.predicted_positives,
+                       "weighted_predicted_positives": sel.weighted_predicted_positives, "n": sel.n,
+                       "positives": sel.positives, "precision_lower_bound_95_one_sided": lcb,
+                       "kish_effective_predicted_positives": kish_pp, "selection_bias": SELECTION_BIAS_NOTE},
+        "calibration": {"method": method, "weighted_ece": ece["ece"],
+                        "decision_region_weighted_ece": gate["decision_region_weighted_ece"],
+                        "decision_region_min_score": float(ccfg["decision_region_min_score"]),
+                        "decision_region_cases": gate["decision_region_cases"],
+                        "max_decision_region_ece": float(ccfg["max_decision_region_ece"]),
+                        "max_weighted_ece_for_probability": float(ccfg["max_weighted_ece_for_probability"]),
+                        "n_bins": int(ccfg["n_bins"]),
+                        "isotonic_min_effective_positives": int(ccfg["isotonic_min_effective_positives"]),
+                        "oof_positives": int((oof.y == 1).sum()), "oof_effective_positives": n_eff_pos_oof},
+        "protocol": PROTOCOL_PATH,
+    }
+    write_json(fdir / "threshold.json", threshold_doc)
+    train_resolved = resolved(table[table.split == "train"])
+    manifest = {
+        "model_version": "v1", "variant": variant, "C": float(cv_doc["best_C"]),
+        "best_C_at_grid_boundary": bool(cv_doc["best_C_at_grid_boundary"]), "calibration_method": method,
+        "feature_policy_version": model.feature_policy_version, "n_features": int(len(feature_names(pipe))),
+        "intercept": float(pipe.named_steps["clf"].intercept_[0]),
+        "train_rows": int(len(oof)), "train_positives": int((oof.y == 1).sum()), "train_groups": int(oof.group_id.nunique()),
+        "oof_positives": int((oof.y == 1).sum()), "oof_effective_positives": n_eff_pos_oof,
+        "oof_raw_score_sd": float(np.std(oof.raw_score.to_numpy())),
+        "refit_train_raw_score_sd": float(np.std(pipe.decision_function(build_feature_frame(train_resolved)))),
+        "seed": int(tcfg["seed"]), "cv_folds": int(tcfg["cv_folds"]), "c_grid": [float(c) for c in tcfg["c_grid"]],
+        "selection_metric": tcfg["selection_metric"], "weighting": tcfg["weighting"],
+        "sample_weight_normalisation": SAMPLE_WEIGHT_NORMALISATION, "class_weight": "none",
+        "pipeline_sha256": sha256_file(fdir / "pipeline.joblib"),
+        "python_version": prov["python_version"], "sklearn_version": prov["sklearn_version"],
+        "numpy_version": prov["numpy_version"], "source_commit": prov["source_commit"], "source_dirty": prov["source_dirty"],
+        "config_sha256": cfg.config_sha256, "lock_sha256": prov["lock_sha256"], "labels_policy_version": prov["policy_version"],
+        "candidates_sha256": prov["candidates_sha256"], "splits_sha256": prov["splits_sha256"],
+        "labels_sha256": prov["labels_sha256"], "label_disclosure": prov["label_disclosure"],
+    }
+    write_json(fdir / "model-manifest.json", manifest)
+    validation_metrics = {"protocol": PROTOCOL_PATH, "split": "validation", "evaluation": report,
+                          "calibration": {**ece, "probability_gate": gate}, "threshold_curve": sel.curve,
+                          "unresolved": unresolved_prevalence(val_all, N_h, pred=pred_all),
+                          "labels": labels_summary(table, "validation", inputs.labels_manifest), "threshold": threshold_doc}
+    write_json(fdir / "validation-metrics.json", validation_metrics)
+    looks_path = fdir.parent / VALIDATION_LOOKS_NAME          # outside frozen/v1 so frozen manifests stay deterministic
+    looks = (read_json(looks_path)["looks"] if looks_path.exists() else 0) + 1
+    write_json(looks_path, {"looks": looks, "last_config_sha256": sha256_file(config_path)})
+    write_sha256sums(fdir, list(FROZEN_FILES))
+
+    session = MlflowSession(cfg, paths)
+    session.log_run(f"freeze-{variant}",
+                    params={**{k: v for k, v in manifest.items() if k != "c_grid"}, "stage": "freeze",
+                            "threshold": sel.threshold, "threshold_status": sel.status, "score_type": score_type,
+                            "validation_looks": looks},
+                    metrics={"validation_weighted_precision": sel.weighted_precision,
+                             "validation_weighted_recall": sel.weighted_recall, "validation_weighted_f1": sel.weighted_f1,
+                             "validation_weighted_ece": ece["ece"], "validation_predicted_positives": sel.predicted_positives,
+                             "validation_precision_lower_bound": lcb, "validation_kish_predicted_positives": kish_pp},
+                    tags={"stage": "freeze", "variant": variant, "threshold_status": sel.status},
+                    artifacts=[fdir / "threshold.json", fdir / "model-manifest.json", fdir / "validation-metrics.json",
+                               fdir / "SHA256SUMS"])
+    result = {"frozen_dir": str(fdir), "status": sel.status, "threshold": float(sel.threshold), "score_type": score_type,
+              "calibration_method": method, "validation": threshold_doc["validation"], "weighted_ece": ece["ece"],
+              "decision_region_weighted_ece": gate["decision_region_weighted_ece"], "fallback": sel.fallback,
+              "best_C_at_grid_boundary": manifest["best_C_at_grid_boundary"], "validation_looks": looks}
+    if sel.status == "experimental":
+        print("FOUNDER GATE: the validation threshold does not meet the production gate (weighted precision >= "
+              f"{floor}, one-sided 95% lower bound >= {floor}, Kish effective predicted positives >= {min_pp}). "
+              "The candidate is EXPERIMENTAL and the rules stay authoritative. Stop and ask before evaluate-final.")
+    if looks >= 3:
+        print(f"VALIDATION LOOK {looks}: validation precision is no longer quoted as an estimate; a fresh validation "
+              "draw is required before quoting it (protocol §7).")
+    return result
