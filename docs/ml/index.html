@@ -147,9 +147,9 @@
 
   <h2>Read further</h2>
   <ul>
-    <li><a href="../ML_TECHNICAL_REPORT.md">Technical report</a> — the full method, design and results.</li>
-    <li><a href="../ML_MODEL_CARD.md">Model card</a> — copied byte-for-byte out of the release bundle.</li>
-    <li><a href="../LABELLING_CRITERIA.md">Labelling criteria</a> — the written policy the labels follow.</li>
+    <li><a href="https://github.com/drkyoyodating/UCC-Demo/blob/main/docs/ML_TECHNICAL_REPORT.md">Technical report</a> — the full method, design and results.</li>
+    <li><a href="https://github.com/drkyoyodating/UCC-Demo/blob/main/docs/ML_MODEL_CARD.md">Model card</a> — copied byte-for-byte out of the release bundle.</li>
+    <li><a href="https://github.com/drkyoyodating/UCC-Demo/blob/main/docs/LABELLING_CRITERIA.md">Labelling criteria</a> — the written policy the labels follow.</li>
     <li><a href="../data/ml/release_v1.sha256">Release digests</a> ·
         <a href="../data/ml/frozen_candidate_v1.sha256">candidate, pre-registered before the test run</a> ·
         <a href="../data/ml/labels_v1.sha256">label digests</a></li>
@@ -276,7 +276,8 @@ fetch('../data/ml/lab_summary.json').then(function(r){ return r.json(); }).then(
     [{t:'stratum'},{t:'resolved',num:true},{t:'positives',num:true},{t:'model weighted precision'}],
     t.per_stratum.map(function(r){
       return [r.stratum, n(r.n), n(r.positives),
-              (r.model_wp.estimate==null && r.model_wp.lower==null) ? 'n/a — no predicted positive'
+              r.model_wp.estimate==null
+                ? 'no predicted positive — precision not defined, not poor'
                 : ci(r.model_wp)]; }));
 
   groupedBars(el('c-strata'), t.per_stratum.map(function(r){
