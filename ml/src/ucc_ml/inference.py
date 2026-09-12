@@ -371,3 +371,99 @@ def load_release_bundle(directory: Path, *, verify: bool = True, top_k: int = 10
                          threshold_status=str(threshold_doc["status"]), score_type=str(threshold_doc["score_type"]),
                          model_manifest=manifest, threshold_manifest=threshold_doc, feature_names=names, coef=coef,
                          top_k=int(top_k))
+
+
+# ---------------------------------------------------------------------------
+# Part 2 — predict_cases: the single inference path (Codex §9, contract K8)
+# ---------------------------------------------------------------------------
+import json  # noqa: E402
+from typing import Annotated, Literal  # noqa: E402
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints  # noqa: E402
+
+from ucc_ml import legacy  # noqa: E402
+from ucc_ml.features import build_feature_frame, top_contributions_from_matrix, transform_features  # noqa: E402
+
+MAX_NAME_CHARS = 300
+MAX_LENDERS = 20
+BoundedName = Annotated[str, StringConstraints(min_length=1, max_length=MAX_NAME_CHARS)]
+LenderName = Annotated[str, StringConstraints(max_length=MAX_NAME_CHARS)]
+
+
+class CaseInput(BaseModel):
+    """One borrower and its lender names. ``region`` is context, never a feature."""
+    model_config = ConfigDict(extra="forbid")
+    borrower_name: BoundedName
+    lender_names: list[LenderName] = Field(default_factory=list, max_length=MAX_LENDERS)
+    region: Literal["CO", "CT"]
+    case_id: str | None = None
+    borrower_name_clean: str | None = None          # batch passes the dataset's value; the API leaves None
+    lender_names_clean: list[str] | None = None
+
+
+class Prediction(BaseModel):
+    case_id: str | None
+    input_hash: str
+    release_id: str
+    score: float
+    score_type: Literal["calibrated_probability", "raw_score"]
+    decision: Literal["suggest_relevant", "review_needed"]
+    threshold: float
+    baseline_qualifies: bool
+    baseline_route: Literal["lender", "borrower", "both", "neither"]
+    top_feature_contributions: list[tuple[str, float]]   # ("<block>__<token>", weight), largest |weight| first
+
+
+def canonical_lenders(values) -> list[str]:
+    """Sorted unique trimmed non-blank lender names: the candidate table's lender-set rule (context pack §3,
+    ucc_ml.dataset.canonical_lender_set). Restated here because ucc_ml.dataset imports duckdb, which the serving image
+    does not carry; test_inference proves the two agree."""
+    out: set[str] = set()
+    for value in values or []:
+        if isinstance(value, str) and value.strip():
+            out.add(value.strip())
+    return sorted(out)
+
+
+def input_hash_for(borrower_name: str, lender_names: list[str], region: str) -> str:
+    payload = {"borrower_name": " ".join(str(borrower_name).split()),
+               "lender_names": sorted({" ".join(str(x).split()) for x in (lender_names or []) if str(x).strip()}),
+               "region": str(region)}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def cases_to_frame(cases: list[CaseInput]) -> pd.DataFrame:
+    rows = []
+    for c in cases:
+        lenders = canonical_lenders(c.lender_names)
+        clean = c.borrower_name_clean if c.borrower_name_clean is not None else legacy.normalize_name(c.borrower_name)[0]
+        if c.lender_names_clean is not None:
+            lenders_clean = [str(x) for x in c.lender_names_clean]
+        else:
+            lenders_clean = sorted({n for n in (legacy.normalize_name(l)[0] for l in lenders) if n})
+        rows.append({"borrower_name_raw": c.borrower_name, "borrower_name_clean": clean,
+                     "lender_names_raw": lenders, "lender_names_clean": lenders_clean})
+    return pd.DataFrame(rows, columns=["borrower_name_raw", "borrower_name_clean", "lender_names_raw", "lender_names_clean"])
+
+
+def predict_cases(cases: list[CaseInput], bundle: ReleaseBundle) -> list[Prediction]:
+    """Shared by score-batch (Task 14) and the API (Plan C). Transforms once, scores, explains; the frozen-rules
+    baseline comes from ucc_ml.legacy on the canonical lender set (contract K8)."""
+    if not cases:
+        return []
+    frame = build_feature_frame(cases_to_frame(cases))
+    X = transform_features(bundle.model.pipeline, frame)
+    _raw, scores = bundle.model.scores_from_matrix(X)
+    contribs = top_contributions_from_matrix(X, bundle.coef, bundle.feature_names, bundle.top_k)
+    out: list[Prediction] = []
+    for case, score, contrib in zip(cases, scores, contribs):
+        lenders = canonical_lenders(case.lender_names)
+        out.append(Prediction(
+            case_id=case.case_id, input_hash=input_hash_for(case.borrower_name, case.lender_names, case.region),
+            release_id=bundle.release_id, score=float(score), score_type=bundle.score_type,
+            decision="suggest_relevant" if float(score) >= bundle.threshold else "review_needed",
+            threshold=float(bundle.threshold), baseline_qualifies=legacy.baseline_qualifies(case.borrower_name, lenders),
+            baseline_route=legacy.baseline_route(case.borrower_name, lenders),
+            top_feature_contributions=[(str(n), float(w)) for n, w in contrib],
+        ))
+    return out
