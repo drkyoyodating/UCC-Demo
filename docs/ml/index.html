@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ML Lab — UCC Heavy Construction Equipment Finance</title>
+<style>
+  :root{
+    --co:#6b3fa0; --ct:#c0392b; --co-dim:#a37fc4; --ct-dim:#e0907f;
+    --ink:#1c1c1c; --mut:#6b6b6b; --line:#d2d2d2; --bg:#ffffff;
+    --bad:#b03030; --ok:#3f7a46;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    padding:16px}
+  .wrap{max-width:960px;margin:0 auto}
+  h1{font-size:21px;font-weight:750;letter-spacing:.1em;text-transform:uppercase;margin:8px 0 0}
+  .sub{font-size:11.5px;font-weight:650;letter-spacing:.13em;text-transform:uppercase;
+    color:#6a6a6a;margin:6px 0 0}
+  h2{font-size:13px;font-weight:750;letter-spacing:.12em;text-transform:uppercase;
+    color:#3a3a3a;margin:30px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  p{margin:9px 0}
+  a{color:#4a3a8a}
+  .back{display:inline-block;margin-bottom:6px;font-size:11.5px;font-weight:650;
+    letter-spacing:.13em;text-transform:uppercase;text-decoration:none;color:#5a5a5a}
+  .verdict{margin:18px 0 4px;padding:14px 16px;border:1px solid var(--line);border-radius:6px;
+    background:linear-gradient(158deg,#ffffff,#f6f6f6)}
+  .verdict b{color:var(--bad)}
+  .tiles{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 2px}
+  .stat{flex:1 1 150px;border:1px solid var(--line);border-radius:5px;padding:10px 12px;
+    background:linear-gradient(158deg,#ffffff,#f4f4f4)}
+  .stat b{display:block;font-size:20px;font-weight:750;font-variant-numeric:tabular-nums}
+  .stat span{display:block;font-size:10px;font-weight:650;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--mut);margin-top:3px}
+  .scroll{overflow-x:auto;margin:10px 0}
+  table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{font-size:10px;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+  td.num,th.num{text-align:right}
+  .mark{color:var(--bad);font-size:11px}
+  .note{font-size:12.5px;color:#444;line-height:1.6}
+  figure{margin:12px 0}
+  figcaption{font-size:11px;color:var(--mut);margin-top:5px;line-height:1.5}
+  svg{max-width:100%;height:auto;display:block}
+  ul{margin:8px 0;padding-left:20px} li{margin:5px 0}
+  code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:#f2f2f2;
+    padding:1px 4px;border-radius:3px}
+  #err{color:var(--bad);font-weight:650}
+  @media (max-width:520px){
+    body{padding:14px 16px}
+    h1{font-size:17px;letter-spacing:.06em}
+    .stat b{font-size:17px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../">&larr; back to the map</a>
+  <h1>Machine-learning screener</h1>
+  <p class="sub">Release <span id="rid">—</span> · built, measured once, and published</p>
+
+  <div class="verdict">
+    <p style="margin-top:0"><b>The result is negative, and that is the finding.</b> The model does not
+    beat the written rules it was built to improve on. The one quantity this whole exercise was
+    designed to measure — the precision of the review queue the model proposes over cases the rules
+    <em>reject</em> — came back at <b id="v-rq">—</b>.</p>
+    <p style="margin-bottom:0" class="note">The candidate was marked <code>experimental</code> on the
+    validation split <em>before</em> the test set was opened, and it stays that way. The rules remain
+    authoritative. Nothing about the map, the headline counts or <code>scope_all</code> changes.</p>
+  </div>
+  <p id="err"></p>
+
+  <h2>The question</h2>
+  <p>The existing screen is a written rules filter. It is precise, but it is a filter: whatever it
+  rejects is gone. The worthwhile question is whether a model can recover the relevant cases the rules
+  throw away, cheaply enough to be worth a person's time. So the model was never framed as a
+  replacement — it is <em>a review queue over rules-rejected cases, plus a second opinion on accepted
+  ones</em>, and the queue's precision was registered in advance as the primary measurement.</p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <h2>Model versus the frozen rules, on the held-out test set</h2>
+  <div class="scroll"><table id="t-main"></table></div>
+  <figure>
+    <svg id="c-main" viewBox="0 0 640 210" role="img"
+         aria-label="Weighted precision and recall for the model and the rules, with 95% intervals"></svg>
+    <figcaption>Dot is the design-weighted point estimate; the bar is its 95% interval. Where the dot
+    falls outside its own bar the pair is marked — the estimate is unsmoothed while the interval
+    carries a Jeffreys prior that keeps a cell with no observed error uncertain.</figcaption>
+  </figure>
+  <p class="note" id="delta"></p>
+
+  <h2>The primary quantity: the review queue</h2>
+  <div class="scroll"><table id="t-rq"></table></div>
+  <p class="note" id="rq-note"></p>
+
+  <h2>Why the answer is this answer</h2>
+  <figure>
+    <svg id="c-strata" viewBox="0 0 640 200" role="img"
+         aria-label="Resolved cases and positive cases in each stratum"></svg>
+    <figcaption>Resolved cases per stratum against the positives inside them. The two rejected strata
+    are where the review queue lives.</figcaption>
+  </figure>
+  <div class="scroll"><table id="t-strata"></table></div>
+  <p class="note">An interval running from near zero to near one is not a measurement of a model; it is
+  a measurement of a sample too small to tell a useless queue from an excellent one. This is a
+  denominator fact, and it was foreseeable — the same arithmetic set the validation lower bound below
+  the gate and forced the <code>experimental</code> verdict before the test was opened.</p>
+  <p class="note">Two further constraints are structural. Roughly half of the rules-rejected cases could
+  not be resolved <em>either way</em> by two independent passes reading the written policy — the filing
+  text often does not say enough to decide. And the model sees <strong>names only</strong>: Colorado's
+  collateral field is a 124-value category list and Connecticut has none.</p>
+  <div class="scroll"><table id="t-unres"></table></div>
+
+  <h2>How the sample was drawn, and how it is weighted</h2>
+  <p class="note">Labelling was drawn, not collected by convenience. Every estimate is weighted by
+  <code>1 / inclusion_probability</code> <em>per row</em>. The stratum average <code>N_h / n_h</code> is
+  shown below for orientation and is applied to no row — the two disagree here, because the sampling
+  design puts several rates inside a single stratum. A guard requires each held-out stratum's design
+  weights to reconstruct its population exactly; they do.</p>
+  <div class="scroll"><table id="t-weights"></table></div>
+
+  <h2>Labels</h2>
+  <p class="note">The two labelling rounds were produced under <em>different arrangements</em>, so each
+  is stated separately rather than pooled into one sentence — naming either alone would describe rows
+  it does not cover. Labelling used the written policy only; nothing was looked up.</p>
+  <div class="scroll"><table id="t-rounds"></table></div>
+  <figure>
+    <svg id="c-status" viewBox="0 0 640 120" role="img" aria-label="Label rows by adjudication status"></svg>
+    <figcaption>Label rows by adjudication status. <code>blind_unresolved</code> are cases the two
+    passes disagreed on, retained as undecided rather than adjudicated, and counted in the denominator.</figcaption>
+  </figure>
+
+  <h2>Scored across the whole population</h2>
+  <p class="note">The frozen model was run over every candidate case. The queue below is published as a
+  candidate list, not as a result: the measurement above does not establish its precision.</p>
+  <div class="tiles" id="tiles2"></div>
+  <div class="scroll"><table id="t-batch"></table></div>
+
+  <h2>What would change the result</h2>
+  <p>A test supplement drawn <em>after</em> freezing and stratified on the frozen decision — roughly 800
+  labels — would narrow the review-queue interval from about 0.59 wide to about 0.09. That is the
+  measurement worth making, and it needs labels, not a better classifier. It was deliberately not taken
+  here: it changes the sampling contract, and opening the test set first forecloses it.</p>
+
+  <h2>Read further</h2>
+  <ul>
+    <li><a href="../ML_TECHNICAL_REPORT.md">Technical report</a> — the full method, design and results.</li>
+    <li><a href="../ML_MODEL_CARD.md">Model card</a> — copied byte-for-byte out of the release bundle.</li>
+    <li><a href="../LABELLING_CRITERIA.md">Labelling criteria</a> — the written policy the labels follow.</li>
+    <li><a href="../data/ml/release_v1.sha256">Release digests</a> ·
+        <a href="../data/ml/frozen_candidate_v1.sha256">candidate, pre-registered before the test run</a> ·
+        <a href="../data/ml/labels_v1.sha256">label digests</a></li>
+    <li><a href="../data/ml/lab_summary.json">The JSON this page renders</a>, generated from the release bundle.</li>
+  </ul>
+  <p class="note" id="prov"></p>
+</div>
+
+<script>
+function el(id){ return document.getElementById(id); }
+function n(v){ return v==null ? '—' : Number(v).toLocaleString(); }
+function f(v,d){ return v==null ? 'n/a' : Number(v).toFixed(d==null?3:d); }
+function pct(v){ return v==null ? 'n/a' : (Number(v)*100).toFixed(1)+'%'; }
+function ci(c){
+  if(!c || (c.estimate==null && c.lower==null)) return 'n/a';
+  var s = f(c.estimate)+' ['+f(c.lower)+', '+f(c.upper)+']';
+  return c.outside ? s+' <span class="mark">(estimate outside interval)</span>' : s;
+}
+function rows(table, head, body){
+  var h = '<thead><tr>'+head.map(function(c){
+    return '<th'+(c.num?' class="num"':'')+'>'+c.t+'</th>'; }).join('')+'</tr></thead>';
+  var b = '<tbody>'+body.map(function(r){
+    return '<tr>'+r.map(function(c,i){
+      return '<td'+(head[i].num?' class="num"':'')+'>'+c+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody>';
+  table.innerHTML = h+b;
+}
+function tile(v,l){ return '<div class="stat"><b>'+v+'</b><span>'+l+'</span></div>'; }
+
+function barChart(svg, series, opts){
+  // series: [{label, estimate, lower, upper, outside, colour}] on a 0..1 axis
+  var W=640, H=opts.height||210, L=150, R=24, T=16, B=28;
+  var iw = W-L-R, s='';
+  for(var g=0; g<=5; g++){
+    var x = L + iw*g/5;
+    s += '<line x1="'+x+'" y1="'+T+'" x2="'+x+'" y2="'+(H-B)+'" stroke="#e8e8e8"/>';
+    s += '<text x="'+x+'" y="'+(H-B+16)+'" font-size="10" fill="#6b6b6b" text-anchor="middle">'+(g/5).toFixed(1)+'</text>';
+  }
+  var rowH = (H-T-B)/series.length;
+  series.forEach(function(d,i){
+    var cy = T + rowH*i + rowH/2;
+    var xl = L + iw*(d.lower==null?0:d.lower);
+    var xu = L + iw*(d.upper==null?0:d.upper);
+    s += '<text x="'+(L-10)+'" y="'+(cy+4)+'" font-size="11" fill="#1c1c1c" text-anchor="end">'+d.label+'</text>';
+    if(d.lower!=null){
+      s += '<line x1="'+xl+'" y1="'+cy+'" x2="'+xu+'" y2="'+cy+'" stroke="'+d.colour+'" stroke-width="7" stroke-linecap="round" opacity=".35"/>';
+      s += '<line x1="'+xl+'" y1="'+(cy-6)+'" x2="'+xl+'" y2="'+(cy+6)+'" stroke="'+d.colour+'" stroke-width="1.5"/>';
+      s += '<line x1="'+xu+'" y1="'+(cy-6)+'" x2="'+xu+'" y2="'+(cy+6)+'" stroke="'+d.colour+'" stroke-width="1.5"/>';
+    }
+    if(d.estimate!=null){
+      var xe = L + iw*d.estimate;
+      s += '<circle cx="'+xe+'" cy="'+cy+'" r="4.5" fill="'+d.colour+'"/>';
+      if(d.outside) s += '<circle cx="'+xe+'" cy="'+cy+'" r="8" fill="none" stroke="#b03030" stroke-width="1.5"/>';
+    }
+  });
+  svg.innerHTML = s;
+}
+
+function groupedBars(svg, items, opts){
+  var W=640, H=opts.height||200, L=110, R=20, T=14, B=30;
+  var iw=W-L-R, ih=H-T-B, max=0;
+  items.forEach(function(d){ d.values.forEach(function(v){ if(v.v>max) max=v.v; }); });
+  if(max<=0) max=1;
+  var s='', bw = iw/items.length;
+  items.forEach(function(d,i){
+    var x0 = L + bw*i, inner = bw*0.66, each = inner/d.values.length;
+    d.values.forEach(function(v,j){
+      var h = ih*(v.v/max), x = x0 + bw*0.17 + each*j, y = T+ih-h;
+      s += '<rect x="'+x+'" y="'+y+'" width="'+(each-3)+'" height="'+h+'" fill="'+v.colour+'"/>';
+      s += '<text x="'+(x+(each-3)/2)+'" y="'+(y-4)+'" font-size="10" fill="#3a3a3a" text-anchor="middle">'+n(v.v)+'</text>';
+    });
+    s += '<text x="'+(x0+bw/2)+'" y="'+(H-B+17)+'" font-size="10" fill="#1c1c1c" text-anchor="middle">'+d.label+'</text>';
+  });
+  s += '<line x1="'+L+'" y1="'+(T+ih)+'" x2="'+(W-R)+'" y2="'+(T+ih)+'" stroke="#d2d2d2"/>';
+  if(opts.legend){
+    opts.legend.forEach(function(g,i){
+      var lx = L + i*160;
+      s += '<rect x="'+lx+'" y="'+(T-10)+'" width="9" height="9" fill="'+g.colour+'"/>';
+      s += '<text x="'+(lx+13)+'" y="'+(T-2)+'" font-size="10" fill="#3a3a3a">'+g.label+'</text>';
+    });
+  }
+  svg.innerHTML = s;
+}
+
+fetch('../data/ml/lab_summary.json').then(function(r){ return r.json(); }).then(function(d){
+  var t = d.test, m = t.model, ru = t.rules, rq = t.review_queue;
+  el('rid').textContent = d.release_id;
+  el('v-rq').innerHTML = ci(rq.weighted_precision) + ' over ' + n(rq.n) + ' resolved rules-rejected cases';
+
+  el('tiles').innerHTML =
+    tile(d.status, 'candidate status') +
+    tile(n(t.n_resolved)+' / '+n(t.n_labelled), 'test cases resolved of labelled') +
+    tile(f(d.threshold,4), 'threshold, chosen on validation') +
+    tile(d.calibration_method, 'calibration');
+
+  rows(el('t-main'),
+    [{t:''},{t:'weighted precision'},{t:'weighted recall'},{t:'weighted F1'},{t:'TP/FP/FN/TN',num:true}],
+    [['model', ci(m.weighted_precision), ci(m.weighted_recall), ci(m.weighted_f1),
+      m.tp+'/'+m.fp+'/'+m.fn+'/'+m.tn],
+     ['frozen rules', ci(ru.weighted_precision), ci(ru.weighted_recall), ci(ru.weighted_f1),
+      ru.tp+'/'+ru.fp+'/'+ru.fn+'/'+ru.tn]]);
+
+  barChart(el('c-main'), [
+    {label:'model — precision',  estimate:m.weighted_precision.estimate, lower:m.weighted_precision.lower, upper:m.weighted_precision.upper, outside:m.weighted_precision.outside, colour:'#6b3fa0'},
+    {label:'rules — precision',  estimate:ru.weighted_precision.estimate, lower:ru.weighted_precision.lower, upper:ru.weighted_precision.upper, outside:ru.weighted_precision.outside, colour:'#a37fc4'},
+    {label:'model — recall',     estimate:m.weighted_recall.estimate, lower:m.weighted_recall.lower, upper:m.weighted_recall.upper, outside:m.weighted_recall.outside, colour:'#c0392b'},
+    {label:'rules — recall',     estimate:ru.weighted_recall.estimate, lower:ru.weighted_recall.lower, upper:ru.weighted_recall.upper, outside:ru.weighted_recall.outside, colour:'#e0907f'}
+  ], {height:210});
+
+  var dp = t.delta.delta_weighted_precision, dr = t.delta.delta_weighted_recall;
+  el('delta').innerHTML = 'Paired difference (model &minus; rules): precision ' + ci(dp) +
+    ' — <strong>' + t.verdict.delta_precision + '</strong>; recall ' + ci(dr) +
+    ' — <strong>' + t.verdict.delta_recall + '</strong>. Two secondary comparisons, not multiplicity-adjusted.';
+
+  rows(el('t-rq'),
+    [{t:'resolved rules-rejected cases',num:true},{t:'positives inside them',num:true},
+     {t:'model suggested',num:true},{t:'correct',num:true},{t:'weighted precision'}],
+    [[n(rq.n), n(rq.positives), n(rq.tp+rq.fp), n(rq.tp), ci(rq.weighted_precision)]]);
+  el('rq-note').innerHTML = 'In plain terms: across ' + n(rq.n) +
+    ' rules-rejected test cases the model made <strong>' + n(rq.tp+rq.fp) +
+    '</strong> suggestion, and it was wrong. The queue held <strong>' + n(rq.positives) +
+    '</strong> true positives and the model found none of them.';
+
+  rows(el('t-strata'),
+    [{t:'stratum'},{t:'resolved',num:true},{t:'positives',num:true},{t:'model weighted precision'}],
+    t.per_stratum.map(function(r){
+      return [r.stratum, n(r.n), n(r.positives),
+              (r.model_wp.estimate==null && r.model_wp.lower==null) ? 'n/a — no predicted positive'
+                : ci(r.model_wp)]; }));
+
+  groupedBars(el('c-strata'), t.per_stratum.map(function(r){
+    return {label:r.stratum, values:[{v:r.n,colour:'#a37fc4'},{v:r.positives,colour:'#6b3fa0'}]}; }),
+    {height:200, legend:[{label:'resolved cases',colour:'#a37fc4'},{label:'positives',colour:'#6b3fa0'}]});
+
+  rows(el('t-unres'),
+    [{t:'stratum'},{t:'labelled',num:true},{t:'unresolved',num:true},{t:'share unresolved',num:true}],
+    t.unresolved.map(function(r){
+      return [r.stratum||r.region, n(r.n_labelled), n(r.n_unresolved), pct(r.share_unresolved)]; }));
+
+  rows(el('t-weights'),
+    [{t:'stratum'},{t:'population N_h',num:true},{t:'labelled n_h',num:true},
+     {t:'average weight N_h/n_h (applied to no row)',num:true}],
+    t.weights.map(function(w){ return [w.stratum, n(w.N_h), n(w.n_h), f(w.w_h,1)]; }));
+
+  var L = d.labels;
+  rows(el('t-rounds'),
+    [{t:'round'},{t:'rows',num:true},{t:'policy'},{t:'arrangement'},{t:'blind-pass agreement',num:true}],
+    Object.keys(L.counts_by_round).sort().map(function(k){
+      var pa = L.pass_agreement[k];
+      return [k, n(L.counts_by_round[k]), L.policy_version_by_round[k], L.disclosure_by_round[k],
+              pa ? pct(pa.rate)+' ('+n(pa.agreed)+'/'+n(pa.n)+')' : '—']; }));
+
+  var st = Object.keys(L.counts_by_status).sort();
+  groupedBars(el('c-status'), st.map(function(k){
+    return {label:k, values:[{v:L.counts_by_status[k], colour: k==='blind_unresolved' ? '#c0392b' : '#6b3fa0'}]}; }),
+    {height:120});
+
+  el('tiles2').innerHTML =
+    tile(n(d.batch.rows), 'candidate cases scored') +
+    tile(n(d.batch.review_queue_suggested), 'proposed review queue') +
+    tile(n(d.batch.invalid_rows), 'rows refused as out of bounds');
+  rows(el('t-batch'),
+    [{t:'region'},{t:'rules outcome'},{t:'model decision'},{t:'cases',num:true}],
+    d.batch.by_region_decision_baseline.map(function(r){
+      return [r.region, r.baseline_qualifies ? 'accepted' : 'rejected', r.decision, n(r.n)]; }));
+
+  el('prov').innerHTML = 'Release <code>'+d.release_id+'</code>, source commit <code>'+
+    d.source_commit.slice(0,12)+'</code>. Intervals are a stratified cluster Bayesian bootstrap over '+
+    n(t.bootstrap.n_clusters)+' borrower clusters, '+n(t.bootstrap.n_resamples)+
+    ' resamples, seed '+t.bootstrap.seed+'. The test set was scored exactly once, behind a guard that refuses a second run.';
+}).catch(function(e){
+  el('err').textContent = 'Could not load ../data/ml/lab_summary.json — ' + e;
+});
+</script>
+</body>
+</html>

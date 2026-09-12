@@ -1,0 +1,402 @@
+{
+ "batch": {
+  "by_region_decision_baseline": [
+   {
+    "baseline_qualifies": false,
+    "decision": "review_needed",
+    "n": 833705,
+    "region": "CO"
+   },
+   {
+    "baseline_qualifies": true,
+    "decision": "review_needed",
+    "n": 14421,
+    "region": "CO"
+   },
+   {
+    "baseline_qualifies": false,
+    "decision": "suggest_relevant",
+    "n": 4421,
+    "region": "CO"
+   },
+   {
+    "baseline_qualifies": true,
+    "decision": "suggest_relevant",
+    "n": 52650,
+    "region": "CO"
+   },
+   {
+    "baseline_qualifies": false,
+    "decision": "review_needed",
+    "n": 312177,
+    "region": "CT"
+   },
+   {
+    "baseline_qualifies": true,
+    "decision": "review_needed",
+    "n": 3448,
+    "region": "CT"
+   },
+   {
+    "baseline_qualifies": false,
+    "decision": "suggest_relevant",
+    "n": 680,
+    "region": "CT"
+   },
+   {
+    "baseline_qualifies": true,
+    "decision": "suggest_relevant",
+    "n": 4755,
+    "region": "CT"
+   }
+  ],
+  "invalid_rows": 5,
+  "review_queue_suggested": 5101,
+  "rows": 1226257
+ },
+ "calibration_method": "sigmoid",
+ "candidates": {
+  "by_region": {
+   "CO": 905197,
+   "CT": 321060
+  },
+  "total": 1226257
+ },
+ "fallback": "precision_lower_bound_or_effective_support_below_floor",
+ "generated_from": "ml/artifacts/releases/80b952a3e9a8 (build-release)",
+ "labels": {
+  "counts_by_round": {
+   "main_v1": 2880,
+   "pilot_v1": 240
+  },
+  "counts_by_status": {
+   "blind_repeat": 520,
+   "blind_unresolved": 83,
+   "founder_adjudicated": 5,
+   "founder_confirmed": 0,
+   "model_agreed": 2512
+  },
+  "disclosure_by_round": {
+   "main_v1": "model-labelled, two independent blind passes, disagreements retained as unresolved",
+   "pilot_v1": "model-labelled, founder-adjudicated"
+  },
+  "pass_agreement": {
+   "main_v1": {
+    "agreed": 2317,
+    "n": 2400,
+    "rate": 0.9654166666666667
+   },
+   "pilot_v1": {
+    "agreed": 195,
+    "n": 200,
+    "rate": 0.975
+   }
+  },
+  "policy_version_by_round": {
+   "main_v1": "label_policy_v2",
+   "pilot_v1": "label_policy_v1"
+  },
+  "repeat_consistency": {
+   "pass_a": {
+    "consistent": 260,
+    "n": 260,
+    "rate": 1.0
+   },
+   "pass_b": {
+    "consistent": 260,
+    "n": 260,
+    "rate": 1.0
+   }
+  }
+ },
+ "release_id": "80b952a3e9a8",
+ "score_type": "calibrated_probability",
+ "source_commit": "6c204059b43634aef35a127c1c368a150fe5ef45",
+ "status": "experimental",
+ "test": {
+  "bootstrap": {
+   "level": 0.95,
+   "method": "stratified cluster Bayesian bootstrap with Jeffreys pseudo-counts (prior 0.5)",
+   "n_clusters": 709,
+   "n_resamples": 2000,
+   "seed": 20260912,
+   "straddling_groups": 8
+  },
+  "delta": {
+   "delta_weighted_f1": {
+    "estimate": -0.09455025365347136,
+    "lower": -0.14893003588516932,
+    "outside": false,
+    "upper": -0.030536425696453005
+   },
+   "delta_weighted_precision": {
+    "estimate": 0.006992727012365418,
+    "lower": -0.11110345596962114,
+    "outside": false,
+    "upper": 0.02317274894081184
+   },
+   "delta_weighted_recall": {
+    "estimate": -0.17347253888830383,
+    "lower": -0.21559356359847734,
+    "outside": false,
+    "upper": -0.0463779921825064
+   }
+  },
+  "model": {
+   "fn": 73,
+   "fp": 1,
+   "tn": 209,
+   "tp": 170,
+   "weighted_f1": {
+    "estimate": 0.8850903459772931,
+    "lower": 0.795211944330242,
+    "outside": false,
+    "upper": 0.9023747042601522
+   },
+   "weighted_precision": {
+    "estimate": 0.997771843283837,
+    "lower": 0.8715528505642136,
+    "outside": true,
+    "upper": 0.9948277516876445
+   },
+   "weighted_recall": {
+    "estimate": 0.7952772022901712,
+    "lower": 0.6893543597611057,
+    "outside": false,
+    "upper": 0.8424643082730016
+   }
+  },
+  "n_labelled": 800,
+  "n_resolved": 453,
+  "negatives": 210,
+  "per_region": [
+   {
+    "model_wp": {
+     "estimate": 0.9976094424633732,
+     "lower": 0.8751570949471155,
+     "outside": false,
+     "upper": 0.9980517299903431
+    },
+    "model_wr": {
+     "estimate": 0.8169012615042326,
+     "lower": 0.7123004113842527,
+     "outside": false,
+     "upper": 0.8705687117855543
+    },
+    "n": 248,
+    "positives": 123,
+    "region": "CO",
+    "rules_wp": {
+     "estimate": 0.9906494795704205,
+     "lower": 0.949381406220464,
+     "outside": false,
+     "upper": 0.9976448025384663
+    },
+    "rules_wr": {
+     "estimate": 0.9682908984680151,
+     "lower": 0.8330101809615279,
+     "outside": false,
+     "upper": 0.9781557547665557
+    }
+   },
+   {
+    "model_wp": {
+     "estimate": 1.0,
+     "lower": 0.5228715497143541,
+     "outside": true,
+     "upper": 0.9980043487274624
+    },
+    "model_wr": {
+     "estimate": 0.5837691660076025,
+     "lower": 0.3907696396849701,
+     "outside": false,
+     "upper": 0.7276533030330172
+    },
+    "n": 205,
+    "positives": 120,
+    "region": "CT",
+    "rules_wp": {
+     "estimate": 0.9920424403183024,
+     "lower": 0.9504252937867276,
+     "outside": false,
+     "upper": 0.9975894014727625
+    },
+    "rules_wr": {
+     "estimate": 0.9732377477868204,
+     "lower": 0.5190957849694753,
+     "outside": false,
+     "upper": 0.9754751963054701
+    }
+   }
+  ],
+  "per_stratum": [
+   {
+    "model_wp": {
+     "estimate": 1.0,
+     "lower": 0.9727773921761537,
+     "outside": true,
+     "upper": 0.9999926345174461
+    },
+    "n": 118,
+    "positives": 117,
+    "stratum": "CO:accepted"
+   },
+   {
+    "model_wp": {
+     "estimate": 0.0,
+     "lower": 0.001022611530884898,
+     "outside": true,
+     "upper": 0.974937739450421
+    },
+    "n": 130,
+    "positives": 6,
+    "stratum": "CO:rejected"
+   },
+   {
+    "model_wp": {
+     "estimate": 1.0,
+     "lower": 0.9564965344234644,
+     "outside": true,
+     "upper": 0.9999892423752937
+    },
+    "n": 119,
+    "positives": 118,
+    "stratum": "CT:accepted"
+   },
+   {
+    "model_wp": {
+     "estimate": null,
+     "lower": 0.0015588920488292658,
+     "outside": false,
+     "upper": 0.9980138394927168
+    },
+    "n": 86,
+    "positives": 2,
+    "stratum": "CT:rejected"
+   }
+  ],
+  "positives": 243,
+  "review_queue": {
+   "fn": 8,
+   "fp": 1,
+   "n": 216,
+   "positives": 8,
+   "tn": 207,
+   "tp": 0,
+   "weighted_precision": {
+    "estimate": 0.0,
+    "lower": 0.028030246615799732,
+    "outside": true,
+    "upper": 0.9483300659991353
+   }
+  },
+  "rules": {
+   "fn": 8,
+   "fp": 2,
+   "tn": 208,
+   "tp": 235,
+   "weighted_f1": {
+    "estimate": 0.9796405996307644,
+    "lower": 0.8924159664027352,
+    "outside": true,
+    "upper": 0.9778895960214321
+   },
+   "weighted_precision": {
+    "estimate": 0.9907791162714715,
+    "lower": 0.9516773100507512,
+    "outside": false,
+    "upper": 0.9964591510971503
+   },
+   "weighted_recall": {
+    "estimate": 0.968749741178475,
+    "lower": 0.8213325812018316,
+    "outside": true,
+    "upper": 0.9681845995728823
+   }
+  },
+  "unresolved": [
+   {
+    "n_labelled": 120,
+    "n_unresolved": 2,
+    "region": "CO",
+    "share_unresolved": 0.01666666666666667,
+    "stratum": "CO:accepted"
+   },
+   {
+    "n_labelled": 314,
+    "n_unresolved": 184,
+    "region": "CO",
+    "share_unresolved": 0.529151742032581,
+    "stratum": "CO:rejected"
+   },
+   {
+    "n_labelled": 120,
+    "n_unresolved": 1,
+    "region": "CT",
+    "share_unresolved": 0.007894736842105263,
+    "stratum": "CT:accepted"
+   },
+   {
+    "n_labelled": 246,
+    "n_unresolved": 160,
+    "region": "CT",
+    "share_unresolved": 0.44065331020661686,
+    "stratum": "CT:rejected"
+   },
+   {
+    "n_labelled": 800,
+    "n_unresolved": 347,
+    "region": "total",
+    "share_unresolved": 0.47655227050601723,
+    "share_unresolved_among_predicted_positive": 0.02765966045720785,
+    "stratum": "all",
+    "weighting": "N_h-weighted over strata"
+   }
+  ],
+  "verdict": {
+   "delta_precision": "not distinguishable",
+   "delta_recall": "lower",
+   "primary": "review-queue weighted precision (rules-rejected strata), pre-registered",
+   "review_queue_weighted_precision": {
+    "estimate": 0.0,
+    "estimate_outside_interval": true,
+    "lower": 0.028030246615799732,
+    "n_failed": 0,
+    "n_resamples": 2000,
+    "upper": 0.9483300659991353
+   },
+   "text": "review-queue precision 0.0 [0.028030246615799732, 0.9483300659991353]; model recall vs rules: lower; model precision vs rules: not distinguishable (95% intervals; two secondary comparisons, not multiplicity-adjusted)"
+  },
+  "weights": [
+   {
+    "N_h": 12703,
+    "n_h": 120,
+    "stratum": "CO:accepted",
+    "unsampled": false,
+    "w_h": 105.85833333333333
+   },
+   {
+    "N_h": 164929,
+    "n_h": 314,
+    "stratum": "CO:rejected",
+    "unsampled": false,
+    "w_h": 525.2515923566879
+   },
+   {
+    "N_h": 1292,
+    "n_h": 120,
+    "stratum": "CT:accepted",
+    "unsampled": false,
+    "w_h": 10.766666666666667
+   },
+   {
+    "N_h": 62056,
+    "n_h": 246,
+    "stratum": "CT:rejected",
+    "unsampled": false,
+    "w_h": 252.260162601626
+   }
+  ]
+ },
+ "threshold": 0.8612124616682861
+}
