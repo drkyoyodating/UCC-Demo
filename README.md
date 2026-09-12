@@ -134,6 +134,8 @@ output. Pins in `requirements.lock.txt` are load-bearing.
 `src/heavy_filter.py` holds the criteria — two lists and nothing else.
 `docs/LABELLING_CRITERIA.md` is the full written reference.
 
+**[`docs/ML_TECHNICAL_REPORT.md`](docs/ML_TECHNICAL_REPORT.md)** reports the ML screener end to end: the sampling design and design weights, the two label rounds and their different arrangements, the pre-registered evaluation protocol, and the single held-out test run. The result is negative and is reported as such — the model does not beat the frozen rules, and the rules remain authoritative.
+
 ## Licence
 
 MIT. Source data is public record.
