@@ -2,7 +2,7 @@
 
 A machine-learning screener was built for the UCC heavy-construction-equipment demo, evaluated once
 on a held-out test set under a protocol registered before the test was opened, and published. This
-report states what was built, what it measured, and why the answer is what it is.
+report states what was built, what it measured, and where the evidence runs out.
 
 **What it is.** A classifier that reads *only the borrower and lender names* on a UCC filing — no
 collateral text, no documents — and decides whether that filing is heavy-construction equipment
