@@ -1028,6 +1028,24 @@ def pooled_disclosure(by_round: Mapping[str, str]) -> str:
     return "mixed by round -- " + "; ".join(f"{r}: {d}" for r, d in sorted(by_round.items()))
 
 
+def pooled_policy_version(by_round, fallback: str) -> str:
+    """One policy-version string for a file whose rounds may sit under different label policies.
+
+    The same rule as pooled_disclosure, and it exists for the same reason. THREE writers publish this
+    scalar -- the metrics labels block, the frozen model manifest, and the release dataset manifest --
+    and three copies of one rule drift apart, which is the defect this project has already paid for
+    more than once. `fallback` is the manifest's own scalar, used only when no map is stated; a
+    manifest that states no map is itself the claim that one policy covers every round.
+    """
+    by_round = {str(k): str(v) for k, v in (by_round or {}).items()}
+    if not by_round:
+        return str(fallback)
+    distinct = set(by_round.values())
+    if len(distinct) == 1:
+        return next(iter(distinct))
+    return "mixed by round -- " + "; ".join(f"{r}: {v}" for r, v in sorted(by_round.items()))
+
+
 def write_labels_digest(public_data_dir: Path, labels_csv: Path, manifest_path: Path, manifest: dict) -> Path:
     path = Path(public_data_dir) / "labels_v1.sha256"
     status = manifest["counts_by_status"]

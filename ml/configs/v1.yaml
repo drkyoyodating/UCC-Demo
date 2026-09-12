@@ -96,6 +96,20 @@ training:
   seed: 20260912
   cv_folds: 5                            # StratifiedGroupKFold inside TRAIN only
   c_grid: [0.1, 1.0, 10.0]
+  # DELIBERATE, and the reason is measured rather than assumed. Both variants select C=10, the top of
+  # this grid, so every release publishes best_C_at_grid_boundary: true. A boundary flag usually means
+  # the search was cut short -- here it does not. Extending the grid on TRAIN only (same seed 20260912,
+  # same StratifiedGroupKFold(5), same weights; 0 validation and 0 test rows read), mean out-of-fold
+  # weighted AP for the shipping variant borrower_lender is:
+  #     C=0.1 0.8494 | C=1 0.8822 | C=10 0.9281 | C=30 0.9362 | C=100 0.9376 | C=300 0.9397 | C=1000 0.9414
+  #     and onward 3e3 0.9422 | 1e4 0.9428 | 3e4 0.9428 | 1e5 0.9428
+  # It never turns over. The curve creeps to an asymptote, so NO finite grid clears the flag for the
+  # variant that ships -- widening only moves it. The gain from C=10 to C=1000 is 0.0133, about 0.28 of
+  # one fold's sd (0.047), and the best-vs-runner-up margin is 0.0018, ~4% of a fold sd, with 3 folds
+  # improving and 2 worsening. Meanwhile out-of-fold log-loss is MINIMISED at C=300 and degrades past it
+  # (0.1031 -> 0.1100 at 1e3 -> 0.1321 at 1e5), and that quality feeds the ECE gate and the threshold.
+  # So the grid stays, the flag is published, and this curve is the answer to it.
+  # (borrower_only, which does not ship, peaks at C=300 and falls at C=1000 -- it alone could clear it.)
   class_weight: null
   weighting: inverse_inclusion_probability_normalised   # 1/inclusion_probability per ROW, mean 1 within each fit.
                                          # NOT N_h/n_h in TRAIN: the pilot and the main round draw the same stratum

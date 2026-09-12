@@ -56,7 +56,17 @@ def _fmt(x, digits: int = 3) -> str:
 
 
 def _interval(c: dict) -> str:
-    return f"{_fmt(c['estimate'])} [{_fmt(c['lower'])}, {_fmt(c['upper'])}]"
+    """An estimate with its interval, and a mark when the estimate falls OUTSIDE its own interval.
+
+    The point estimate is the design-weighted plug-in; the interval is smoothed by the Jeffreys
+    pseudo-mass, which deliberately keeps a cell holding no observed false positive uncertain. Near the
+    boundary the two disagree -- a precision of 1.000 against an interval ending at 0.997 -- and that is
+    the prior working, not a weighting error. evaluation.BootstrapResult.to_dict has always computed
+    this flag and metrics.json has always carried it; the card simply never read it, so the one
+    document a reader actually opens showed the pair with nothing to say they were computed differently.
+    """
+    text = f"{_fmt(c['estimate'])} [{_fmt(c['lower'])}, {_fmt(c['upper'])}]"
+    return f"{text} (estimate outside interval)" if c.get("estimate_outside_interval") else text
 
 
 def _ci(block: dict, key: str) -> str:
@@ -205,6 +215,10 @@ def render_model_card(release_id: str, model_manifest: dict, threshold_doc: dict
                      f"{_ci(row['rules'], 'weighted_recall')}")
     lines += [
         "", "## Limitations",
+        "- A figure marked `(estimate outside interval)` is not a contradiction to reconcile: the point "
+        "estimate is the design-weighted plug-in, while the interval is smoothed by a Jeffreys prior that "
+        "keeps a cell with no observed error uncertain, so at the boundary the smoothed interval ends "
+        "below an unsmoothed 1.000. Read the interval, not the point, wherever the mark appears.",
         "- Inputs are names only: no collateral text (CO's field is a 124-value category list, CT has none), no documents.",
         "- Rates estimate performance on the RESOLVABLE population (cases a screener could label RELEVANT or NOT_RELEVANT), design-weighted by 1 / inclusion_probability — the sampling rate of the (split, stratum, screen cell) each case was actually drawn from, since the boundary screen puts several rates inside one stratum. N_h / n_h is reported per stratum as that stratum's AVERAGE weight and is applied to no row. The INSUFFICIENT_EVIDENCE share of the population and of the model's suggestions is reported above with its interval.",
         "- The split is by borrower group within this snapshot; it is not a chronological forecast and not a transfer claim to other states.",
@@ -261,12 +275,9 @@ def run_build_release(config_path: Path) -> Path:
     policy_by_round = {str(k): str(v) for k, v in (lm.get("policy_version_by_round") or {}).items()}
     if not policy_by_round:
         policy_by_round = {str(r): str(lm["policy_version"]) for r in lm.get("rounds") or []}
-    if policy_by_round:
-        distinct = set(policy_by_round.values())
-        policy_version = (next(iter(distinct)) if len(distinct) == 1 else "mixed by round -- " +
-                          "; ".join(f"{r}: {v}" for r, v in sorted(policy_by_round.items())))
-    else:
-        policy_version = str(lm["policy_version"])
+    from ucc_ml.labeling import pooled_policy_version
+
+    policy_version = pooled_policy_version(policy_by_round, str(lm["policy_version"]))
     # The DISCLOSURE map is deliberately not invented when it is absent: one arrangement really does
     # cover some label files, and the card's single-sentence form is the honest rendering for those.
     # When the map IS stated, the pooled sentence is rebuilt from it and must agree exactly -- the same

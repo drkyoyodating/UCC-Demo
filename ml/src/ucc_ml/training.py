@@ -268,12 +268,10 @@ def labels_summary(table: pd.DataFrame, split: str, labels_manifest: Mapping) ->
     # pooled_disclosure(disclosure_by_round), so a mismatch there can only be a tampered or stale file.
     # The policy scalar is deliberately left as the config default beside the map, so raising on that
     # would refuse the pipeline's own current output and stop every metrics document.
+    from ucc_ml.labeling import pooled_policy_version
+
     policy_by_round = labels_manifest.get("policy_version_by_round")
-    policy_version = labels_manifest["policy_version"]
-    if policy_by_round:
-        distinct = set(policy_by_round.values())
-        policy_version = (next(iter(distinct)) if len(distinct) == 1 else "mixed by round -- " +
-                          "; ".join(f"{r}: {v}" for r, v in sorted(policy_by_round.items())))
+    policy_version = pooled_policy_version(policy_by_round, labels_manifest["policy_version"])
     sub = table[table.split == split]
     block = {**{k: labels_manifest[k] for k in K3_LABEL_STATISTICS}, "policy_version": policy_version,
              "split": split, "n_labelled": int(len(sub)), "n_resolved": int(sub.y.notna().sum()),
@@ -651,6 +649,8 @@ def run_freeze_candidate(config_path: Path, *, force: bool = False) -> dict:
     }
     write_json(fdir / "threshold.json", threshold_doc)
     train_resolved = resolved(table[table.split == "train"])
+    from ucc_ml.labeling import pooled_policy_version          # local: labeling imports from training
+
     manifest = {
         "model_version": "v1", "variant": variant, "C": float(cv_doc["best_C"]),
         "best_C_at_grid_boundary": bool(cv_doc["best_C_at_grid_boundary"]), "calibration_method": method,
@@ -666,7 +666,16 @@ def run_freeze_candidate(config_path: Path, *, force: bool = False) -> dict:
         "pipeline_sha256": sha256_file(fdir / "pipeline.joblib"),
         "python_version": prov["python_version"], "sklearn_version": prov["sklearn_version"],
         "numpy_version": prov["numpy_version"], "source_commit": prov["source_commit"], "source_dirty": prov["source_dirty"],
-        "config_sha256": cfg.config_sha256, "lock_sha256": prov["lock_sha256"], "labels_policy_version": prov["policy_version"],
+        "config_sha256": cfg.config_sha256, "lock_sha256": prov["lock_sha256"],
+        # THIS FILE IS THE FIRST OF THE FOUR MANIFESTS HASHED INTO release_id, so anything false here is
+        # baked into a permanent public identifier that cannot be corrected without changing the id and
+        # invalidating every link to it. prov["policy_version"] is the CONFIG DEFAULT, label_policy_v1 --
+        # the pilot's policy, 240 of 3,120 rows -- while main_v1's 2,880 rows sit under label_policy_v2.
+        # Publishing that scalar alone states the smaller round's policy as if it covered the file. The
+        # map travels beside the scalar and the scalar is rebuilt from it by the shared rule.
+        "labels_policy_version": pooled_policy_version(prov["policy_version_by_round"], prov["policy_version"]),
+        "labels_policy_version_by_round": dict(prov["policy_version_by_round"]),
+        "label_disclosure_by_round": dict(prov["label_disclosure_by_round"]),
         "candidates_sha256": prov["candidates_sha256"], "splits_sha256": prov["splits_sha256"],
         "labels_sha256": prov["labels_sha256"], "label_disclosure": prov["label_disclosure"],
     }
