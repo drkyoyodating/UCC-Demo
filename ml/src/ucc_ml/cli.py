@@ -94,6 +94,27 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_arg(sp)
     sp.add_argument("--dry-run", action="store_true", help="print the allocation and draw nothing")
     sp.set_defaults(func=cmd_make_main_round)
+    sp = sub.add_parser("build-release", help="package the frozen candidate and its single TEST result into ml/artifacts/releases/<release_id>/")
+    _add_config_arg(sp)
+    sp.set_defaults(func=cmd_build_release)
+    sp = sub.add_parser("evaluate-final", help="score TEST once with the frozen candidate (exit 2 when TEST was already evaluated)")
+    _add_config_arg(sp)
+    sp.add_argument("--force-i-know", action="store_true",
+                    help="re-run TEST; the first result is kept on disk and the override is logged")
+    sp.set_defaults(func=cmd_evaluate_final)
+    sp = sub.add_parser("freeze-candidate", help="calibrate on out-of-fold TRAIN scores, choose the threshold on VALIDATION, freeze")
+    _add_config_arg(sp)
+    sp.add_argument("--force-refreeze", action="store_true",
+                    help="re-freeze although TEST_EVALUATED.json exists (starts a NEW candidate that needs a fresh benchmark)")
+    sp.set_defaults(func=cmd_freeze_candidate)
+    sp = sub.add_parser("score-batch", help="score every candidate with a release into ml/data/predictions/<release_id>.parquet")
+    _add_config_arg(sp)
+    sp.add_argument("--release-dir", type=Path, default=None,
+                    help="release directory (default: the only one under ml/artifacts/releases)")
+    sp.set_defaults(func=cmd_score_batch)
+    sp = sub.add_parser("train", help="grouped CV grid inside TRAIN, refit, out-of-fold scores, MLflow")
+    _add_config_arg(sp)
+    sp.set_defaults(func=cmd_train)
     # --- subcommands are registered below this line by later tasks (keep alphabetical) ---
     return parser
 
@@ -521,6 +542,57 @@ def cmd_make_main_round(ns: argparse.Namespace) -> int:
     })
     print(f"wrote {paths.main_cases} rows={len(drawn)} sha256={sha256_file(paths.main_cases)}")
     print(f"wrote {paths.main_manifest}")
+    return 0
+
+
+def cmd_build_release(ns: argparse.Namespace) -> int:
+    from ucc_ml.inference import run_build_release
+
+    path = run_build_release(ns.config)
+    print(f"release built at {path}")
+    print(path.name)
+    return 0
+
+
+def cmd_evaluate_final(ns: argparse.Namespace) -> int:
+    from ucc_ml.evaluation import FinalEvaluationRefused, run_evaluate_final
+
+    try:
+        run_evaluate_final(ns.config, force_i_know=ns.force_i_know)
+    except FinalEvaluationRefused as exc:
+        print(exc)
+        return 2
+    return 0
+
+
+def cmd_freeze_candidate(ns: argparse.Namespace) -> int:
+    import json
+
+    from ucc_ml.training import run_freeze_candidate
+
+    result = run_freeze_candidate(ns.config, force=ns.force_refreeze)
+    keys = ("status", "threshold", "score_type", "calibration_method", "fallback", "validation",
+            "decision_region_weighted_ece", "best_C_at_grid_boundary", "validation_looks")
+    print(json.dumps({k: result[k] for k in keys}, indent=2, sort_keys=True))
+    return 0
+
+
+def cmd_score_batch(ns: argparse.Namespace) -> int:
+    from ucc_ml.inference import run_score_batch
+
+    print(run_score_batch(ns.config, ns.release_dir))
+    return 0
+
+
+def cmd_train(ns: argparse.Namespace) -> int:
+    from ucc_ml.training import run_train
+
+    report = run_train(ns.config)
+    for variant, block in report["variants"].items():
+        print(f"{variant}: best C={block['best_C']} (grid boundary: {block['best_C_at_grid_boundary']}) "
+              f"validation weighted AP={block['validation']['weighted_average_precision']}")
+    rules = report["rules"]["validation"]
+    print(f"rules validation: wP={rules['weighted_precision']} wR={rules['weighted_recall']}")
     return 0
 
 
