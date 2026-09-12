@@ -35,3 +35,6 @@ ml/reports/
 
 # --- macOS ---
 .DS_Store
+
+# editable-install build metadata
+ml/src/*.egg-info/
