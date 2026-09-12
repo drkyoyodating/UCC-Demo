@@ -124,3 +124,33 @@ def test_ablation_round_has_its_own_files_and_never_collides_with_the_main_round
     assert ablation.cases.name == "ablation_cases.parquet"
     assert ablation.report != main.report
     assert ablation.key != main.key and ablation.preregistration != main.preregistration
+
+
+def test_a_rendered_v2_brief_carries_no_roster_in_its_instructions():
+    """The gate that matters is on the INSTRUCTION half of the brief, not the whole file.
+
+    The data chunk necessarily carries real lender strings -- CATERPILLAR FINANCIAL SERVICES,
+    WAGNER EQUIPMENT CO -- because the labeller has to read them to judge them. Scanning the whole
+    brief for brand names therefore reports a leak on every honest round. What must never appear is
+    a roster in the part of the brief that TELLS the labeller what qualifies.
+    """
+    import pandas as pd
+
+    from ucc_ml.labeling import QUEUE_COLUMNS, render_labeller_brief
+
+    chunk = pd.DataFrame(
+        [["a" * 64, "BOBS EXCAVATION LLC", "CATERPILLAR FINANCIAL SERVICES CORPORATION", "DENVER", "CO"],
+         ["b" * 64, "SMITH LAW OFFICES PC", "WELLS FARGO BANK NA", "HARTFORD", "CT"]],
+        columns=list(QUEUE_COLUMNS))
+    brief = render_labeller_brief(
+        (SPECS / "labeller_prompt_v1.md").read_text(encoding="utf-8"),
+        (SPECS / "label_policy_v2.md").read_text(encoding="utf-8"),
+        chunk)
+
+    marker = "# Your queue chunk"
+    assert marker in brief
+    instructions, data = brief[:brief.index(marker)].upper(), brief[brief.index(marker):].upper()
+    for roster_word in WITHDRAWN:
+        assert roster_word not in instructions, f"the brief teaches {roster_word}"
+    # and the data half must still show the labeller the real lender string
+    assert "CATERPILLAR FINANCIAL SERVICES CORPORATION" in data
