@@ -1,0 +1,5 @@
+{
+  "decided_at": "2026-09-12T11:50:20Z",
+  "decision": "skip",
+  "note": "The live API is not deployed. docs/data/ml/manifest.json keeps api_url null and the Lab page says the API is unavailable."
+}
